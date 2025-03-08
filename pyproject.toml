@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "lorad"
+version = "0.0.1"
+description = "Locchan's Radio"
+authors = ["Jaroslaw Locchansky <locchansky@gmail.com>"]
+license = "GPLv2"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+mutagen = "==1.47.0"
+feedparser = "==6.0.11"
+beautifulsoup4 = "==4.13.3"
+openai = "==1.65.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
