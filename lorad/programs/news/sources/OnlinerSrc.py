@@ -3,9 +3,9 @@ from time import mktime
 import feedparser
 import requests
 from bs4 import BeautifulSoup
-from lorad.newsagency.News import News
-from lorad.newsagency.database.NewsDB import NewsDB
-from lorad.newsagency.sources.GenericSrc import GenericSource
+from lorad.programs.news.News import News
+from lorad.programs.news.database.NewsDB import NewsDB
+from lorad.programs.news.sources.GenericSrc import GenericSource
 from lorad.utils.logger import get_logger
 
 logger = get_logger()
@@ -17,7 +17,7 @@ class OnlinerSource(GenericSource):
         "https://money.onliner.by/feed",
         "https://tech.onliner.by/feed"
     ]
-    name = "Издательство онлайнер"
+    name = "Онлайнер"
 
     def __init__(self, db_conn : NewsDB):
         self.db_conn = db_conn

@@ -1,8 +1,8 @@
 import os
 from yandex_music import Client as YaMuClient, Track
 
-from lorad.connectors.Connector import Connector
-from lorad.connectors.yandex.Radio import Radio
+from lorad.music.Connector import Connector
+from lorad.music.yandex.Radio import Radio
 from lorad.utils.logger import get_logger
 from __main__ import TEMPDIR
 
@@ -37,6 +37,7 @@ class YaMu(Connector):
     def next_track(self):
         return self.__next_track()
 
+    # TODO: Add support for non-radio tracklists (charts, playlists)
     def __next_track(self) -> Track:
         if self.radio_started:
             track = self.radio.play_next()
@@ -55,7 +56,7 @@ class YaMu(Connector):
 
             # For debugging so that we don't download everytime we re-launch
             if not os.path.exists(self.current_track_path):
-                logger.info(f"Downloading track [{self.current_track_name}] to {self.current_track_path}")
+                logger.info(f"Downloading track [{self.current_track_name}]")
                 self.current_track.download(filename=self.current_track_path, bitrate_in_kbps=self.bitrate)
 
     def __set_current_track(self, track) -> None:

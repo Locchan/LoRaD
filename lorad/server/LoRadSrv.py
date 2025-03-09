@@ -24,6 +24,7 @@ class LoRadServer(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
+        LoRadServer.thread_count += 1
         if LoRadServer.connected_clients > 10:
             logger.error("Too many clients! DDOS?")
             os._exit(1)
@@ -49,4 +50,6 @@ class LoRadServer(BaseHTTPRequestHandler):
         except Exception as e:
             logger.info(f"A client disconnected: ({e.__class__.__name__}) Connected clients: {LoRadServer.connected_clients-1}")
             logger.exception(e)
-        LoRadServer.connected_clients -= 1
+        finally:
+            LoRadServer.thread_count -= 1
+            LoRadServer.connected_clients -= 1
