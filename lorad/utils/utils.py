@@ -1,5 +1,7 @@
 import json
 
+from lorad.utils.logger import get_logger
+
 
 def read_config(filepath="config.json"):
     with open(filepath, "r") as config_file:
@@ -8,3 +10,17 @@ def read_config(filepath="config.json"):
         except Exception as e:
             print(f"Could not read config file {filepath}: {e.__class__.__name__}")
             exit(1)
+
+def splash():
+    logger = get_logger()
+    splash = """
+  _           _____       _____  
+ | |         |  __ \     |  __ \ 
+ | |     ___ | |__) |__ _| |  | |
+ | |    / _ \|  _  // _` | |  | |
+ | |___| (_) | | \ \ (_| | |__| |
+ |______\___/|_|  \_\__,_|_____/ 
+"""
+    lines = splash.split("\n")
+    for aline in lines:
+        logger.info(aline)

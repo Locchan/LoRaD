@@ -1,6 +1,6 @@
 from time import sleep
-from lorad.newsagency.database.NewsDB import NewsDB
-from lorad.newsagency.sources.OnlinerSrc import OnlinerSource
+from lorad.programs.news.database.NewsDB import NewsDB
+from lorad.programs.news.sources.OnlinerSrc import OnlinerSource
 from lorad.utils.utils import read_config
 
 def parse_news():
