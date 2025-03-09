@@ -7,15 +7,11 @@ from lorad.utils.utils import read_config
 logger = get_logger()
 
 class GenericPrg():
-    def __init__(self, start_times: list[datetime.time], jingle_path: str, name: str, preparation_needed_mins: int):
+    def __init__(self, start_times: list[datetime.time], name: str, preparation_needed_mins: int):
         config = read_config()
         self.name = name
         self.start_times  = start_times
         self.preparation_needed_mins = preparation_needed_mins
-        if jingle_path is not None:
-            self.jingle_path = os.path.join(config["DATADIR"], jingle_path)
-        else:
-            self.jingle_path = None
         self.prepared_program = None
         self.preparations_started = False
         self.program_running = False
@@ -42,13 +38,9 @@ class GenericPrg():
                     return
             logger.info(f"Running a scheduled program: [{self.name}]...")
             streamer.stop_carousel()
-            if self.jingle_path is not None:
-                streamer.serve_file(self.jingle_path)
             for anum, afile in enumerate(self.prepared_program):
                 logger.info(f"Program: {self.name}; Track {anum+1}/{len(self.prepared_program)}")
                 streamer.serve_file(afile)
-            if self.jingle_path is not None:
-                streamer.serve_file(self.jingle_path)
             logger.info(f"Program [{self.name}] finished. Restarting carousel.")
         except Exception as e:
             logger.error(f"Failed to run the program: {e.__class__.__name__}")

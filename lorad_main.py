@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from http.server import ThreadingHTTPServer
 import os
 from threading import Thread

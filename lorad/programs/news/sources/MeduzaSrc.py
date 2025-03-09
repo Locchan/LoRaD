@@ -10,14 +10,11 @@ from lorad.utils.logger import get_logger
 
 logger = get_logger()
 
-class OnlinerSrc(GenericSource):
+class MdzSrc(GenericSource):
     rss_feeds = [
-        "https://people.onliner.by/feed",
-        "https://auto.onliner.by/feed",
-        "https://money.onliner.by/feed",
-        "https://tech.onliner.by/feed"
+        "https://meduza.io/rss/news",
     ]
-    name = "Онлайнер"
+    name = "Медуза"
 
     def __init__(self, db_conn : NewsDB):
         self.db_conn = db_conn
@@ -28,40 +25,33 @@ class OnlinerSrc(GenericSource):
         return self._get_news_impl()
 
     def _get_news_impl(self):
-        logger.info("Getting news from Onliner...")
+        logger.info("Getting news from Meduza...")
         self.get_rss_data()
-        self.get_news_text()
         news = []
         for anitem in self.rss_data:
-            news.append(News(OnlinerSrc.name, anitem["title"], datetime.fromtimestamp(mktime(anitem["date"])), anitem["text"]))
-        logger.info(f"Got {len(news)} news from Onliner.")
+            news.append(News(MdzSrc.name, anitem["title"], datetime.fromtimestamp(mktime(anitem["date"])), anitem["text"]))
+        logger.info(f"Got {len(news)} news from Meduza.")
         return news
 
     def get_rss_data(self):
-        for anrss in OnlinerSrc.rss_feeds:
+        for anrss in MdzSrc.rss_feeds:
             feed = feedparser.parse(anrss)
 
             if feed.status == 200:
                 for entry in feed.entries:
                     # Creating a temporary News object to generate hash and check if this piece of news is already in the database
-                    tmpnews = News(OnlinerSrc.name, entry.title, date_published=datetime.fromtimestamp(mktime(entry.published_parsed)))
+                    tmpnews = News(MdzSrc.name, entry.title, date_published=datetime.fromtimestamp(mktime(entry.published_parsed)))
                     if not self.db_conn.check_hash_exists(tmpnews.hash):
                         self.rss_data.append({
                             "title": entry.title,
                             "link": entry.link,
-                            "date": entry.published_parsed
+                            "date": entry.published_parsed,
+                            "text": self.sanitize_rss_text(entry.description)
                         })
             else:
                 logger.error("Failed to get RSS feed. Status code: ", feed.status)
 
-    def get_news_text(self):
-        for anrss in self.rss_data:
-            response = requests.get(anrss["link"], headers=GenericSource.headers)
-            soup = BeautifulSoup(response.text, 'html.parser')
-            news_raw = soup.find_all(class_='news-text')
-            news_text = ""
-            for anitem in news_raw:
-                paragraphs = anitem.find_all("p")
-                for aparagraph in paragraphs:
-                    news_text += aparagraph.text + "\n"
-            anrss["text"] = news_text
+    def sanitize_rss_text(self, text_input):
+        sanitized_text = text_input.replace("\xa0", " ").replace("<p>", "\n").replace("<\\p>", "\n")
+        sanitized_text.strip()
+        return sanitized_text

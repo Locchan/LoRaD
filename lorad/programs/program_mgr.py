@@ -20,7 +20,6 @@ def register_programs():
                 for anitem in config["ENABLED_PROGRAMS"][aprogram.name]["start_times"]:
                     dates.append(datetime.datetime.strptime(anitem, '%H:%M').time())
                 ENABLED_PROGRAMS.append(aprogram(dates,
-                                                 config["ENABLED_PROGRAMS"][aprogram.name]["jingle_path"],
                                                  config["ENABLED_PROGRAMS"][aprogram.name]["preparation_needed_mins"]))
             except Exception as e:
                 logger.error(f"Could not enable the program: {e.__class__.__name__}")
