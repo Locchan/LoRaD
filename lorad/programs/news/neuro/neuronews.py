@@ -1,6 +1,7 @@
+import re
 from time import sleep
 from lorad.programs.news.database.NewsDB import NewsDB
-from lorad.programs.news.sources.OnlinerSrc import OnlinerSource
+from lorad.programs.news.sources.OnlinerSrc import OnlinerSrc
 from lorad.utils.logger import get_logger
 from lorad.utils.utils import read_config
 from openai import OpenAI
@@ -16,7 +17,7 @@ def get_summary(openai_api_key, body_full):
         messages=[
             {
                 "role": "system",
-                "content": "Веди себя как диктор на радио."
+                "content": "Веди себя как диктор на радио, зачитывающий новости."
             },
             {
                 "role": "user",
@@ -70,6 +71,12 @@ def get_most_important_news_by_source(source: str, titles_to_give: int, importan
         model="gpt-4o-mini"
     )
     chat_response = chat_completion.choices[0].message.content
-    important_idx = [int(x) - 1 for x in chat_response.split(",")]
+    filtered_response = filter_text(chat_response)
+    important_idx = [int(x) - 1 for x in filtered_response.split(",")]
     important_hashes = [neurified_news[idx]["hash"] for idx in important_idx]
     return important_hashes 
+
+# Removing all text, leaving only numbers and punctuation.
+#  NN is stoopid, sometimes answers with words even when clearly instructed not to do so.
+def filter_text(text):
+    return re.sub(r'[^\d\W]', '', text)

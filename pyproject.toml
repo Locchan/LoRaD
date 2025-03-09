@@ -1,10 +1,9 @@
 [tool.poetry]
 name = "lorad"
-version = "0.0.2"
+version = "0.0.3"
 description = "Locchan's Radio"
 authors = ["Jaroslaw Locchansky <locchansky@gmail.com>"]
-license = "GPLv2"
-readme = "README.md"
+packages = [{include = "lorad"}]
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -14,6 +13,7 @@ beautifulsoup4 = "==4.13.3"
 openai = "==1.65.4"
 google-cloud-texttospeech = "==2.25.0"
 ffmpeg-python = "==0.2.0"
+yandex-music = "==2.2.0"
 
 [build-system]
 requires = ["poetry-core"]

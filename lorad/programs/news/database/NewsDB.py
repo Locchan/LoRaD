@@ -87,3 +87,23 @@ class NewsDB():
         ''', (hash,))
         data = cursor.fetchall()
         return(data)
+    
+    def get_unread_news(self):
+        cursor = self.connection.cursor()
+        cursor.execute(f'''
+            SELECT * FROM news
+            WHERE NOT used OR used IS NULL
+            AND date_published > DATETIME("now", "-12 hour")
+        ''')
+        data = cursor.fetchall()
+        return(data)
+    
+    def mark_as_read(self, hashlist: list[str]):
+        cursor = self.connection.cursor()
+        for anitem in hashlist:
+            cursor.execute(f'''
+            UPDATE news
+            SET used = true
+            WHERE hash = ?
+            ''', (anitem,))
+        self.connection.commit()
