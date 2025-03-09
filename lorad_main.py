@@ -31,7 +31,7 @@ yandex_music.initialize()
 carousel_providers.append(yandex_music)
 
 logger.info("Starting LoRaD...")
-server = ThreadingHTTPServer(("0.0.0.0", 8085), LoRadServer)
+server = ThreadingHTTPServer(("0.0.0.0", config["LISTEN_PORT"]), LoRadServer)
 
 streamer = Streamer(carousel_providers, server)
 streamer_thread = Thread(name="Streamer", target=streamer.carousel)
