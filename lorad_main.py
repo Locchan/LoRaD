@@ -2,15 +2,19 @@
 
 from http.server import ThreadingHTTPServer
 import os
+import signal
 from threading import Thread
 from time import sleep
 from lorad.programs.news.neuro.neuronews import neurify_news
 from lorad.programs.news.newsparser import parse_news
 from lorad.programs.program_mgr import prg_sched_loop
 from lorad.utils.logger import get_logger
-from lorad.utils.utils import read_config, splash
+from lorad.utils.utils import read_config, signal_stop, splash
 
 logger = get_logger()
+
+signal.signal(signal.SIGTERM, signal_stop)
+signal.signal(signal.SIGINT, signal_stop)
 
 splash()
 
