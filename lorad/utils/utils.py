@@ -1,8 +1,8 @@
 import json
 import os
+import signal
 
 from lorad.utils.logger import get_logger
-
 
 def read_config(filepath="config.json"):
     if "CFGFILE_PATH" in os.environ:
@@ -13,6 +13,11 @@ def read_config(filepath="config.json"):
         except Exception as e:
             print(f"Could not read config file {filepath}: {e.__class__.__name__}")
             exit(1)
+
+def signal_stop(_signo, _stack_frame):
+    logger = get_logger()
+    logger.info(f"Caught {signal.Signals(_signo).name}. Shutting down...")
+    os._exit(0)
 
 def splash():
     logger = get_logger()
