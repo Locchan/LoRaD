@@ -17,9 +17,9 @@ class GenericPrg():
         self.program_running = False
 
     def prepare_program(self):
+        self.preparations_started = True
         logger.info(f"Starting to prepare program: {self.name}.")
         logger.info(f"Program will start in {self.preparation_needed_mins} minutes.")
-        self.preparations_started = True
         self.prepared_program = self._prepare_program_impl() 
     
     def _prepare_program_impl(self):
@@ -28,6 +28,7 @@ class GenericPrg():
     def start_program(self):
         if self.prepared_program is None:
             logger.error(f"Can't run program [{self.name}]: not prepared!")
+            self.preparations_started = False
             return
         try:
             from __main__ import streamer
