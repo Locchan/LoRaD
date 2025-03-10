@@ -1,8 +1,6 @@
 from datetime import datetime
 from time import mktime
 import feedparser
-import requests
-from bs4 import BeautifulSoup
 from lorad.programs.news.News import News
 from lorad.programs.news.database.NewsDB import NewsDB
 from lorad.programs.news.sources.GenericSrc import GenericSource

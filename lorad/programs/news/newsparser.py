@@ -12,5 +12,5 @@ def parse_news():
         news = []
         for asource in sources:
             news = asource.get_news()
-        db.add_news(news)
+            db.add_news(news)
         sleep(config["NEWS_PARSER_PERIOD_MIN"] * 60)
