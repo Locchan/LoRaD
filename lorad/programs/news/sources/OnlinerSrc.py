@@ -10,6 +10,9 @@ from lorad.utils.logger import get_logger
 
 logger = get_logger()
 
+# TODO: fix this shit
+#  sometimes has ads for goods from the end of the news page
+#  this wastes NN tokens!
 class OnlinerSrc(GenericSource):
     rss_feeds = [
         "https://people.onliner.by/feed",

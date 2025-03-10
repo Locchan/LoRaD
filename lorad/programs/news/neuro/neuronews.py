@@ -42,7 +42,7 @@ def neurify_news():
                 db.add_neuro_to_existing(anews["hash"], summary)
                 success += 1
             except Exception as e:
-                logger.error(f"Could not neurify a piece of news: {e.__class__.__name__}")
+                logger.warn(f"Could not neurify a piece of news: {e.__class__.__name__}")
         logger.info(f"Neurified {success} news objects.")
         sleep(config["NEWS_NEURIFIER_PERIOD_MIN"] * 60)
 
