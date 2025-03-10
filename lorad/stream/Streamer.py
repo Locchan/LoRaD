@@ -29,6 +29,8 @@ class Streamer():
         logger.debug("Entering carousel")
         while True:
             if self.carousel_enabled:
+                if not self.current_connector.initialized:
+                    self.current_connector.initialize()
                 filepath = self.current_connector.get_current_track_file()
                 # Serve chunks and exit when the end of the file is reached
                 self.serve_file(filepath)

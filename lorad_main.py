@@ -30,8 +30,6 @@ from lorad.music.yandex.YaMu import YaMu
 from lorad.server.LoRadSrv import LoRadServer
 
 yandex_music = YaMu(config["YAMU_TOKEN"], config["BITRATE_KBPS"])
-yandex_music.initialize()
-
 carousel_providers.append(yandex_music)
 
 logger.info("Starting LoRaD...")

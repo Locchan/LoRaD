@@ -1,5 +1,9 @@
 class Connector():
     def __init__(self):
+        self.initialized = False
+        pass
+
+    def initialize(self):
         pass
 
     def download_current_track(self):
