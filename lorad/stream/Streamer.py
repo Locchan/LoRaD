@@ -103,9 +103,9 @@ class Streamer():
             #  The code below is to compensate for being such a fast boi
             #  We know the track duration and we know how long we've been transferring it
             #   so we sleep the difference after we're done with transferring the track
-            if not self.interrupt:
-                serve_end = datetime.datetime.now().timestamp()
-                serve_delay = math.ceil(track_end_time - serve_end) + 1
+            serve_end = datetime.datetime.now().timestamp()
+            serve_delay = math.ceil(track_end_time - serve_end) + 1
+            if not self.interrupt and serve_delay > 0:
                 logger.info(f"Serve delay is {serve_delay}.")
                 sleep(serve_delay)
         finally:
