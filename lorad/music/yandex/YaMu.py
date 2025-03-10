@@ -10,6 +10,7 @@ logger = get_logger()
 
 class YaMu(Connector):
     def __init__(self, token, bitrate):
+        super().__init__()
         self.bitrate : int = bitrate
         self.client : YaMuClient = YaMuClient(token).init()
         self.radio : Radio = None
@@ -29,6 +30,7 @@ class YaMu(Connector):
             self.radio_started = True
             self.__set_current_track(track)
             logger.info("Yandex Music initialized.")
+            self.initialized = True
             return track
         else:
             logger.warn("Radio is already started, but initialize was called. Returning current track...")
