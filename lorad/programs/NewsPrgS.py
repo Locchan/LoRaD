@@ -16,7 +16,7 @@ class NewsPrgS(GenericPrg):
         super().__init__(start_times, NewsPrgS.name, preparation_needed_mins)
         self.config = read_config()
         self.db = NewsDB(self.config["DBDIR"])
-        self.jingle_path = os.path.join(self.config["DATADIR"], "resources", self.config["ENABLED_PROGRAMS"][NewsPrgS.name]["jingle_path"])
+        self.jingle_path = os.path.join(self.config["RESDIR"], self.config["ENABLED_PROGRAMS"][NewsPrgS.name]["jingle_path"])
 
     def _prepare_program_impl(self):
         news = self.db.get_unread_news()
