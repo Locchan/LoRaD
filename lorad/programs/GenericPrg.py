@@ -26,12 +26,12 @@ class GenericPrg():
         pass
 
     def start_program(self):
+        if self.prepared_program is None:
+            logger.error(f"Can't run program [{self.name}]: not prepared!")
+            return
         try:
             from __main__ import streamer
             self.program_running = True
-            if self.prepared_program is None:
-                logger.error(f"Can't run program [{self.name}]: not prepared!")
-                return
             for aprogram in self.prepared_program:
                 if not os.path.exists(aprogram):
                     logger.error(f"Can't run program [{self.name}]: file [{aprogram}] does not exist!")
