@@ -1,4 +1,5 @@
 import datetime
+from threading import Thread
 from time import sleep
 from lorad.programs.GenericPrg import GenericPrg
 from lorad.programs.NewsPrgS import NewsPrgS
@@ -34,13 +35,13 @@ def prg_sched_loop():
                 if is_now_the_minute(atime):
                     if not aprogram.program_running:
                         logger.debug("Starting a program")
-                        aprogram.start_program()
-                        break
+                        program_start_thread = Thread(name=f"PrgRunner", target=aprogram.start_program)
+                        program_start_thread.start()
                 if is_now_the_minute(atime, 0 - aprogram.preparation_needed_mins):
                     if not aprogram.preparations_started:
                         logger.debug("Starting program preparation")
-                        aprogram.prepare_program()
-                        break
+                        program_prep_thread = Thread(name=f"PrgPrep", target=aprogram.prepare_program)
+                        program_prep_thread.start()
         sleep(20)
 
 def is_now_the_minute(time_obj, offset_mins = 0):
