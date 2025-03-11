@@ -48,7 +48,7 @@ enabled_threads = [
 if "NEURONEWS" in config["ENABLED_FEATURES"]:
     enabled_threads.append(Thread(name="NewsParser", target=parse_news))
     enabled_threads.append(Thread(name="Neuro", target=neurify_news))
-    enabled_threads(Thread(name="ProgramMgr", target=prg_sched_loop))
+    enabled_threads.append(Thread(name="ProgramMgr", target=prg_sched_loop))
 
 # Sleeps are helping to avoid scrambled module startup logs
 for athread in enabled_threads:
