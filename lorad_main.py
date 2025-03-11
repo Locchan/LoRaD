@@ -8,7 +8,7 @@ from time import sleep
 from lorad.programs.news.neuro.neuronews import neurify_news
 from lorad.programs.news.newsparser import parse_news
 from lorad.programs.program_mgr import prg_sched_loop
-from lorad.utils.logger import get_logger
+from lorad.utils.logger import get_logger, setdebug
 from lorad.utils.utils import read_config, signal_stop, splash
 
 logger = get_logger()
@@ -20,6 +20,9 @@ splash()
 
 logger.info("Loading config...")
 config = read_config("config.json")
+
+if "DEBUG" in config and config["DEBUG"]:
+    setdebug()
 
 carousel_providers = []
 

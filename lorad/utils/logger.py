@@ -12,7 +12,7 @@ else:
 
 loggers = {}
 
-default_level = logging.DEBUG
+default_level = logging.INFO
 
 
 def get_stream_handlers(level=logging.INFO):
