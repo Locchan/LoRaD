@@ -34,43 +34,30 @@ carousel_providers.append(yandex_music)
 
 logger.info("Starting LoRaD...")
 server = ThreadingHTTPServer(("0.0.0.0", config["LISTEN_PORT"]), LoRadServer)
-
+logger.info(f"Enabled features: {config['ENABLED_FEATURES']}")
 streamer = Streamer(carousel_providers, server)
-streamer_thread = Thread(name="Streamer", target=streamer.carousel)
-server_thread = Thread(name="HTTPServer", target=server.serve_forever)
-news_parser_thread = Thread(name="NewsParser", target=parse_news)
-neuro_thread = Thread(name="Neuro", target=neurify_news)
-program_thread = Thread(name="ProgramMgr", target=prg_sched_loop)
+
+enabled_threads = [
+    Thread(name="Streamer", target=streamer.carousel),
+    Thread(name="HTTPServer", target=server.serve_forever)
+]
+
+if "NEURONEWS" in config["ENABLED_FEATURES"]:
+    enabled_threads.append(Thread(name="NewsParser", target=parse_news))
+    enabled_threads.append(Thread(name="Neuro", target=neurify_news))
+    enabled_threads(Thread(name="ProgramMgr", target=prg_sched_loop))
 
 # Sleeps are helping to avoid scrambled module startup logs
-streamer_thread.start()
-sleep(0.2)
-server_thread.start()
-sleep(0.2)
-program_thread.start()
-sleep(0.2)
-news_parser_thread.start()
-sleep(0.2)
-neuro_thread.start()
-sleep(0.2)
+for athread in enabled_threads:
+    athread.start()
+    sleep(0.2)
 
 logger.info("All threads started.")
 streamer.start_carousel()
 
 while True:
-    if not streamer_thread.is_alive():
-        logger.error("Carousel thread died! Restarting...")
-        os._exit(1)
-    if not server_thread.is_alive():
-        logger.error("Server thread died! Restarting...")
-        os._exit(1)
-    if not news_parser_thread.is_alive():
-        logger.error("News parser thread died! Restarting...")
-        os._exit(1)
-    if not neuro_thread.is_alive():
-        logger.error("Neuro thread died! Restarting...")
-        os._exit(1)
-    if not program_thread.is_alive():
-        logger.error("Program manager thread died! Restarting...")
-        os._exit(1)
+    for athread in enabled_threads:
+        if not athread.is_alive:
+            logger.error(f"A thread named [{athread.name}] died! Crashing!")
+            os._exit(1)
     sleep(5)
