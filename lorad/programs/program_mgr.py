@@ -44,6 +44,7 @@ def prg_sched_loop():
                         program_prep_thread.start()
         sleep(20)
 
-def is_now_the_minute(time_obj, offset_mins = 0):
-    dt = datetime.datetime.now()
-    return dt.hour == time_obj.hour and dt.minute == (time_obj.minute + offset_mins)
+def is_now_the_minute(time_obj: datetime.time, offset_mins: int = 0):
+    now = datetime.datetime.now()
+    time_to_check = time_obj + offset_mins
+    return f"{now.time().hour}:{now.time().minute}" == f"{time_to_check.time().hour}:{time_to_check.time().minute}"

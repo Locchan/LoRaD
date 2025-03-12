@@ -33,5 +33,5 @@ def splash():
     for aline in lines:
         logger.info(aline)
     if "VERSION" in os.environ:
-        logger.info({os.environ["VERSION"]})
+        logger.info(os.environ["VERSION"])
         logger.info("")
