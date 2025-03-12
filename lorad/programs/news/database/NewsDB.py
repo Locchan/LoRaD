@@ -29,7 +29,7 @@ class NewsDB():
                 title TEXT NOT NULL,
                 body_raw TEXT NOT NULL,
                 source TEXT NOT NULL,
-                body_neuro TEXT,
+                body_prepared TEXT,
                 date_published DATETIME,
                 used BOOLEAN
                 );
@@ -42,13 +42,17 @@ class NewsDB():
         logger.debug(f"Adding {len(news)} news...")
         for anews in news:
             cursor = self.connection.cursor()
-            cursor.execute('INSERT OR IGNORE INTO news (hash, title, body_raw, date_published, source) VALUES (?, ?, ?, ?, ?)',
-                            (anews.hash, anews.title, anews.body_unprepared, anews.date_published, anews.source))
+            if anews.neurification_needed:
+                cursor.execute('INSERT OR IGNORE INTO news (hash, title, body_raw, date_published, source) VALUES (?, ?, ?, ?, ?)',
+                                (anews.hash, anews.title, anews.body_unprepared, anews.date_published, anews.source))
+            else:
+                cursor.execute('INSERT OR IGNORE INTO news (hash, title, body_raw, body_prepared, date_published, source) VALUES (?, ?, ?, ?, ?, ?)',
+                                                (anews.hash, anews.title, anews.body_unprepared, anews.body_unprepared,anews.date_published, anews.source))
         self.connection.commit()
     
     def add_neuro_to_existing(self, hash, neuro_body):
         cursor = self.connection.cursor()
-        cursor.execute('UPDATE news SET body_neuro = ? where hash = ?',(neuro_body, hash))
+        cursor.execute('UPDATE news SET body_prepared = ? where hash = ?',(neuro_body, hash))
         self.connection.commit()
 
     def check_hash_exists(self, hash) -> bool:
@@ -61,7 +65,7 @@ class NewsDB():
         cursor = self.connection.cursor()
         cursor.execute(f'''
             SELECT * FROM news
-            WHERE body_neuro IS NULL AND (used IS NULL OR NOT used) AND date_published > DATETIME("now", "-6 hour")
+            WHERE body_prepared IS NULL AND (used IS NULL OR NOT used) AND date_published > DATETIME("now", "-6 hour")
             ORDER BY date_published DESC
             LIMIT {limit}
         ''')
@@ -72,7 +76,7 @@ class NewsDB():
         cursor = self.connection.cursor()
         cursor.execute(f'''
             SELECT * FROM news
-            WHERE body_neuro IS NOT NULL AND source = ?
+            WHERE body_prepared IS NOT NULL AND source = ?
             ORDER BY date_published DESC
             LIMIT {limit}
         ''', (source,))

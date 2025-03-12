@@ -12,10 +12,10 @@ def voice_news(news_hash):
     logger.debug(f"Voicing news: {news_hash}")
     try:
         news = db.get_news_by_hash(news_hash)
-        if news[0]["body_neuro"] is None:
+        if news[0]["body_prepared"] is None:
             return
         client = texttospeech.TextToSpeechClient.from_service_account_info(config["GOOGLE_CLOUD_API_USERDATA"])
-        input_text = texttospeech.SynthesisInput(text=news[0]["body_neuro"])
+        input_text = texttospeech.SynthesisInput(text=news[0]["body_prepared"])
 
         voice = texttospeech.VoiceSelectionParams(
             language_code="ru-RU",

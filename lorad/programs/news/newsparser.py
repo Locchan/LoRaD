@@ -8,7 +8,7 @@ def parse_news():
     config = read_config()
     db = NewsDB(config["DBDIR"])
     while True:
-        sources = [OnlinerSrc(db), MdzSrc(db)]
+        sources = [MdzSrc(db)]
         news = []
         for asource in sources:
             news = asource.get_news()

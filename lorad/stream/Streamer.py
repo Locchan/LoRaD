@@ -77,7 +77,7 @@ class Streamer():
             track_info = MP3(filepath).info
             seconds_per_chunk = self.chunk_size_bytes / (track_info.bitrate / 8)
             sleep_time = (math.floor(seconds_per_chunk * 100) - 1) / 100.0
-            logger.info(f"Strarting to serve the next track...")
+            logger.info(f"Starting to serve the next track...")
             logger.info(f"Track bitrate: {int(track_info.bitrate/1000)}kbps")
             logger.info(f"Seconds per chunk (approx.): {seconds_per_chunk}; Chunk size: {self.chunk_size}kB")
             logger.info(f"Traffic per client (approx.): {int(self.chunk_size / seconds_per_chunk)}kBps")

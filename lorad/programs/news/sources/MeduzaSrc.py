@@ -27,7 +27,7 @@ class MdzSrc(GenericSource):
         self.get_rss_data()
         news = []
         for anitem in self.rss_data:
-            news.append(News(MdzSrc.name, anitem["title"], datetime.fromtimestamp(mktime(anitem["date"])), anitem["text"]))
+            news.append(News(MdzSrc.name, anitem["title"], datetime.fromtimestamp(mktime(anitem["date"])), anitem["text"], neurification_needed=False))
         logger.info(f"Got {len(news)} news from Meduza.")
         return news
 
