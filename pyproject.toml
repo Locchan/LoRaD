@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "lorad"
-version = "0.0.5"
+version = "0.5"
 description = "Locchan's Radio"
 authors = ["Jaroslaw Locchansky <locchansky@gmail.com>"]
 packages = [{include = "lorad"}]

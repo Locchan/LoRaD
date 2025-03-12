@@ -52,7 +52,7 @@ class LoRadServer(BaseHTTPRequestHandler):
         # When we're proxied, self.client address will have our proxy IP inside, not the clients IP
         ip_from_headers = self.headers.get('X-Real-IP')
         if ip_from_headers is not None:
-            self.client_address[0] = ip_from_headers
+            self.client_address = (ip_from_headers, self.client_address[1])
 
         while True:
             client_id = hashlib.sha256((self.client_address[0] + str(self.client_address[1])).encode("utf-8")).hexdigest()[:4]
