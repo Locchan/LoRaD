@@ -33,18 +33,19 @@ def neurify_news():
     db = NewsDB(config["DBDIR"])
     logger.info("NeuroNews started...")
     while True:
-        logger.info("Neurifying news...")
         nn_news = db.get_non_neurified_news()
-        success = 0
-        for anews in nn_news:
-            try:
-                summary = get_summary(config["OPENAI_API_KEY"], anews["body_raw"])
-                db.add_neuro_to_existing(anews["hash"], summary)
-                success += 1
-            except Exception as e:
-                logger.warn(f"Could not neurify a piece of news: {e.__class__.__name__}")
-        logger.info(f"Neurified {success} news objects.")
-        sleep(config["NEWS_NEURIFIER_PERIOD_MIN"] * 60)
+        if len(nn_news) > 0:
+            logger.info("Neurifying news...")
+            success = 0
+            for anews in nn_news:
+                try:
+                    summary = get_summary(config["OPENAI_API_KEY"], anews["body_raw"])
+                    db.add_neuro_to_existing(anews["hash"], summary)
+                    success += 1
+                except Exception as e:
+                    logger.warn(f"Could not neurify a piece of news: {e.__class__.__name__}")
+            logger.info(f"Neurified {success} news objects.")
+            sleep(config["NEWS_NEURIFIER_PERIOD_MIN"] * 60)
 
 def get_most_important_news_by_source(source: str, titles_to_give: int, important_to_ask: int) -> list[str]:
     config = read_config()

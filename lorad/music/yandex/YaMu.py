@@ -1,5 +1,6 @@
 import os
 from yandex_music import Client as YaMuClient, Track
+import yandex_music
 
 from lorad.music.Connector import Connector
 from lorad.music.yandex.Radio import Radio
@@ -9,9 +10,10 @@ from __main__ import TEMPDIR
 logger = get_logger()
 
 class YaMu(Connector):
-    def __init__(self, token, bitrate):
+    def __init__(self, token, bitrate, fallback_bitrate=128):
         super().__init__()
         self.bitrate : int = bitrate
+        self.fallback_bitrate : int = fallback_bitrate
         self.client : YaMuClient = YaMuClient(token).init()
         self.radio : Radio = None
         self.radio_started : bool = False
@@ -59,7 +61,11 @@ class YaMu(Connector):
             # For debugging so that we don't download everytime we re-launch
             if not os.path.exists(self.current_track_path):
                 logger.info(f"Downloading track [{self.current_track_name}]")
-                self.current_track.download(filename=self.current_track_path, bitrate_in_kbps=self.bitrate)
+                try:
+                    self.current_track.download(filename=self.current_track_path, bitrate_in_kbps=self.bitrate)
+                except yandex_music.exceptions.InvalidBitrateError:
+                    logger.warn(f"Could not download the track with correct bitrate. Falling back to {self.fallback_bitrate}kbps")
+                    self.current_track.download(filename=self.current_track_path, bitrate_in_kbps=self.fallback_bitrate)
 
     def __set_current_track(self, track) -> None:
         self.current_track = track
