@@ -10,6 +10,7 @@ WORKDIR /tmp/lorad
 COPY . .
 RUN apk add ffmpeg && pip install poetry
 RUN poetry build
+
 RUN pip install --upgrade --no-deps --force-reinstall dist/*.whl
 RUN pip install --upgrade dist/*.whl
 

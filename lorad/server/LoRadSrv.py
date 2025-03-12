@@ -48,6 +48,12 @@ class LoRadServer(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
+        # If X-Real-IP exists, then we're proxied. 
+        # When we're proxied, self.client address will have our proxy IP inside, not the clients IP
+        ip_from_headers = self.headers.get('X-Real-IP')
+        if ip_from_headers is not None:
+            self.client_address[0] = ip_from_headers
+
         while True:
             client_id = hashlib.sha256((self.client_address[0] + str(self.client_address[1])).encode("utf-8")).hexdigest()[:4]
             if client_id not in LoRadServer.clients:
