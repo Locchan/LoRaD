@@ -21,7 +21,7 @@ def signal_stop(_signo, _stack_frame):
 
 def splash():
     logger = get_logger()
-    splash = """
+    splash = f"""
   _           _____       _____  
  | |         |  __ \\     |  __ \\ 
  | |     ___ | |__) |__ _| |  | |
@@ -32,3 +32,5 @@ def splash():
     lines = splash.split("\n")
     for aline in lines:
         logger.info(aline)
+    if "VERSION" in os.environ:
+        logger.info(os.environ["VESION"])
