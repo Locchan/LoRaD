@@ -1,4 +1,4 @@
-from collections import deque
+from collections import Counter, deque
 import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import os
@@ -9,18 +9,25 @@ import threading
 from time import sleep
 
 from lorad.utils.logger import get_logger
+from lorad.utils.utils import read_config
 
 logger = get_logger()
+config = read_config()
 
 class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     pass
 
 class LoRadServer(BaseHTTPRequestHandler):
     connected_clients = 0
+    MAX_CLIENTS = config["MAX_CLIENTS"] if "MAX_CLIENTS" in config else 10
     thread_count = 1
 
+    # List of IP addresses to kick
+    #  Users get into this list by trying to DDOS.
+    kick_list = []
+
     # This gets some chunks at the start
-    #  by default users get only the first chunk
+    #  by default users get only the last chunk
     #  But when a user first connects is gets a burst of data (this whole array)
     current_data = deque()
 
@@ -28,7 +35,7 @@ class LoRadServer(BaseHTTPRequestHandler):
     #  before it gets completely rewritten by the new track
     track_ended = False
 
-    client_names = []
+    clients = []
 
     def add_data(data):
         LoRadServer.current_data.popleft()
@@ -43,43 +50,51 @@ class LoRadServer(BaseHTTPRequestHandler):
     def do_GET(self):
         while True:
             client_id = hashlib.sha256((self.client_address[0] + str(self.client_address[1])).encode("utf-8")).hexdigest()[:4]
-            if client_id not in LoRadServer.client_names:
-                LoRadServer.client_names.append(client_id)
+            if client_id not in LoRadServer.clients:
+                LoRadServer.clients.append((client_id, self.client_address[0]))
                 break
         LoRadServer.thread_count += 1
-        if LoRadServer.connected_clients > 10:
-            logger.error("Too many clients! DDOS?")
-            os._exit(1)
         threading.current_thread().name = f"WRK#{LoRadServer.thread_count}"
         LoRadServer.connected_clients += 1
         pushed_data = bytes()
-        logger.info(f"Client [{client_id}] connected. Connected clients: {LoRadServer.connected_clients}")
+        logger.info(f"Client [{client_id} ({self.client_address[0]})] connected. Connected clients: {LoRadServer.connected_clients}")
         try:
+
+            # If we're in kick list, we get kicked (nuff said)
+            if self.client_address[0] in LoRadServer.kick_list:
+                self.gtfo()
+                raise RuntimeError(f"[{self.client_address[0]}] is in kick list.")
+
+            if LoRadServer.connected_clients > LoRadServer.MAX_CLIENTS:
+                self.ddos_protection()
+                raise RuntimeError("Asked to wait a while")
+
             self.send_response(200)
             self.send_header("Connection", "Close")
             self.send_header("Content-type", "audio/mpeg")
             self.send_header("Cache-Control", "no-cache, no-store")
             self.send_header("Client-ID", f"{client_id}")
             self.end_headers()
-            last_burst_chunk = bytes()
 
             # Main loop. Each iteration is a new track
             while True:
-                send_regularly = False
 
-                # Sending initial burst of data for the newly-connected clients (or track starts) and setting last_burst_chunk
-                # When the client reaches last_burst_chunk, this means that we can
-                #  proceed as normal.
+                # Stop sending data to a kicked client.
+                if self.client_address[0] in LoRadServer.kick_list:
+                    raise RuntimeError(f"[{self.client_address[0]}] is in kick list.")
+
+                # Sending initial burst of data for the newly-connected clients (or when the track starts)
                 #  current_data is being copied to be thread-safe
                 while True:
                     current_data = deque(LoRadServer.current_data)
                     if len(current_data) > 0:
                         data_to_push = bytes()
                         for data_to_push in current_data:
-                            logger.debug(f"[{client_id}] Sending a burst chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]; Length: {len(data_to_push)}")
-                            self.wfile.write(data_to_push)
-                            self.wfile.flush()
-                        last_burst_chunk = data_to_push
+                            if data_to_push:
+                                #logger.debug(f"[{client_id}] Sending a burst chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]; Length: {len(data_to_push)}")
+                                self.wfile.write(data_to_push)
+                                self.wfile.flush()
+                                pushed_data = data_to_push
                         break
                     sleep(0.1)
 
@@ -97,37 +112,60 @@ class LoRadServer(BaseHTTPRequestHandler):
                     #  Current_data is being copied to be thread-safe
                     current_data = deque(LoRadServer.current_data)
 
-                    # current_data[0] can be false if we reached the end of the track
-                    if len(current_data) > 0 and current_data[0]:
-                        data_to_push = current_data[0]
-                        if send_regularly and data_to_push != pushed_data:
-                            logger.debug(f"[{client_id}] Sending a chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]; Length: {len(data_to_push)}")
+                    if len(current_data) > 0:
+                        data_to_push = current_data[-1]
+                        if data_to_push != pushed_data:
+                            #logger.debug(f"[{client_id}] Sending a chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]; Length: {len(data_to_push)}")
                             self.wfile.write(data_to_push)
                             self.wfile.flush()
                             if LoRadServer.track_ended:
-                                LoRadServer.add_data(False)
-                        elif data_to_push != pushed_data and not send_regularly:
-                            logger.debug(f"[{client_id}] Skipping a chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]: not yet at the burst end")
-                            if data_to_push == last_burst_chunk:
-                                pushed_data = last_burst_chunk
-                                send_regularly = True
-                        # Pushing falses to the current_data array until we squeezed out all the data and are left with an array of falses
-                        #  This just starts the cycle, it will continue above
-                        elif data_to_push == pushed_data and LoRadServer.track_ended:
-                            if current_data[0] != False:
-                                logger.debug("The track ended. Squeezing leftovers from our streamer.")
                                 LoRadServer.add_data(False)
                         pushed_data = data_to_push
                     sleep(0.1)
         except (BrokenPipeError, ConnectionResetError) as e:
             logger.info(f"A client disconnected. Connected clients: {LoRadServer.connected_clients-1}")
+        except RuntimeError as e:
+            logger.info(f"A client was kicked: ({e}) Connected clients: {LoRadServer.connected_clients-1}")
         except Exception as e:
             logger.info(f"A client disconnected: ({e.__class__.__name__}) Connected clients: {LoRadServer.connected_clients-1}")
             logger.exception(e)
         finally:
-            LoRadServer.client_names.remove(client_id)
+            self.remove_client(client_id)
             LoRadServer.thread_count -= 1
             LoRadServer.connected_clients -= 1
         
     def detect_new_track(self, current_data, old_data):
         return not set(current_data) & set(old_data)
+
+    def remove_client(self, client_id):
+        num_to_delete = -1
+        for anum, anitem in enumerate(LoRadServer.clients):
+            if anitem[0] == client_id:
+                num_to_delete = anum
+        if num_to_delete >= 0:
+            del LoRadServer.clients[num_to_delete]
+        else:
+            logger.error(f"Was told to remove client [{client_id}] but the client does not exist!")
+
+    # Considering every IP with >2 connections a DUDOSERs
+    def ddos_protection(self):
+        logger.warn(f"Too many clients ({LoRadServer.connected_clients}/{LoRadServer.MAX_CLIENTS})! DDOS?")
+        logger.info("Searching for dudoseri...")
+        ip_list = [x[1] for x in LoRadServer.clients]
+        ip_frequency = dict(Counter(ip_list))
+        for anitem in ip_frequency:
+            if ip_frequency[anitem] > 2:
+                logger.info(f"Dudoser: {anitem}")
+                LoRadServer.kick_list.append(anitem)
+        self.ddosed()
+        
+    def ddosed(self):
+        self.send_response(503)
+        self.end_headers()
+        self.wfile.write("Overloaded. Try later.\n".encode("utf-8"))
+        self.wfile.flush()
+
+    def gtfo(self):
+        self.send_response(302)
+        self.send_header('Location', "https://www.youtube.com/watch?v=mjuS_vZ2Gp4&rco=1")
+        self.end_headers()
