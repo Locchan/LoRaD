@@ -1,5 +1,8 @@
 FROM localhost/locchan/lorad:latest
 
+ARG VERSION
+ENV VERSION=${VERSION}
+
 RUN rm -rf /resources
 RUN rm /usr/bin/lorad
 RUN rm -rf /tmp/lorad
