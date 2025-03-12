@@ -75,12 +75,12 @@ class Streamer():
         self.free = False
         try:
             track_info = MP3(filepath).info
-            seconds_per_packet = self.chunk_size_bytes / (track_info.bitrate / 8)
-            sleep_time = (math.floor(seconds_per_packet * 100) - 1) / 100.0
+            seconds_per_chunk = self.chunk_size_bytes / (track_info.bitrate / 8)
+            sleep_time = (math.floor(seconds_per_chunk * 100) - 1) / 100.0
             logger.info(f"Strarting to serve the next track...")
             logger.info(f"Track bitrate: {int(track_info.bitrate/1000)}kbps")
-            logger.info(f"Seconds per chunk (approx.): {seconds_per_packet}; Chunk size: {self.chunk_size}kB")
-            logger.info(f"Traffic per client (approx.): {int(self.chunk_size / seconds_per_packet)}kBps")
+            logger.info(f"Seconds per chunk (approx.): {seconds_per_chunk}; Chunk size: {self.chunk_size}kB")
+            logger.info(f"Traffic per client (approx.): {int(self.chunk_size / seconds_per_chunk)}kBps")
             logger.info(f"Delay betweek chunk sends (approx.): {sleep_time}s")
             logger.info(f"Track duration: {track_info.length}s")
             with open(filepath, 'rb') as mp3file:
@@ -121,7 +121,7 @@ class Streamer():
             #  We know the track duration and we know how long we've been transferring it
             #   so we sleep the difference after we're done with transferring the track
             if not self.interrupt:
-                serve_delay = math.ceil(track_end_time - serve_end)
+                serve_delay = track_end_time - serve_end - (self.initial_burst_chunks * seconds_per_chunk)
                 if serve_delay > 0:
                     logger.info(f"Serve delay is {serve_delay}.")
                     sleep(serve_delay)
