@@ -2,8 +2,9 @@ FROM localhost/locchan/lorad:latest
 
 RUN rm -rf /resources
 RUN rm /usr/bin/lorad
+RUN rm -rf /tmp/lorad
 
-RUN mkdir /tmp/lorad
+RUN mkdir -p /tmp/lorad
 WORKDIR /tmp/lorad
 
 COPY . .
