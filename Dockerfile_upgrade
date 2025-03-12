@@ -1,4 +1,4 @@
-FROM localhost/locchan:lorad
+FROM localhost/locchan/lorad:latest
 
 RUN rm -rf /resources
 RUN rm /usr/bin/lorad
