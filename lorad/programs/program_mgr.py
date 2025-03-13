@@ -6,9 +6,11 @@ from lorad.programs.NewsPrgS import NewsPrgS
 from lorad.utils.logger import get_logger
 from lorad.utils.utils import read_config
 
+
 AVAILABLE_PROGRAMS: list[GenericPrg] = [NewsPrgS]
 ENABLED_PROGRAMS: list[GenericPrg] = []
 logger = get_logger()
+
 
 def register_programs():
     logger.info("Registering programs...")
@@ -25,6 +27,7 @@ def register_programs():
             except Exception as e:
                 logger.error(f"Could not enable the program: {e.__class__.__name__}")
     logger.info(f"Registered {len(ENABLED_PROGRAMS)} programs.")
+
 
 def prg_sched_loop():
     register_programs()
@@ -43,6 +46,7 @@ def prg_sched_loop():
                         program_prep_thread = Thread(name="PrgPrep", target=aprogram.prepare_program)
                         program_prep_thread.start()
         sleep(20)
+
 
 def is_now_the_minute(time_obj: datetime.time, offset_mins: int = 0):
     now = datetime.datetime.now()
