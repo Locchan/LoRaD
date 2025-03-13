@@ -10,10 +10,9 @@ from __main__ import TEMPDIR
 logger = get_logger()
 
 class YaMu(Connector):
-    def __init__(self, token, bitrate, fallback_bitrate=128):
+    def __init__(self, token, bitrate):
         super().__init__()
         self.bitrate : int = bitrate
-        self.fallback_bitrate : int = fallback_bitrate
         self.client : YaMuClient = YaMuClient(token).init()
         self.radio : Radio = None
         self.radio_started : bool = False
@@ -64,8 +63,9 @@ class YaMu(Connector):
                 try:
                     self.current_track.download(filename=self.current_track_path, bitrate_in_kbps=self.bitrate)
                 except yandex_music.exceptions.InvalidBitrateError:
-                    logger.warn(f"Could not download the track with correct bitrate. Falling back to {self.fallback_bitrate}kbps")
-                    self.current_track.download(filename=self.current_track_path, bitrate_in_kbps=self.fallback_bitrate)
+                    max_avail_bitrate = max(self.current_track.get_download_info(), key=lambda item: item.bitrate_in_kbps)
+                    logger.warn(f"Could not download the track with correct bitrate. Falling back to {max_avail_bitrate} (highest available).")
+                    self.current_track.download(filename=self.current_track_path, bitrate_in_kbps=max_avail_bitrate)
 
     def __set_current_track(self, track) -> None:
         self.current_track = track
