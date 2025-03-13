@@ -14,13 +14,13 @@ class NewsPrgS(GenericPrg):
 
     def __init__(self, start_times: datetime.time, preparation_needed_mins: int):
         super().__init__(start_times, NewsPrgS.name, preparation_needed_mins)
-        self.config = None
+        self.config = read_config()
         self.db = None
         self.jingle_path = os.path.join(self.config["RESDIR"], self.config["ENABLED_PROGRAMS"][NewsPrgS.name]["jingle_path"])
 
     def connect_database(self):
-        self.config = read_config()
-        self.db = NewsDB(self.config["DBDIR"])
+        config = read_config()
+        self.db = NewsDB(config["DBDIR"])
 
     def _prepare_program_impl(self):
         self.connect_database()
