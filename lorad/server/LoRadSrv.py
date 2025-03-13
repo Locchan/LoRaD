@@ -29,31 +29,34 @@ class LoRadServer(BaseHTTPRequestHandler):
     #  But when a user first connects is gets a burst of data (this whole array)
     current_data = deque()
 
-    # If track_ended is passed from the streamer, we should send all data that is left in current_data
-    #  before it gets completely rewritten by the new track
+    # If track_ended is passed from the streamer, we should send all data that is left
+    #  in current_data before it gets completely rewritten by the new track
     track_ended = False
 
     clients = []
 
+    @staticmethod
     def add_data(data):
         LoRadServer.current_data.popleft()
         LoRadServer.current_data.append(data)
 
-    def __init__(self, request, client_address, server):
-        super().__init__(request, client_address, server)
-
+    @staticmethod
     def log_message(*args):
         pass
 
+    def __init__(self, request, client_address, server):
+        super().__init__(request, client_address, server)
+
     def do_GET(self):
-        # If X-Real-IP exists, then we're proxied. 
+        # If X-Real-IP exists, then we're proxied.
         # When we're proxied, self.client address will have our proxy IP inside, not the clients IP
         ip_from_headers = self.headers.get('X-Real-IP')
         if ip_from_headers is not None:
             self.client_address = (ip_from_headers, self.client_address[1])
 
         while True:
-            client_id = hashlib.sha256((self.client_address[0] + str(self.client_address[1])).encode("utf-8")).hexdigest()[:4]
+            client_id = hashlib.sha256((self.client_address[0] + str(self.client_address[1]))
+                                       .encode("utf-8")).hexdigest()[:4]
             if client_id not in LoRadServer.clients:
                 LoRadServer.clients.append((client_id, self.client_address[0]))
                 break
@@ -61,7 +64,8 @@ class LoRadServer(BaseHTTPRequestHandler):
         threading.current_thread().name = f"WRK#{LoRadServer.thread_count}"
         LoRadServer.connected_clients += 1
         pushed_data = bytes()
-        logger.info(f"Client [{client_id} ({self.client_address[0]})] connected. Connected clients: {LoRadServer.connected_clients}")
+        logger.info(f"Client [{client_id} ({self.client_address[0]})] connected. " +
+                    "Connected clients: {LoRadServer.connected_clients}")
         try:
 
             # If we're in kick list, we get kicked (nuff said)
@@ -127,11 +131,11 @@ class LoRadServer(BaseHTTPRequestHandler):
                         pushed_data = data_to_push
                     sleep(0.1)
         except (BrokenPipeError, ConnectionResetError):
-            logger.info(f"A client disconnected. Connected clients: {LoRadServer.connected_clients-1}")
+            logger.info(f"Client [{client_id} ({self.client_address[0]})] disconnected. Connected clients: {LoRadServer.connected_clients-1}")
         except RuntimeError as e:
-            logger.info(f"A client was kicked: ({e}) Connected clients: {LoRadServer.connected_clients-1}")
+            logger.info(f"Client [{client_id} ({self.client_address[0]})] was kicked: ({e}) Connected clients: {LoRadServer.connected_clients-1}")
         except Exception as e:
-            logger.info(f"A client disconnected: ({e.__class__.__name__}) Connected clients: {LoRadServer.connected_clients-1}")
+            logger.info(f"Client [{client_id} ({self.client_address[0]})] disconnected with an error: ({e.__class__.__name__}) Connected clients: {LoRadServer.connected_clients-1}")
             logger.exception(e)
         finally:
             self.remove_client(client_id)

@@ -14,11 +14,16 @@ class NewsPrgS(GenericPrg):
 
     def __init__(self, start_times: datetime.time, preparation_needed_mins: int):
         super().__init__(start_times, NewsPrgS.name, preparation_needed_mins)
-        self.config = read_config()
-        self.db = NewsDB(self.config["DBDIR"])
+        self.config = None
+        self.db = None
         self.jingle_path = os.path.join(self.config["RESDIR"], self.config["ENABLED_PROGRAMS"][NewsPrgS.name]["jingle_path"])
 
+    def connect_database(self):
+        self.config = read_config()
+        self.db = NewsDB(self.config["DBDIR"])
+
     def _prepare_program_impl(self):
+        self.connect_database()
         news = self.db.get_unread_news()
         if len(news) == 0:
             logger.warning("No news!")
