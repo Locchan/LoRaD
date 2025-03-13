@@ -46,7 +46,7 @@ def prg_sched_loop():
 
 def is_now_the_minute(time_obj: datetime.time, offset_mins: int = 0):
     now = datetime.datetime.now()
-    dt_tmp = datetime.combine(datetime.today(), time_obj)
+    dt_tmp = datetime.datetime.combine(datetime.today(), time_obj)
     dt_tmp += datetime.timedelta(minutes=offset_mins)
     time_to_check = dt_tmp.time()
 

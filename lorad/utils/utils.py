@@ -32,6 +32,12 @@ def splash():
     lines = splash.split("\n")
     for aline in lines:
         logger.info(aline)
-    if "VERSION" in os.environ:
-        logger.info(os.environ["VERSION"])
-        logger.info("")
+    logger.info(get_version())
+    logger.info("")
+
+def get_version(path="/version"):
+    if os.path.exists(path):
+        with open(path, "r") as versionfile:
+            return versionfile.readline()
+    else:
+        return "Unknown version"

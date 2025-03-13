@@ -1,7 +1,6 @@
 FROM localhost/locchan/lorad:latest
 
 ARG VERSION
-ENV VERSION=${VERSION}
 
 RUN rm -rf /resources
 RUN rm /usr/bin/lorad
@@ -21,6 +20,8 @@ RUN cp /tmp/lorad/lorad_main.py /usr/bin/lorad && cp -rf /tmp/lorad/resources /r
 RUN rm -rf /tmp/lorad
 
 RUN ln -sf /usr/share/zoneinfo/Europe/Minsk /etc/localtime
+
+RUN echo "${VERSION}" > /version
 
 WORKDIR /
 EXPOSE 5475
