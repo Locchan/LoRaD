@@ -35,18 +35,18 @@ def prg_sched_loop():
                 if is_now_the_minute(atime):
                     if not aprogram.program_running:
                         logger.debug("Starting a program")
-                        program_start_thread = Thread(name=f"PrgRunner", target=aprogram.start_program)
+                        program_start_thread = Thread(name="PrgRunner", target=aprogram.start_program)
                         program_start_thread.start()
                 if is_now_the_minute(atime, 0 - aprogram.preparation_needed_mins):
                     if not aprogram.preparations_started:
                         logger.debug("Starting program preparation")
-                        program_prep_thread = Thread(name=f"PrgPrep", target=aprogram.prepare_program)
+                        program_prep_thread = Thread(name="PrgPrep", target=aprogram.prepare_program)
                         program_prep_thread.start()
         sleep(20)
 
 def is_now_the_minute(time_obj: datetime.time, offset_mins: int = 0):
     now = datetime.datetime.now()
-    dt_tmp = datetime.datetime.combine(datetime.today(), time_obj)
+    dt_tmp = datetime.datetime.combine(datetime.datetime.today(), time_obj)
     dt_tmp += datetime.timedelta(minutes=offset_mins)
     time_to_check = dt_tmp.time()
 
