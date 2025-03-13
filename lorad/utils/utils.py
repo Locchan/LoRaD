@@ -7,7 +7,7 @@ from lorad.utils.logger import get_logger
 def read_config(filepath="config.json"):
     if "CFGFILE_PATH" in os.environ:
         filepath = os.environ["CFGFILE_PATH"]
-    with open(filepath, "r") as config_file:
+    with open(filepath, "r", encoding="utf-8") as config_file:
         try:
             return json.load(config_file)
         except Exception as e:
@@ -21,7 +21,7 @@ def signal_stop(_signo, _stack_frame):
 
 def splash():
     logger = get_logger()
-    splash = f"""
+    splash = """
   _           _____       _____  
  | |         |  __ \\     |  __ \\ 
  | |     ___ | |__) |__ _| |  | |
@@ -32,12 +32,12 @@ def splash():
     lines = splash.split("\n")
     for aline in lines:
         logger.info(aline)
-    logger.info(get_version())
+    logger.info(get_version().strip())
     logger.info("")
 
 def get_version(path="/version"):
     if os.path.exists(path):
-        with open(path, "r") as versionfile:
+        with open(path, "r", encoding="utf-8") as versionfile:
             return versionfile.readline()
     else:
         return "Unknown version"

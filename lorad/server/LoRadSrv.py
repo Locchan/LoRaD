@@ -1,10 +1,7 @@
 from collections import Counter, deque
 import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
-import os
-import random
 from socketserver import ThreadingMixIn
-from threading import Thread
 import threading
 from time import sleep
 
@@ -16,6 +13,7 @@ config = read_config()
 
 class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     pass
+
 
 class LoRadServer(BaseHTTPRequestHandler):
     connected_clients = 0
@@ -121,14 +119,14 @@ class LoRadServer(BaseHTTPRequestHandler):
                     if len(current_data) > 0:
                         data_to_push = current_data[-1]
                         if data_to_push != pushed_data:
-                            #logger.debug(f"[{client_id}] Sending a chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]; Length: {len(data_to_push)}")
+                            # logger.debug(f"[{client_id}] Sending a chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]; Length: {len(data_to_push)}")
                             self.wfile.write(data_to_push)
                             self.wfile.flush()
                             if LoRadServer.track_ended:
                                 LoRadServer.add_data(False)
                         pushed_data = data_to_push
                     sleep(0.1)
-        except (BrokenPipeError, ConnectionResetError) as e:
+        except (BrokenPipeError, ConnectionResetError):
             logger.info(f"A client disconnected. Connected clients: {LoRadServer.connected_clients-1}")
         except RuntimeError as e:
             logger.info(f"A client was kicked: ({e}) Connected clients: {LoRadServer.connected_clients-1}")
@@ -173,5 +171,5 @@ class LoRadServer(BaseHTTPRequestHandler):
 
     def gtfo(self):
         self.send_response(302)
-        self.send_header('Location', "https://www.youtube.com/watch?v=mjuS_vZ2Gp4&rco=1")
+        self.send_header('Location', "https://www.youtube.com/watch?v=mjuS_vZ2Gp4")
         self.end_headers()
