@@ -63,7 +63,7 @@ class YaMu(Connector):
                 try:
                     self.current_track.download(filename=self.current_track_path, bitrate_in_kbps=self.bitrate)
                 except yandex_music.exceptions.InvalidBitrateError:
-                    max_avail_bitrate = max(self.current_track.get_download_info(), key=lambda item: item.bitrate_in_kbps)
+                    max_avail_bitrate = max(self.current_track.get_download_info(), key=lambda item: item.bitrate_in_kbps).bitrate_in_kbps
                     logger.warn(f"Could not download the track with correct bitrate. Falling back to {max_avail_bitrate} (highest available).")
                     self.current_track.download(filename=self.current_track_path, bitrate_in_kbps=max_avail_bitrate)
 
