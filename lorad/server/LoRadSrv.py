@@ -64,8 +64,7 @@ class LoRadServer(BaseHTTPRequestHandler):
         threading.current_thread().name = f"WRK#{LoRadServer.thread_count}"
         LoRadServer.connected_clients += 1
         pushed_data = bytes()
-        logger.info(f"Client [{client_id} ({self.client_address[0]})] connected. " +
-                    "Connected clients: {LoRadServer.connected_clients}")
+        logger.info(f"Client [{client_id} ({self.client_address[0]})] connected. Connected clients: {LoRadServer.connected_clients}")
         try:
 
             # If we're in kick list, we get kicked (nuff said)
