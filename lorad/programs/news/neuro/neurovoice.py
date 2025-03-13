@@ -41,7 +41,7 @@ def voice_news(news_hash):
             out.write(response.audio_content)
             logger.debug(f"Generated news audio: {output_filename}")
     except Exception as e:
-        logger.error("Error while voicing news [{}]: ", e.__class__.__name__)
+        logger.error(f"Error while voicing news [{e.__class__.__name__}]: {e}")
     
 def check_voiced(ahash) -> bool:
     config = read_config()
