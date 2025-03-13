@@ -5,7 +5,7 @@ from lorad.programs.GenericPrg import GenericPrg
 from lorad.programs.NewsPrgS import NewsPrgS
 from lorad.utils.logger import get_logger
 from lorad.utils.utils import read_config
-from lorad_main import LoRadServer
+from lorad.server.LoRadSrv import LoRadServer
 
 
 AVAILABLE_PROGRAMS: list[GenericPrg] = [NewsPrgS]
