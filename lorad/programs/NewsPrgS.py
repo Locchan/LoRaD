@@ -2,7 +2,7 @@ import datetime
 import os
 import ffmpeg
 from lorad.programs.GenericPrg import GenericPrg
-from lorad.programs.news.database.NewsDB import NewsDB
+from lorad.programs.news.orm import News
 from lorad.programs.news.neuro.neurovoice import check_voiced, get_filelist, voice_news
 from lorad.utils.logger import get_logger
 from lorad.utils.utils import read_config
@@ -15,34 +15,28 @@ class NewsPrgS(GenericPrg):
     def __init__(self, start_times: datetime.time, preparation_needed_mins: int):
         super().__init__(start_times, NewsPrgS.name, preparation_needed_mins)
         self.config = read_config()
-        self.db = None
         self.jingle_path = os.path.join(self.config["RESDIR"], self.config["ENABLED_PROGRAMS"][NewsPrgS.name]["jingle_path"])
 
-    def connect_database(self):
-        config = read_config()
-        self.db = NewsDB(config["DBDIR"])
-
     def _prepare_program_impl(self):
-        self.connect_database()
-        news = self.db.get_unread_news()
+        news = News.get_unread_news()
         if len(news) == 0:
             logger.warning("No news!")
             return
         for anews in news:
-            if not check_voiced(anews["hash"]):
-                voice_news(anews["hash"])
-        news_hashes = [x["hash"] for x in news]
+            if not check_voiced(anews.id):
+                voice_news(anews.id)
+        news_ids = [x.id for x in news]
 
         # TODO: Jingles by source (or news source name being clearly spoken at the end/start of the block)
-        news_files = get_filelist(news_hashes)
+        news_files = get_filelist(news_ids)
 
         # Re-encode neuro files to 320kbps 44100 so that we don't change quality dramatically
         news_digest = self._reencode_news(news_files)
         logger.info("Program prepared")
-        self.db.mark_as_read(news_hashes)
+        News.mark_as_read(news_ids)
         return [news_digest]
     
-    def _reencode_news(self, news_files):
+    def _reencode_news(self, news_files) -> str:
         reencode_date = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         digestdir = os.path.join(self.config["DATADIR"], "neurovoice", "digests")
         if not os.path.exists(digestdir):
