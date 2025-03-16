@@ -1,7 +1,6 @@
 import re
 from time import sleep
-from lorad.programs.news.database.NewsDB import NewsDB
-from lorad.programs.news.sources.OnlinerSrc import OnlinerSrc
+from lorad.programs.news.orm import News
 from lorad.utils.logger import get_logger
 from lorad.utils.utils import read_config
 from openai import OpenAI
@@ -30,17 +29,16 @@ def get_summary(openai_api_key, body_full):
 
 def neurify_news():
     config = read_config()
-    db = NewsDB(config["DBDIR"])
     logger.info("NeuroNews started...")
     while True:
-        nn_news = db.get_non_neurified_news()
+        nn_news = News.get_unprepared_news()
         if len(nn_news) > 0:
             logger.info("Neurifying news...")
             success = 0
             for anews in nn_news:
                 try:
-                    summary = get_summary(config["OPENAI_API_KEY"], anews["body_raw"])
-                    db.add_neuro_to_existing(anews["hash"], summary)
+                    summary = get_summary(config["OPENAI_API_KEY"], anews.body_raw)
+                    News.add_prepared_body_to_existing(anews.id, summary)
                     success += 1
                 except Exception as e:
                     logger.warn(f"Could not neurify a piece of news: {e.__class__.__name__}")
@@ -49,8 +47,7 @@ def neurify_news():
 
 def get_most_important_news_by_source(source: str, titles_to_give: int, important_to_ask: int) -> list[str]:
     config = read_config()
-    db = NewsDB(config["DBDIR"])
-    neurified_news = db.get_neurified_news_by_source(source, titles_to_give)
+    neurified_news = News.get_prepared_news_by_source(source, titles_to_give)
     titles = []
     for anitem in neurified_news:
         titles.append(anitem["title"])
@@ -73,9 +70,9 @@ def get_most_important_news_by_source(source: str, titles_to_give: int, importan
     )
     chat_response = chat_completion.choices[0].message.content
     filtered_response = filter_text(chat_response)
-    important_idx = [int(x) - 1 for x in filtered_response.split(",")]
-    important_hashes = [neurified_news[idx]["hash"] for idx in important_idx]
-    return important_hashes 
+    important_indexes = [int(x) - 1 for x in filtered_response.split(",")]
+    important_ids = [neurified_news[idx].id for idx in important_indexes]
+    return important_ids
 
 # Removing all text, leaving only numbers and punctuation.
 #  NN is stoopid, sometimes answers with words even when clearly instructed not to do so.

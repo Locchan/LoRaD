@@ -1,8 +1,7 @@
 from datetime import datetime
 from time import mktime
 import feedparser
-from lorad.programs.news.News import News
-from lorad.programs.news.database.NewsDB import NewsDB
+from lorad.programs.news.orm.News import News
 from lorad.programs.news.sources.GenericSrc import GenericSource
 from lorad.utils.logger import get_logger
 
@@ -14,21 +13,26 @@ class MdzSrc(GenericSource):
     ]
     name = "Медуза"
 
-    def __init__(self, db_conn : NewsDB):
-        self.db_conn = db_conn
-        super().__init__(db_conn)
+    def __init__(self):
+        self.name = MdzSrc.name
+        super().__init__()
         self.rss_data = []
     
-    def get_news(self) -> list[News]:
-        return self._get_news_impl()
+    def parse_news(self) -> list[News]:
+        return self._parse_news_impl()
 
-    def _get_news_impl(self):
-        logger.info("Getting news from Meduza...")
+    def _parse_news_impl(self):
+        logger.info("Parsing news from Meduza...")
         self.get_rss_data()
         news = []
         for anitem in self.rss_data:
-            news.append(News(MdzSrc.name, anitem["title"], datetime.fromtimestamp(mktime(anitem["date"])), anitem["text"], neurification_needed=False))
-        logger.info(f"Got {len(news)} news from Meduza.")
+            news_obj = News()
+            news_obj.source = MdzSrc.name
+            news_obj.title = anitem["title"]
+            news_obj.body_raw = anitem["text"]
+            news_obj.date_published = datetime.fromtimestamp(mktime(anitem["date"]))
+            news_obj.preparation_needed = False
+            news.append(news_obj)
         return news
 
     def get_rss_data(self):
@@ -37,15 +41,12 @@ class MdzSrc(GenericSource):
 
             if feed.status == 200:
                 for entry in feed.entries:
-                    # Creating a temporary News object to generate hash and check if this piece of news is already in the database
-                    tmpnews = News(MdzSrc.name, entry.title, date_published=datetime.fromtimestamp(mktime(entry.published_parsed)))
-                    if not self.db_conn.check_hash_exists(tmpnews.hash):
-                        self.rss_data.append({
-                            "title": entry.title,
-                            "link": entry.link,
-                            "date": entry.published_parsed,
-                            "text": self.sanitize_rss_text(entry.description)
-                        })
+                    self.rss_data.append({
+                        "title": entry.title,
+                        "link": entry.link,
+                        "date": entry.published_parsed,
+                        "text": self.sanitize_rss_text(entry.description)
+                    })
             else:
                 logger.error("Failed to get RSS feed. Status code: ", feed.status)
 
