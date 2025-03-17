@@ -43,7 +43,7 @@ def neurify_news():
                 except Exception as e:
                     logger.warn(f"Could not neurify a piece of news: {e.__class__.__name__}")
             logger.info(f"Neurified {success} news objects.")
-            sleep(config["NEWS_NEURIFIER_PERIOD_MIN"] * 60)
+        sleep(config["NEWS_NEURIFIER_PERIOD_MIN"] * 60)
 
 def get_most_important_news_by_source(source: str, titles_to_give: int, important_to_ask: int) -> list[str]:
     config = read_config()
