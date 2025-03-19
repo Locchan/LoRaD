@@ -17,12 +17,12 @@ class MdzSrc(GenericSource):
         self.name = MdzSrc.name
         super().__init__()
         self.rss_data = []
-    
+
     def parse_news(self) -> list[News]:
         return self._parse_news_impl()
 
     def _parse_news_impl(self):
-        logger.info("Parsing news from Meduza...")
+        logger.info(f"Parsing news from {self.name}...")
         self.get_rss_data()
         news = []
         for anitem in self.rss_data:

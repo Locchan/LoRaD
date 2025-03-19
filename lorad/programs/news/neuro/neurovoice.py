@@ -1,4 +1,5 @@
 import os
+from google.api_core.exceptions import ResourceExhausted
 from google.cloud import texttospeech
 from lorad.programs.news.orm import News
 from lorad.utils.logger import get_logger
@@ -39,8 +40,11 @@ def voice_news(news_id):
         with open(output_filename, "wb") as out:
             out.write(response.audio_content)
             logger.debug(f"Generated news audio: {output_filename}")
+    except ResourceExhausted:
+        logger.warn(f"Reached resource limit when trying to voice a piece of news.")
     except Exception as e:
         logger.error(f"Error while voicing news [{e.__class__.__name__}]: {e}")
+
 
 
 def check_voiced(anid) -> bool:

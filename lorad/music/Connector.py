@@ -12,5 +12,6 @@ class Connector():
     def get_current_track_file(self):
         pass
 
-    def next_track():
+    def next_track(self):
         pass
+
