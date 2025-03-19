@@ -9,6 +9,7 @@ COPY . .
 RUN apk add ffmpeg && pip install poetry
 RUN poetry build
 RUN pip install dist/*.whl
+RUN cp /tmp/lorad/lorad_main.py /usr/bin/lorad
 RUN rm -rf /tmp/lorad
 
 RUN ln -s /usr/share/zoneinfo/Europe/Minsk /etc/localtime
