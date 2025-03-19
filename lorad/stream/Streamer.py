@@ -16,6 +16,7 @@ class Streamer():
     def __init__(self, connectors: list[Connector], server: LoRadServer):
         logger.debug("Initializing carousel...")
         config = read_config()
+        self.fallback_index = 0
         self.server = server
         self.connectors = connectors
         self.connector_index = 0
@@ -31,13 +32,18 @@ class Streamer():
         logger.debug("Entering carousel")
         while True:
             if self.carousel_enabled:
-                if not self.current_connector.initialized:
-                    self.current_connector.initialize()
-                filepath = self.current_connector.get_current_track_file()
-                # Serve chunks and exit when the end of the file is reached
-                self.serve_file(filepath)
-                self.cleanup(filepath)
-                self.current_connector.next_track() 
+                try:
+                    if not self.current_connector.initialized:
+                        self.current_connector.initialize()
+                    filepath = self.current_connector.get_current_track_file()
+                    # Serve chunks and exit when the end of the file is reached
+                    self.serve_file(filepath)
+                    self.cleanup(filepath)
+                    self.current_connector.next_track()
+                except Exception as e:
+                    logger.warn(f"Could not get the next track from {self.current_connector.__class__.__name__}: [{e.__class__.__name__}: {e}]")
+                    self.stop_carousel()
+                    self.fallback()
                 # Rotating connectors if possible
                 self.connector_index += 1
                 if len(self.connectors) > self.connector_index:
@@ -46,6 +52,19 @@ class Streamer():
                     self.current_connector = self.connectors[0]
             else:
                 sleep(1)
+
+    def fallback(self):
+        logger.info("Loading fallback track.")
+        config = read_config()
+        fallback_tracks = os.listdir(config["FALLBACK_TRACK_DIR"])
+        if len(fallback_tracks) == 0:
+            logger.error("Nothing to fall back to! No fallback tracks! Catastrophe!")
+            os._exit(1)
+        if self.fallback_index == len(fallback_tracks):
+            self.fallback_index = 0
+        self.serve_file(os.path.join(config["FALLBACK_TRACK_DIR"], fallback_tracks[self.fallback_index]))
+        self.fallback_index += 1
+        self.start_carousel()
 
     def start_carousel(self):
         if self.carousel_enabled:
