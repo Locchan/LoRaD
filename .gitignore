@@ -4,3 +4,5 @@ __pycache__
 test*
 dist/
 resources/*
+update_resources.sh
+.DS_Store
