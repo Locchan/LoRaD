@@ -18,7 +18,7 @@ class NewsPrgS(GenericPrg):
         self.jingle_path = os.path.join(self.config["RESDIR"], self.config["ENABLED_PROGRAMS"][NewsPrgS.name]["jingle_path"])
 
     def _prepare_program_impl(self):
-        news = News.get_unread_news()
+        news = News.get_news()
         if len(news) == 0:
             logger.warning("No news!")
             return
