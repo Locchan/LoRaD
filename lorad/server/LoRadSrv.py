@@ -54,6 +54,8 @@ class LoRadServer(BaseHTTPRequestHandler):
         if ip_from_headers is not None:
             self.client_address = (ip_from_headers, self.client_address[1])
 
+        type_err = bytes
+
         while True:
             client_id = hashlib.sha256((self.client_address[0] + str(self.client_address[1]))
                                        .encode("utf-8")).hexdigest()[:4]
@@ -122,6 +124,11 @@ class LoRadServer(BaseHTTPRequestHandler):
                     if len(current_data) > 0:
                         data_to_push = current_data[-1]
                         if data_to_push != pushed_data:
+                            if isinstance(data_to_push, bytes) and not isinstance(data_to_push, type_err):
+                                type_err = type(data_to_push)
+                                logger.error(f"Wrong data type! Got [{type_err}] as data to push!")
+                                continue
+                            type_err = bytes
                             # logger.debug(f"[{client_id}] Sending a chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]; Length: {len(data_to_push)}")
                             self.wfile.write(data_to_push)
                             self.wfile.flush()
