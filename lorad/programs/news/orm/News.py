@@ -14,9 +14,9 @@ class News(Base):
     
     id: Mapped[int] = mapped_column(primary_key=True)
     source: Mapped[str] = mapped_column(String(16), nullable=False)
-    title: Mapped[str] = mapped_column(String(256), nullable=False)
+    title: Mapped[str] = mapped_column(String(512), nullable=False)
     body_raw: Mapped[str] = mapped_column(Text, nullable=False)
-    body_prepared: Mapped[str] = mapped_column(String(4096), nullable=True)
+    body_prepared: Mapped[str] = mapped_column(Text, nullable=True)
     date_published: Mapped[datetime.datetime] = mapped_column(nullable=False)
     preparation_needed: Mapped[bool] = mapped_column(default=False)
     used: Mapped[bool] = mapped_column(default=False)
@@ -30,6 +30,7 @@ def add_news(news: list[News]) -> int:
         for anitem in news:
             if not anitem.preparation_needed and anitem.body_prepared is None:
                 anitem.body_prepared = anitem.body_raw
+                prettify_text(anitem)
             try:
                 session.add(anitem)
                 session.commit()
@@ -38,6 +39,17 @@ def add_news(news: list[News]) -> int:
             except IntegrityError:
                 session.rollback()
     return news_added
+
+
+def prettify_text(newsobj: News):
+    newsobj.body_raw = newsobj.body_raw.replace('\xa0', ' ')
+    newsobj.body_raw = newsobj.body_prepared.strip()
+    newsobj.title = newsobj.title.replace('\xa0', ' ')
+    newsobj.title = newsobj.title.strip()
+    if newsobj.body_prepared is not None:
+        newsobj.body_prepared = newsobj.body_prepared.replace('\xa0', ' ')
+        newsobj.body_prepared = newsobj.body_prepared.strip()
+
 
 def get_news_by_id(news_id):
     with MySQL.get_session() as session:
