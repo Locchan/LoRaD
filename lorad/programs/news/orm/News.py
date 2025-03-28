@@ -74,7 +74,7 @@ def get_prepared_news_by_src(source) -> Result[Tuple[News]]:
 
 def get_news(news_to_get: int = 10) -> Result[Tuple[News]]:
     with MySQL.get_session() as session:
-        return session.scalars(select(News).order_by(News.date_published).limit(news_to_get))
+        return session.scalars(select(News).order_by(News.date_published).limit(news_to_get)).all()
 
 def mark_as_read(ids) -> None:
     with MySQL.get_session() as session:
