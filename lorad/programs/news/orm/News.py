@@ -60,10 +60,10 @@ def get_prepared_news_by_src(source) -> Result[Tuple[News]]:
     with MySQL.get_session() as session:
         return session.scalars(select(News).where(News.body_prepared is not None and News.source == source)).all()
 
-def get_unread_news(period_hrs=1) -> Result[Tuple[News]]:
+def get_unread_news(period_hrs=6) -> Result[Tuple[News]]:
     with MySQL.get_session() as session:
         return session.scalars(select(News).where(News.used == False and \
-                                                  News.date_published > (datetime.datetime.now() - datetime.timedelta(hours=period_hrs)))
+                                                  News.date_published.timestamp() > (datetime.datetime.now() - datetime.timedelta(hours=period_hrs).timestamp()))
                               ).all()
 
 def mark_as_read(ids) -> None:

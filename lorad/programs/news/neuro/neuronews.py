@@ -47,7 +47,7 @@ def neurify_news():
 
 def get_most_important_news_by_source(source: str, titles_to_give: int, important_to_ask: int) -> list[str]:
     config = read_config()
-    neurified_news = News.get_prepared_news_by_source(source, titles_to_give)
+    neurified_news = News.get_prepared_news_by_src(source)
     titles = []
     for anitem in neurified_news:
         titles.append(anitem["title"])
