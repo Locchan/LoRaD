@@ -6,7 +6,7 @@ authors = ["Jaroslaw Locchansky <locchansky@gmail.com>"]
 packages = [{include = "lorad"}]
 
 [tool.poetry.dependencies]
-python = ">3.10,<3.12"
+python = ">3.10,<4.0"
 mutagen = "==1.47.0"
 sqlalchemy = ">2.0,<2.1"
 PyMySQL = "==1.1.1"

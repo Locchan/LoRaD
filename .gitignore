@@ -6,3 +6,4 @@ dist/
 resources/*
 update_resources.sh
 .DS_Store
+.venv/
