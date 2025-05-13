@@ -1,8 +1,8 @@
 import datetime
 import os
 
-from lorad.utils.logger import get_logger
-from lorad.utils.utils import read_config
+from lorad_radio.utils.logger import get_logger
+from lorad_radio.utils.utils import read_config
 
 logger = get_logger()
 

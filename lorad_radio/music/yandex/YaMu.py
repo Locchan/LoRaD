@@ -2,9 +2,9 @@ import os
 from yandex_music import Client as YaMuClient, Track
 import yandex_music
 
-from lorad.music.Connector import Connector
-from lorad.music.yandex.Radio import Radio
-from lorad.utils.logger import get_logger
+from lorad_radio.music.Connector import Connector
+from lorad_radio.music.yandex.Radio import Radio
+from lorad_radio.utils.logger import get_logger
 from __main__ import TEMPDIR
 
 logger = get_logger()

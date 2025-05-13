@@ -1,11 +1,11 @@
 import datetime
 from threading import Thread
 from time import sleep
-from lorad.programs.GenericPrg import GenericPrg
-from lorad.programs.NewsPrgS import NewsPrgS
-from lorad.utils.logger import get_logger
-from lorad.utils.utils import read_config
-from lorad.server.LoRadSrv import LoRadServer
+from lorad_radio.programs.GenericPrg import GenericPrg
+from lorad_radio.programs.NewsPrgS import NewsPrgS
+from lorad_radio.utils.logger import get_logger
+from lorad_radio.utils.utils import read_config
+from lorad_radio.server.LoRadSrv import LoRadServer
 
 
 AVAILABLE_PROGRAMS: list[GenericPrg] = [NewsPrgS]

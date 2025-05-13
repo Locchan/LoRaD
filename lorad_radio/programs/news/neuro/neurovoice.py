@@ -1,9 +1,9 @@
 import os
 from google.api_core.exceptions import ResourceExhausted
 from google.cloud import texttospeech
-from lorad.programs.news.orm import News
-from lorad.utils.logger import get_logger
-from lorad.utils.utils import read_config
+from lorad_radio.programs.news.orm import News
+from lorad_radio.utils.logger import get_logger
+from lorad_radio.utils.utils import read_config
 
 logger = get_logger()
 

@@ -3,12 +3,12 @@ import datetime
 import math
 import os
 from time import sleep
-from lorad.music.Connector import Connector
-from lorad.server.LoRadSrv import LoRadServer
-from lorad.utils.logger import get_logger
+from lorad_radio.music.Connector import Connector
+from lorad_radio.server.LoRadSrv import LoRadServer
+from lorad_radio.utils.logger import get_logger
 from mutagen.mp3 import MP3
 
-from lorad.utils.utils import read_config
+from lorad_radio.utils.utils import read_config
 
 logger = get_logger()
 

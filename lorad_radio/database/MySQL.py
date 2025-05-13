@@ -5,9 +5,9 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.session import Session
-from lorad.database.Base import Base
-from lorad.utils.utils import read_config
-from lorad.utils.logger import get_logger
+from lorad_radio.database.Base import Base
+from lorad_radio.utils.utils import read_config
+from lorad_radio.utils.logger import get_logger
 
 logger = get_logger()
 
@@ -25,7 +25,7 @@ class MySQL():
         return sessionmaker(autoflush=True, bind=MySQL.engine)()
 
     def _register_orm(self):
-        from lorad.programs.news.orm.News import News
+        from lorad_radio.programs.news.orm.News import News
         Base.metadata.create_all(MySQL.engine)
 
     def __reconnect(self) -> None:

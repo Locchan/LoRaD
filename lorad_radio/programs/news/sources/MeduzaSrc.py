@@ -1,9 +1,9 @@
 from datetime import datetime
 from time import mktime
 import feedparser
-from lorad.programs.news.orm.News import News
-from lorad.programs.news.sources.GenericSrc import GenericSource
-from lorad.utils.logger import get_logger
+from lorad_radio.programs.news.orm.News import News
+from lorad_radio.programs.news.sources.GenericSrc import GenericSource
+from lorad_radio.utils.logger import get_logger
 
 logger = get_logger()
 

@@ -5,8 +5,8 @@ from socketserver import ThreadingMixIn
 import threading
 from time import sleep
 
-from lorad.utils.logger import get_logger
-from lorad.utils.utils import read_config
+from lorad_radio.utils.logger import get_logger
+from lorad_radio.utils.utils import read_config
 
 logger = get_logger()
 config = read_config()
@@ -26,7 +26,7 @@ class LoRadServer(BaseHTTPRequestHandler):
 
     # This gets some chunks at the start
     #  by default users get only the last chunk
-    #  But when a user first connects is gets a burst of data (this whole array)
+    #  But when a user connects for the first time, they get a burst of data (this whole array)
     current_data = deque()
 
     # If track_ended is passed from the streamer, we should send all data that is left

@@ -2,7 +2,7 @@ import json
 import os
 import signal
 
-from lorad.utils.logger import get_logger
+from lorad_radio.utils.logger import get_logger
 
 def read_config(filepath="config.json"):
     if "CFGFILE_PATH" in os.environ:

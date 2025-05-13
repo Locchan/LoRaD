@@ -7,3 +7,4 @@ resources/*
 update_resources.sh
 .DS_Store
 .venv/
+temp/
