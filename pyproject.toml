@@ -16,6 +16,7 @@ openai = "==1.65.4"
 google-cloud-texttospeech = "==2.25.0"
 ffmpeg-python = "==0.2.0"
 yandex-music = "==2.2.0"
+tzdata = ">=2025.2"
 
 [build-system]
 requires = ["poetry-core"]

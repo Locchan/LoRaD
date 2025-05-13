@@ -4,7 +4,7 @@ from time import sleep
 from lorad.radio.programs.GenericPrg import GenericPrg
 from lorad.radio.programs.NewsPrgS import NewsPrgS
 from lorad.common.utils.logger import get_logger
-from lorad.common.utils.utils import read_config
+from lorad.common.utils.misc import read_config
 from lorad.radio.server.LoRadSrv import LoRadServer
 
 

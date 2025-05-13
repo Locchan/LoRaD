@@ -6,7 +6,7 @@ import threading
 from time import sleep
 
 from lorad.common.utils.logger import get_logger
-from lorad.common.utils.utils import read_config
+from lorad.common.utils.misc import get_version, read_config
 
 logger = get_logger()
 config = read_config()
@@ -45,6 +45,9 @@ class LoRadServer(BaseHTTPRequestHandler):
         pass
 
     def __init__(self, request, client_address, server):
+        self.client_address = client_address
+        self.server_version = f"LoRaD Radio v.{get_version()}"
+        self.sys_version = ""
         super().__init__(request, client_address, server)
 
     def do_GET(self):
@@ -183,3 +186,7 @@ class LoRadServer(BaseHTTPRequestHandler):
         self.send_response(302)
         self.send_header('Location', "https://www.youtube.com/watch?v=mjuS_vZ2Gp4")
         self.end_headers()
+
+def start(server):
+    logger.info(f"Ready. Listening on port {config["LISTEN_PORT"]}.")
+    server.serve_forever()

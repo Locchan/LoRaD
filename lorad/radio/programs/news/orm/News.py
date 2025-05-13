@@ -4,8 +4,8 @@ from sqlalchemy import Result, String, Text, UniqueConstraint, select, desc
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, mapped_column
 
-from lorad.radio.database.Base import Base
-from lorad.radio.database.MySQL import MySQL
+from lorad.common.database.Base import Base
+from lorad.common.database.MySQL import MySQL
 
 
 

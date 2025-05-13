@@ -5,18 +5,21 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.session import Session
-from lorad.radio.database.Base import Base
-from lorad.common.utils.utils import read_config
+from lorad.common.database.Base import Base
+from lorad.common.utils.globs import FEAT_NEURONEWS, FEAT_REST
+from lorad.common.utils.misc import read_config
 from lorad.common.utils.logger import get_logger
 
 logger = get_logger()
+config = read_config()
 
+# Connector class. The connector engine itself is static
 class MySQL():
-    '''Connector class. The connector engine itself is static'''
     engine = None
     obj = None
     
     def __init__(self) -> None:
+        logger.info("Connecting to the database...")
         self.__reconnect()
         self._register_orm()
         MySQL.obj = self
@@ -25,7 +28,11 @@ class MySQL():
         return sessionmaker(autoflush=True, bind=MySQL.engine)()
 
     def _register_orm(self):
-        from lorad.radio.programs.news.orm.News import News
+        if FEAT_NEURONEWS in config["ENABLED_FEATURES"]:
+            from lorad.radio.programs.news.orm.News import News
+        if FEAT_REST in config["ENABLED_FEATURES"]:
+            from lorad.api.orm.Group import Group
+            from lorad.api.orm.User import User
         Base.metadata.create_all(MySQL.engine)
 
     def __reconnect(self) -> None:
@@ -34,7 +41,6 @@ class MySQL():
             MySQL.engine = create_engine(connection_string, pool_pre_ping=True)
 
     def __generate_connection_string(self) -> str:
-        config = read_config()
         if "MYSQL" in config:
             try:
                 c = config["MYSQL"]

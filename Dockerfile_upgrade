@@ -24,4 +24,5 @@ RUN echo "${VERSION}" > /version
 
 WORKDIR /
 EXPOSE 5475
+EXPOSE 5476
 ENTRYPOINT [ "lorad" ]

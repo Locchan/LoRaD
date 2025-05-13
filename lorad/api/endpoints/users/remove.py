@@ -1,0 +1,28 @@
+from atexit import register
+from lorad.api.endpoints.users.auth import lrd_validate
+from lorad.api.orm.User import user_remove
+from lorad.api.utils.decorators import lrd_api_endp, lrd_auth
+from lorad.common.utils.globs import CAP_ADMIN
+
+ENDP_PATH = "/user/remove"
+
+def validate(headers, data):
+    required_fields = ["username"]
+    for areq in required_fields:
+        if areq not in data or areq == "":
+            return f"This method requires {required_fields} to be specified."
+    if len(data["username"]) < 3:
+        return "Such user cannot possibly exist"
+    return
+
+@lrd_api_endp
+@lrd_validate(validate)
+@lrd_auth(CAP_ADMIN)
+def impl_POST(headers, data):
+    register_result = user_remove(data["username"])
+    if register_result is None:
+        return (500, {"error": "Unknown error"})
+    if register_result:
+        return {"success": True}
+    else:
+        return (404, {"error": f"User {data["username"]} not found."})

@@ -2,7 +2,7 @@ from time import sleep
 from lorad.radio.programs.news.orm import News
 from lorad.radio.programs.news.sources.MeduzaSrc import MdzSrc
 from lorad.common.utils.logger import get_logger
-from lorad.common.utils.utils import read_config
+from lorad.common.utils.misc import read_config
 
 logger = get_logger()
 

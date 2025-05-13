@@ -1,10 +1,9 @@
-from api.utils.decorators import lrd_api_endp
+from lorad.api.utils.decorators import lrd_api_endp
+from lorad.common.utils.misc import get_version
 
-
-__path = "/version"
-
+ENDP_PATH = "/version"
 
 @lrd_api_endp
-def __impl(data: dict):
-    from common.utils
-    return {}
+def impl_GET(headers):
+    version = get_version()
+    return {"version": version}

@@ -2,10 +2,11 @@ import os
 from yandex_music import Client as YaMuClient, Track
 import yandex_music
 
+from lorad.common.utils.globs import FLG_NO_DOWNLOADING
 from lorad.radio.music.Connector import Connector
 from lorad.radio.music.yandex.Radio import Radio
 from lorad.common.utils.logger import get_logger
-from __main__ import TEMPDIR
+from __main__ import TEMPDIR, FEATURE_FLAGS
 
 logger = get_logger()
 
@@ -51,21 +52,26 @@ class YaMu(Connector):
         return track
 
     def __download_current_track(self) -> str:
-        if self.current_track is None:
-            logger.error("Could not download track: No current track")
-        else:
-            self.tracks_played += 1
-            self.current_track_path = os.path.join(TEMPDIR, f"current_yandex_{self.tracks_played}.mp3")
+        try:
+            if FLG_NO_DOWNLOADING in FEATURE_FLAGS:
+                raise RuntimeError("NO_DOWNLOADING flag is set.")
+            if self.current_track is None:
+                logger.error("Could not download track: No current track")
+            else:
+                self.tracks_played += 1
+                self.current_track_path = os.path.join(TEMPDIR, f"current_yandex_{self.tracks_played}.mp3")
 
-            # For debugging so that we don't download everytime we re-launch
-            if not os.path.exists(self.current_track_path):
-                logger.info(f"Downloading track [{self.current_track_name}]")
-                try:
-                    self.current_track.download(filename=self.current_track_path, bitrate_in_kbps=self.bitrate)
-                except yandex_music.exceptions.InvalidBitrateError:
-                    max_avail_bitrate = max(self.current_track.get_download_info(), key=lambda item: item.bitrate_in_kbps).bitrate_in_kbps
-                    logger.warn(f"Could not download the track with correct bitrate. Falling back to {max_avail_bitrate} (highest available).")
-                    self.current_track.download(filename=self.current_track_path, bitrate_in_kbps=max_avail_bitrate)
+                # For debugging so that we don't download everytime we re-launch
+                if not os.path.exists(self.current_track_path):
+                    logger.info(f"Downloading track [{self.current_track_name}]")
+                    try:
+                        self.current_track.download(filename=self.current_track_path, bitrate_in_kbps=self.bitrate)
+                    except yandex_music.exceptions.InvalidBitrateError:
+                        max_avail_bitrate = max(self.current_track.get_download_info(), key=lambda item: item.bitrate_in_kbps).bitrate_in_kbps
+                        logger.warn(f"Could not download the track with correct bitrate. Falling back to {max_avail_bitrate} (highest available).")
+                        self.current_track.download(filename=self.current_track_path, bitrate_in_kbps=max_avail_bitrate)
+        except RuntimeError as e:
+            logger.warning(f"Track download cancelled: {e}")
 
     def __set_current_track(self, track) -> None:
         self.current_track = track

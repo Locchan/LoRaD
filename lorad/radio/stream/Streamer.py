@@ -8,7 +8,7 @@ from lorad.radio.server.LoRadSrv import LoRadServer
 from lorad.common.utils.logger import get_logger
 from mutagen.mp3 import MP3
 
-from lorad.common.utils.utils import read_config
+from lorad.common.utils.misc import read_config
 
 logger = get_logger()
 
