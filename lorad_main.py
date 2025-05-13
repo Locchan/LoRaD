@@ -5,11 +5,11 @@ import os
 import signal
 from threading import Thread
 from time import sleep
-from lorad_radio.programs.news.neuro.neuronews import neurify_news
-from lorad_radio.programs.news.newsparser import parse_news
-from lorad_radio.programs.program_mgr import prg_sched_loop
-from lorad_radio.utils.logger import get_logger, setdebug
-from lorad_radio.utils.utils import read_config, signal_stop, splash
+from lorad.radio.programs.news.neuro.neuronews import neurify_news
+from lorad.radio.programs.news.newsparser import parse_news
+from lorad.radio.programs.program_mgr import prg_sched_loop
+from lorad.common.utils.logger import get_logger, setdebug
+from lorad.common.utils.utils import read_config, signal_stop, splash
 
 logger = get_logger()
 
@@ -28,9 +28,9 @@ carousel_providers = []
 
 TEMPDIR = config["TEMPDIR"]
 
-from lorad_radio.stream.Streamer import Streamer
-from lorad_radio.music.yandex.YaMu import YaMu
-from lorad_radio.server.LoRadSrv import LoRadServer
+from lorad.radio.stream.Streamer import Streamer
+from lorad.radio.music.yandex.YaMu import YaMu
+from lorad.radio.server.LoRadSrv import LoRadServer
 
 yandex_music = YaMu(config["YAMU_TOKEN"], config["BITRATE_KBPS"])
 carousel_providers.append(yandex_music)
