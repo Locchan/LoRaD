@@ -15,7 +15,7 @@ RUN poetry build
 RUN pip install --upgrade --no-deps --force-reinstall dist/*.whl
 RUN pip install --upgrade dist/*.whl
 
-RUN cp /tmp/lorad/lorad_main.py /usr/bin/lorad
+RUN cp /tmp/lorad/lorad_main.py /usr/bin/lorad && chmod +x /usr/bin/lorad
 RUN rm -rf /tmp/lorad
 
 RUN ln -sf /usr/share/zoneinfo/Europe/Minsk /etc/localtime
