@@ -4,7 +4,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from lorad.api.utils.misc import hash_password
 from lorad.common.database.Base import Base
 from lorad.common.database.MySQL import MySQL
-from lorad.common.utils.globs import LOGIN_INCORRECT_PASSWORD, LOGIN_NO_SUCH_USER, LOGIN_SUCCESS
+import lorad.common.utils.globs as globs
 from lorad.common.utils.logger import get_logger
 
 logger = get_logger()
@@ -47,8 +47,8 @@ def user_login(username, password_to_check) -> int:
     with MySQL.get_session() as session:
         user = session.scalar(select(User).where(User.name == username))
         if user is None:
-            return LOGIN_NO_SUCH_USER
+            return globs.LOGIN_NO_SUCH_USER
         password_to_check_hash = hash_password(password_to_check)
         if user.password_hash == password_to_check_hash:
-            return LOGIN_SUCCESS
-        return LOGIN_INCORRECT_PASSWORD
+            return globs.LOGIN_SUCCESS
+        return globs.LOGIN_INCORRECT_PASSWORD

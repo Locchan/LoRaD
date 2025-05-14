@@ -104,16 +104,16 @@ class Streamer():
             logger.info(f"Track duration: {track_info.length}s")
             with open(filepath, 'rb') as mp3file:
                 # Get chunks for the initial burst
-                chunks = [mp3file.read(self.chunk_size_bytes) for _ in range(self.initial_burst_chunks)]
+                burst_chunks = [mp3file.read(self.chunk_size_bytes) for _ in range(self.initial_burst_chunks)]
                 while True:
                     if not self.interrupt:
                         if LoRadServer.connected_clients != 0:
-                            # If we have chunks var, this means that we're sending the initial burst of data
+                            # If we have burst_chunks var, this means that we're sending the initial burst of data
                             #  thus we just set current_data in the server and continue with out lives as normal
-                            if chunks:
+                            if burst_chunks:
                                 track_end_time = datetime.datetime.now().timestamp() + track_info.length
-                                LoRadServer.current_data = deque(chunks)
-                                chunks = False
+                                LoRadServer.current_data = deque(burst_chunks)
+                                burst_chunks = False
                                 continue
                             
                             chunk = mp3file.read(self.chunk_size_bytes)

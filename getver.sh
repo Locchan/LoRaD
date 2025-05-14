@@ -3,6 +3,7 @@ LAST_COMMIT_HASH=$(git log --pretty=format:'%h' -n 1)
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 LAST_COMMIT_NUMBER=$(git rev-list --count $CURRENT_BRANCH)
 LORAD_VERSION=$(sed -nE 's/version = "(.*)"/\1/p' pyproject.toml)
+LOC=$(find . -name "*.py" -exec cat {} + | wc -l )
 
 while test $# -gt 0
 do
@@ -14,6 +15,6 @@ do
     shift
 done
 
-echo "LoRaD v.$LORAD_VERSION.$LAST_COMMIT_NUMBER (Commit: $LAST_COMMIT_HASH; $LAST_COMMIT_DATE)"
+echo "LoRaD v.$LORAD_VERSION.$LAST_COMMIT_NUMBER | Commit: $LAST_COMMIT_HASH; $LAST_COMMIT_DATE | $LOC LoC"
 
 exit 0

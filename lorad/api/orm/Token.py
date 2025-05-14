@@ -8,7 +8,7 @@ from lorad.api.orm.Group import Group
 from lorad.api.orm.User import User
 from lorad.common.database.Base import Base
 from lorad.common.database.MySQL import MySQL
-from lorad.common.utils.globs import CAP_IMBA
+import lorad.common.utils.globs as globs
 from lorad.common.utils.misc import read_config
 
 config = read_config()
@@ -49,7 +49,7 @@ def check_caps(username, needed_cap):
     with MySQL.get_session() as session:
         user = session.scalar(select(User).where(User.name == username))
         existing_caps = session.scalar(select(Group).where(Group.id == user.group)).capabilities
-        if CAP_IMBA in existing_caps:
+        if globs.CAP_IMBA in existing_caps:
             return True
         if existing_caps is not None:
             caps = existing_caps.split(",")

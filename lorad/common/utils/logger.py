@@ -27,7 +27,7 @@ def get_stream_handlers(level=logging.INFO):
     return stream_handler, stream_handler_file
 
 
-def get_logger(name="LoRad", level=None):
+def get_logger(name="LoRaD", level=None):
     global default_level
     if level is None:
         level = default_level

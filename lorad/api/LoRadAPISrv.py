@@ -67,9 +67,12 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
                 self.wfile.write(response.encode("utf-8"))
                 self.wfile.flush()
                 logger.info(f"RQ: GET {self.path}: {endpoint_exec_result["rc"]}." +
-                            f" Data: TX:{sys.getsizeof(endpoint_exec_result["data"])}b")
+                            f" Data: TX:{sys.getsizeof(response)}b")
                 logger.debug(f"RQ Headers: {self.headers}")
-                logger.debug(f"Data: {endpoint_exec_result["data"]}")
+                if sys.getsizeof(response) < 8192:
+                    logger.debug(f"Data: {response}")
+                else:
+                    logger.debug(f"Data omitted: too big.")
             else:
                 self.error(404, f"No such endpoint: '{self.path}'")
                 logger.info(f"RQ: GET {self.path}: 404")
@@ -114,8 +117,6 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
                 pass
             logger.error(f"RQ: POST {self.path}: 500 ({e.__class__.__name__})")
             logger.exception(e)
-
-
 
 def start_api_server():
     global endpoints

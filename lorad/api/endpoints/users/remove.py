@@ -2,7 +2,7 @@ from atexit import register
 from lorad.api.endpoints.users.auth import lrd_validate
 from lorad.api.orm.User import user_remove
 from lorad.api.utils.decorators import lrd_api_endp, lrd_auth
-from lorad.common.utils.globs import CAP_ADMIN
+import lorad.common.utils.globs as globs
 
 ENDP_PATH = "/user/remove"
 
@@ -17,7 +17,7 @@ def validate(headers, data):
 
 @lrd_api_endp
 @lrd_validate(validate)
-@lrd_auth(CAP_ADMIN)
+@lrd_auth(globs.CAP_ADMIN)
 def impl_POST(headers, data):
     register_result = user_remove(data["username"])
     if register_result is None:

@@ -2,11 +2,10 @@ import os
 from yandex_music import Client as YaMuClient, Track
 import yandex_music
 
-from lorad.common.utils.globs import FLG_NO_DOWNLOADING
+import lorad.common.utils.globs as globs
 from lorad.radio.music.Connector import Connector
 from lorad.radio.music.yandex.Radio import Radio
 from lorad.common.utils.logger import get_logger
-from __main__ import TEMPDIR, FEATURE_FLAGS
 
 logger = get_logger()
 
@@ -27,7 +26,6 @@ class YaMu(Connector):
         if not self.radio_started:
             logger.info("Getting radio...")
             self.radio = Radio(self)
-            self.radio.init_self_radio()
             track = self.radio.start_radio()
             self.radio_started = True
             self.__set_current_track(track)
@@ -47,19 +45,19 @@ class YaMu(Connector):
             track = self.radio.play_next()
         else:
             logger.warn("Radio was not started, but next_track was called. Starting radio...")
-            track = self.start_radio()
+            track = self.radio.start_radio()
         self.__set_current_track(track)
         return track
 
     def __download_current_track(self) -> str:
         try:
-            if FLG_NO_DOWNLOADING in FEATURE_FLAGS:
+            if globs.FLG_NO_DOWNLOADING in globs.FEATURE_FLAGS:
                 raise RuntimeError("NO_DOWNLOADING flag is set.")
             if self.current_track is None:
                 logger.error("Could not download track: No current track")
             else:
                 self.tracks_played += 1
-                self.current_track_path = os.path.join(TEMPDIR, f"current_yandex_{self.tracks_played}.mp3")
+                self.current_track_path = os.path.join(globs.TEMPDIR, f"current_yandex_{self.tracks_played}.mp3")
 
                 # For debugging so that we don't download everytime we re-launch
                 if not os.path.exists(self.current_track_path):

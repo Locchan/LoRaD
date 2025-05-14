@@ -1,6 +1,7 @@
 import datetime
 import os
 
+import lorad.common.utils.globs as globs
 from lorad.common.utils.logger import get_logger
 from lorad.common.utils.misc import read_config
 
@@ -31,23 +32,22 @@ class GenericPrg():
             self.preparations_started = False
             return
         try:
-            from __main__ import streamer
             self.program_running = True
             for aprogram in self.prepared_program:
                 if not os.path.exists(aprogram):
                     logger.error(f"Can't run program [{self.name}]: file [{aprogram}] does not exist!")
                     return
             logger.info(f"Running a scheduled program: [{self.name}]...")
-            streamer.stop_carousel()
+            globs.RADIO_STREAMER.stop_carousel()
             for anum, afile in enumerate(self.prepared_program):
                 logger.info(f"Program: {self.name}; Track {anum+1}/{len(self.prepared_program)}")
-                streamer.serve_file(afile)
+                globs.RADIO_STREAMER.serve_file(afile)
             logger.info(f"Program [{self.name}] finished. Restarting carousel.")
         except Exception as e:
             logger.error(f"Failed to run the program: {e.__class__.__name__}")
             logger.info("Falling back to the carousel")
         finally:
-            streamer.start_carousel()
+            globs.RADIO_STREAMER.start_carousel()
             self.prepared_program = None
             self.preparations_started = False
             self.program_running = False

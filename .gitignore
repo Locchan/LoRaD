@@ -4,6 +4,7 @@ __pycache__
 dist/
 resources/*
 update_resources.sh
+update_repo_author.sh
 .DS_Store
 .venv/
 temp/

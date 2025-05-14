@@ -15,4 +15,12 @@ from lorad.api.endpoints.users import whoami
 from lorad.api.endpoints.users import register
 from lorad.api.endpoints.users import remove
 
-endpoints_to_register : list[ModuleType] = [version, auth, whoami, register, remove]
+from lorad.api.endpoints.yandex import radios
+from lorad.api.endpoints.yandex import current_station
+from lorad.api.endpoints.yandex import switch_station
+
+endpoints_to_register : list[ModuleType] = [
+                                            version, # root
+                                            auth, whoami, register, remove, # user
+                                            radios, current_station, switch_station #yandex
+                                            ]

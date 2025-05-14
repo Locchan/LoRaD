@@ -1,13 +1,12 @@
-from math import floor
 from random import random
 
 from yandex_music import Track
 
 
 class Radio:
-    def __init__(self, yamu_obj):
+    def __init__(self, yamu_obj, station_id="user:onyourwave"):
         self.client = yamu_obj.client
-        self.station_id = None
+        self.station_id = station_id
         self.station_from = None
 
         self.play_id = None
@@ -15,8 +14,8 @@ class Radio:
         self.current_track = None
         self.station_tracks = None
 
-    def init_self_radio(self):
-        self.station_id = f'user:onyourwave'
+    def get_stations(self):
+        return self.client.rotor_stations_list()
 
     def start_radio(self, station_id=None, station_from=None) -> Track:
         if station_id is not None:

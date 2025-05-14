@@ -1,3 +1,12 @@
+from lorad.radio.music.yandex.YaMu import YaMu
+from lorad.radio.stream.Streamer import Streamer
+
+FEATURE_FLAGS = []
+TEMPDIR = ""
+
+RADIO_STREAMER : Streamer = None
+RADIO_YAMU : YaMu = None
+
 FLG_DEBUG = "DEBUG"
 FLG_NO_DOWNLOADING = "NO_DOWNLOADING"
 
