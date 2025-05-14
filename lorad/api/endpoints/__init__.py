@@ -17,10 +17,12 @@ from lorad.api.endpoints.users import remove
 
 from lorad.api.endpoints.yandex import radios
 from lorad.api.endpoints.yandex import current_station
+from lorad.api.endpoints.yandex import current_track
 from lorad.api.endpoints.yandex import switch_station
 
-endpoints_to_register : list[ModuleType] = [
-                                            version, # root
-                                            auth, whoami, register, remove, # user
-                                            radios, current_station, switch_station #yandex
-                                            ]
+endpoints_to_register : list[ModuleType] = \
+[
+version, # root
+auth, whoami, register, remove, # user
+radios, current_station, switch_station, current_track #yandex
+]

@@ -2,6 +2,8 @@ import json
 import os
 import signal
 
+from yandex_music import Track
+
 from lorad.common.utils.logger import get_logger
 
 def read_config(filepath="config.json"):
@@ -41,3 +43,10 @@ def get_version(path="/version"):
             return versionfile.readline()
     else:
         return "Unknown version"
+
+def repr_track(track: Track):
+    if track.artists is not None and track.artists:
+        artist_names = [x.name for x in track.artists]
+        return f"{', '.join(artist_names)} — {track.title}"
+    else:
+        return track.title
