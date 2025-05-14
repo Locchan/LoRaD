@@ -188,5 +188,5 @@ class LoRadServer(BaseHTTPRequestHandler):
         self.end_headers()
 
 def start(server):
-    logger.info(f"Ready. Listening on port {config["LISTEN_PORT"]}.")
+    logger.info(f"Ready. Listening on port {config['LISTEN_PORT']}.")
     server.serve_forever()
