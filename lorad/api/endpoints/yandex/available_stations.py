@@ -2,7 +2,7 @@ from lorad.api.utils.decorators import lrd_api_endp, lrd_auth
 from lorad.api.utils.misc import get_stations
 import lorad.common.utils.globs as globs
 
-ENDP_PATH = "/yandex/radios"
+ENDP_PATH = "/yandex/available_stations"
 
 @lrd_api_endp
 @lrd_auth(globs.CAP_BASIC_USER)

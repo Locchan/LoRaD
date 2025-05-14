@@ -9,13 +9,15 @@
 # ** - the order is super important, the first arg should always be headers
 
 from types import ModuleType
+
 from lorad.api.endpoints import version
+
 from lorad.api.endpoints.users import auth
 from lorad.api.endpoints.users import whoami
 from lorad.api.endpoints.users import register
 from lorad.api.endpoints.users import remove
 
-from lorad.api.endpoints.yandex import radios
+from lorad.api.endpoints.yandex import available_stations
 from lorad.api.endpoints.yandex import current_station
 from lorad.api.endpoints.yandex import current_track
 from lorad.api.endpoints.yandex import switch_station
@@ -24,5 +26,5 @@ endpoints_to_register : list[ModuleType] = \
 [
 version, # root
 auth, whoami, register, remove, # user
-radios, current_station, switch_station, current_track #yandex
+available_stations, current_station, switch_station, current_track #yandex
 ]
