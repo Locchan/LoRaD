@@ -2,6 +2,9 @@ from random import random
 
 from yandex_music import Track
 
+from lorad.api.LoRadAPISrv import get_logger
+
+logger = get_logger()
 
 class Radio:
     def __init__(self, yamu_obj, station_id="user:onyourwave"):
@@ -22,7 +25,7 @@ class Radio:
             self.station_id = station_id
         if station_from is not None:
             self.station_from = station_from
-
+        logger.info(f"Starting radio. Station: {self.station_id}")
         # get first 5 tracks
         self.__update_radio_batch(None)
 
