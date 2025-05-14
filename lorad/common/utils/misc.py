@@ -34,13 +34,13 @@ def splash():
     lines = splash.split("\n")
     for aline in lines:
         logger.info(aline)
-    logger.info(get_version().strip())
+    logger.info(get_version())
     logger.info("")
 
 def get_version(path="/version"):
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as versionfile:
-            return versionfile.readline()
+            return versionfile.readline().strip()
     else:
         return "Unknown version"
 
