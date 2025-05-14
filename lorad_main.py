@@ -37,7 +37,6 @@ from lorad.radio.server import LoRadSrv
 from lorad.radio.stream.Streamer import Streamer
 from lorad.radio.music.yandex.YaMu import YaMu
 from lorad.radio.server.LoRadSrv import LoRadServer
-from lorad.api.LoRadAPISrv import start_api_server
 
 globs.RADIO_YAMU = YaMu(config["YAMU_TOKEN"], config["BITRATE_KBPS"])
 carousel_providers.append(globs.RADIO_YAMU)
@@ -58,6 +57,7 @@ if globs.FEAT_NEURONEWS in config["ENABLED_FEATURES"]:
     enabled_threads.append(Thread(name="ProgramMgr", target=prg_sched_loop))
 
 if globs.FEAT_REST in config["ENABLED_FEATURES"]:
+    from lorad.api.LoRadAPISrv import start_api_server
     enabled_threads.append(Thread(name="API", target=start_api_server))
 
 # Sleeps are helping to avoid scrambled module startup logs
