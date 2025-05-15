@@ -1,0 +1,36 @@
+<div class="player-container">
+  <header>
+    <h1>LoRaD Radio</h1>
+    <div class="user-info">
+      <span>{{ currentUser }}</span>
+      <button class="logout-button transition-all" (click)="onLogout()">Logout</button>
+    </div>
+  </header>
+
+  <div class="player-controls">
+    <div class="station-selector transition-all">
+      <label for="station">Station:</label>
+      <select 
+        id="station" 
+        [(ngModel)]="selectedStation" 
+        (change)="onStationChange(selectedStation)"
+        class="transition-all">
+        <option value="">Select a station</option>
+        <option *ngFor="let station of availableStations | keyvalue" [value]="station.value">
+          {{ station.key }}
+        </option>
+      </select>
+    </div>
+
+    <div class="current-track transition-all">
+      <h2>Now Playing</h2>
+      <p>{{ currentTrack || 'Loading...' }}</p>
+    </div>
+
+    <div class="playback-controls">
+      <button class="play-button transition-all" (click)="playPause()">
+        {{ audioPlayer?.paused ? '▶' : '⏸' }}
+      </button>
+    </div>
+  </div>
+</div>
