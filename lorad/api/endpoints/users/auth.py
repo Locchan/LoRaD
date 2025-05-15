@@ -1,16 +1,25 @@
+import inspect
 from lorad.api.orm import Token, User
 from lorad.api.utils.decorators import lrd_api_endp, lrd_validate
 import lorad.common.utils.globs as globs
 from lorad.common.utils.logger import get_logger
 
 ENDP_PATH = "/user/auth"
+LOGIN_REQUIRED = False
+DOCSTRING = {
+        "POST": "Authenticates a user and returns an auth token"
+}
+RESULT_EXAMPLE = "{'token': 'abcdefghi'}"
+REQUIRED_FIELDS = {
+    "POST": ["username", "password"]
+}
+OPTIONAL_FIELDS = {}
 logger = get_logger()
 
 def validate(headers, data):
-    required_fields = ["username", "password"]
-    for areq in required_fields:
+    for areq in REQUIRED_FIELDS["POST"]:
         if areq not in data or areq == "":
-            return f"This method requires {required_fields} to be specified."
+            return f"This method requires {REQUIRED_FIELDS["POST"]} to be specified."
     return
 
 @lrd_api_endp

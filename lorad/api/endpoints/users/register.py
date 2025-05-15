@@ -4,12 +4,17 @@ from lorad.api.utils.decorators import lrd_api_endp, lrd_auth
 import lorad.common.utils.globs as globs
 
 ENDP_PATH = "/user/register"
+LOGIN_REQUIRED = True
+REQUIRED_FIELDS = {
+    "POST": ["username", "password"]
+}
+OPTIONAL_FIELDS = {}
+DOCSTRING = {"POST": "Registers a user. You should be an admin to do this."}
 
 def validate(headers, data):
-    required_fields = ["username", "password"]
-    for areq in required_fields:
+    for areq in REQUIRED_FIELDS['POST']:
         if areq not in data or areq == "":
-            return f"This method requires {required_fields} to be specified."
+            return f"This method requires {REQUIRED_FIELDS['POST']} to be specified."
     if len(data["username"]) < 3:
         return "The username should be at least 3 characters"
     if len(data["password"]) < 8:

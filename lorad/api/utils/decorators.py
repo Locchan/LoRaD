@@ -9,7 +9,7 @@ def lrd_api_endp(func):
             result = func(*args, **kwargs)
             if isinstance(result, tuple):
                 return {"rc": result[0], "data": result[1]}
-            if isinstance(result, dict):
+            if isinstance(result, dict) or isinstance(result, str):
                 return {"rc": 200, "data": result}
             return {"rc": 500, "data": {"error": "Incorrect output from the endpoint function."}}
         except Exception as e:

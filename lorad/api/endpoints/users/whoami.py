@@ -3,6 +3,9 @@ from lorad.api.utils.misc import get_username_from_headers
 import lorad.common.utils.globs as globs
 
 ENDP_PATH = "/user/whoami"
+LOGIN_REQUIRED = True
+DOCSTRING = {"GET": "Returns the username of the logged in user."}
+RESULT_EXAMPLE = "{'whoami': 'admin'}"
 
 @lrd_api_endp
 @lrd_auth(globs.CAP_BASIC_USER)

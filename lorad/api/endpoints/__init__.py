@@ -11,6 +11,7 @@
 from types import ModuleType
 
 from lorad.api.endpoints import version
+from lorad.api.endpoints import apidoc
 
 from lorad.api.endpoints.users import auth
 from lorad.api.endpoints.users import whoami
@@ -24,7 +25,7 @@ from lorad.api.endpoints.yandex import switch_station
 
 endpoints_to_register : list[ModuleType] = \
 [
-version, # root
+version, apidoc, # root
 auth, whoami, register, remove, # user
 available_stations, current_station, switch_station, current_track #yandex
 ]

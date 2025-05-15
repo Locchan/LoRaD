@@ -63,7 +63,10 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
                 endpoint_exec_result = endpoints["GET"][self.path](self.headers)
                 self.send_response(endpoint_exec_result["rc"])
                 self.end_headers()
-                response = json.dumps(endpoint_exec_result["data"])
+                if isinstance(endpoint_exec_result["data"], dict):
+                    response = json.dumps(endpoint_exec_result["data"])
+                else:
+                    response = endpoint_exec_result["data"]
                 self.wfile.write(response.encode("utf-8"))
                 self.wfile.flush()
                 logger.info(f"RQ: GET {self.path}: {endpoint_exec_result["rc"]}." +
@@ -99,7 +102,10 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
                 endpoint_exec_result = endpoints["POST"][self.path](self.headers, data)
                 self.send_response(endpoint_exec_result["rc"])
                 self.end_headers()
-                response = json.dumps(endpoint_exec_result["data"])
+                if isinstance(endpoint_exec_result["data"], dict):
+                    response = json.dumps(endpoint_exec_result["data"])
+                else:
+                    response = endpoint_exec_result["data"]
                 self.wfile.write(response.encode("utf-8"))
                 self.wfile.flush()
                 logger.info(f"RQ: POST {self.path}: {endpoint_exec_result["rc"]}." +
