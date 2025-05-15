@@ -8,3 +8,4 @@ update_repo_author.sh
 .DS_Store
 .venv/
 temp/
+.pytest_cache/

@@ -1,6 +1,7 @@
 import os
 from yandex_music import Client as YaMuClient, Track
 import yandex_music
+import hashlib
 
 import lorad.common.utils.globs as globs
 from lorad.radio.music.Connector import Connector
@@ -19,7 +20,6 @@ class YaMu(Connector):
         self.current_track : Track = None
         self.current_track_path : str = None
         self.current_track_name : str = None
-        self.tracks_played : int = 0
 
     def initialize(self) -> Track:
         logger.info("Initializing Yandex Music...")
@@ -56,8 +56,8 @@ class YaMu(Connector):
             if self.current_track is None:
                 logger.error("Could not download track: No current track")
             else:
-                self.tracks_played += 1
-                self.current_track_path = os.path.join(globs.TEMPDIR, f"current_yandex_{self.tracks_played}.mp3")
+                track_hash = hashlib.md5(self.current_track_name.encode('utf-8')).hexdigest()
+                self.current_track_path = os.path.join(globs.TEMPDIR, f"yandex_{track_hash}.mp3")
 
                 # For debugging so that we don't download everytime we re-launch
                 if not os.path.exists(self.current_track_path):
