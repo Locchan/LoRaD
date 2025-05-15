@@ -5,7 +5,7 @@ RUN npm install -g @angular/cli
 COPY package*.json ./
 RUN npm install
 COPY . .
-RUN ng build --configuration=production
+RUN ng build --configuration=production --base-href /ui/
 
 FROM docker.io/library/nginx:stable-alpine AS runner
 RUN rm -rf /usr/share/nginx/html/*
