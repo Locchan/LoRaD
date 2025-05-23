@@ -10,22 +10,13 @@
 
 from types import ModuleType
 
-from lorad.api.endpoints import version
-from lorad.api.endpoints import apidoc
-
-from lorad.api.endpoints.users import auth
-from lorad.api.endpoints.users import whoami
-from lorad.api.endpoints.users import register
-from lorad.api.endpoints.users import remove
-
-from lorad.api.endpoints.yandex import available_stations
-from lorad.api.endpoints.yandex import current_station
-from lorad.api.endpoints import current_track
-from lorad.api.endpoints.yandex import switch_station
+from lorad.api.endpoints import openapi, version, apidoc, whatsplaying
+from lorad.api.endpoints.users import auth, whoami, register, remove
+from lorad.api.endpoints.yandex import available_stations, current_station, switch_station
 
 endpoints_to_register : list[ModuleType] = \
 [
-version, apidoc, # root
+version, apidoc, openapi, whatsplaying, # root
 auth, whoami, register, remove, # user
-available_stations, current_station, switch_station, current_track #yandex
+available_stations, current_station, switch_station, #yandex
 ]

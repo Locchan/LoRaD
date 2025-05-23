@@ -61,7 +61,7 @@ class YaMu(Ride):
 
                 # For debugging so that we don't download everytime we re-launch
                 if not os.path.exists(self.current_track_path):
-                    logger.info(f"Downloading track [{self.current_track_name}]")
+                    logger.debug(f"Downloading track [{self.current_track_name}]")
                     try:
                         self.current_track.download(filename=self.current_track_path, bitrate_in_kbps=self.bitrate)
                     except yandex_music.exceptions.InvalidBitrateError:
@@ -77,8 +77,8 @@ class YaMu(Ride):
         self.current_track_name = f"{','.join(artists)} - {self.current_track.title}"
         self.__download_current_track()
 
-    def get_current_track(self):
+    def get_current_track(self) -> tuple[str, str]:
         if self.current_track_path is None:
             logger.error("Could not get track: No current track path")
         else:
-            return self.current_track_path, self.current_track_name
+            return self.current_track_name, self.current_track_path

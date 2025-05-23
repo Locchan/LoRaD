@@ -2,11 +2,16 @@ from collections import deque
 import datetime
 import math
 import os
+from pathlib import Path
 from time import sleep
+from typing import Tuple
+
+from openai.types.beta.threads import Run
 from lorad.radio.music.Ride import Ride
 from lorad.radio.server.LoRadSrv import LoRadServer
 from lorad.common.utils.logger import get_logger
 from mutagen.mp3 import MP3
+from mutagen.easyid3 import EasyID3
 
 from lorad.common.utils.misc import read_config
 
@@ -37,10 +42,14 @@ class Streamer():
                 try:
                     if not self.current_ride.initialized:
                         self.current_ride.initialize()
-                    self.currently_playing, self.current_filepath = self.current_ride.get_current_track()
+                    track = self.current_ride.get_current_track()
+                    if track is not None and track and isinstance(track, Tuple):
+                        (self.currently_playing, self.current_filepath) = track
+                    else:
+                        raise RuntimeError(f"Got an invalid track for the carousel: '{track}' Falling back")
                     # Serve chunks and exit when the end of the file is reached
-                    self.serve_file(self.current_filepath)
-                    self.cleanup(self.current_filepath)
+                    self.serve_file()
+                    self.cleanup()
                     self.current_ride.next_track()
                 except Exception as e:
                     logger.warn(f"Could not get the next track from {self.current_ride.__class__.__name__}: [{e.__class__.__name__}: {e}]")
@@ -64,7 +73,8 @@ class Streamer():
             os._exit(1)
         if self.fallback_index == len(fallback_tracks):
             self.fallback_index = 0
-        self.serve_file(os.path.join(config["FALLBACK_TRACK_DIR"], fallback_tracks[self.fallback_index]))
+        self.current_filepath = os.path.join(config["FALLBACK_TRACK_DIR"], fallback_tracks[self.fallback_index])
+        self.serve_file()
         self.fallback_index += 1
         self.start_carousel()
 
@@ -83,7 +93,33 @@ class Streamer():
         else:
             logger.warn("Tried to stop carousel when it is already stoppped")
 
-    def serve_file(self, filepath, track_name=None):
+    # If we don't have track name from whoever wants us to play it, try getting it from metadata.
+    # If even this fails, just cut the file extension use the rest as the track title
+    def set_track_name_from_metadata(self):
+        try:
+            track_id3_obj = EasyID3(self.current_filepath)
+            artist = track_id3_obj.get("artist")
+            title = track_id3_obj.get("title")
+            if artist is None and title is None:
+                raise RuntimeError("No track name in metadata.")
+            self.currently_playing = f"{artist} — {title}"
+        except Exception:
+            self.currently_playing = Path(self.current_filepath).stem
+
+    def get_track_info(self) -> tuple:
+        track_info =  MP3(self.current_filepath).info
+        seconds_per_chunk = self.chunk_size_bytes / (track_info.bitrate / 8)
+        sleep_time = (math.floor(seconds_per_chunk * 100) - 1) / 100.0
+        logger.info(f"Starting to serve the next track...")
+        logger.info(f"Track name: '{self.currently_playing}'")
+        logger.info(f"Track bitrate: {int(track_info.bitrate/1000)}kbps")
+        logger.info(f"Seconds per chunk (approx.): {seconds_per_chunk}; Chunk size: {self.chunk_size}kB")
+        logger.info(f"Traffic per client (approx.): {int(self.chunk_size / seconds_per_chunk)}kBps")
+        logger.info(f"Delay betweek chunk sends (approx.): {sleep_time}s")
+        logger.info(f"Track duration: {track_info.length}s")
+        return seconds_per_chunk, sleep_time, track_info.length
+
+    def serve_file(self, track_name=None):
         if track_name is not None:
             self.currently_playing = track_name
         # Wait if some other thread is in here
@@ -97,16 +133,12 @@ class Streamer():
         self.interrupt = False
         self.free = False
         try:
-            track_info = MP3(filepath).info
-            seconds_per_chunk = self.chunk_size_bytes / (track_info.bitrate / 8)
-            sleep_time = (math.floor(seconds_per_chunk * 100) - 1) / 100.0
-            logger.info(f"Starting to serve the next track...")
-            logger.info(f"Track bitrate: {int(track_info.bitrate/1000)}kbps")
-            logger.info(f"Seconds per chunk (approx.): {seconds_per_chunk}; Chunk size: {self.chunk_size}kB")
-            logger.info(f"Traffic per client (approx.): {int(self.chunk_size / seconds_per_chunk)}kBps")
-            logger.info(f"Delay betweek chunk sends (approx.): {sleep_time}s")
-            logger.info(f"Track duration: {track_info.length}s")
-            with open(filepath, 'rb') as mp3file:
+            if self.currently_playing == "":
+                self.set_track_name_from_metadata()
+
+            seconds_per_chunk, sleep_time, length = self.get_track_info()
+
+            with open(self.current_filepath, 'rb') as mp3file:
                 # Get chunks for the initial burst
                 burst_chunks = [mp3file.read(self.chunk_size_bytes) for _ in range(self.initial_burst_chunks)]
                 while True:
@@ -115,7 +147,7 @@ class Streamer():
                             # If we have burst_chunks var, this means that we're sending the initial burst of data
                             #  thus we just set current_data in the server and continue with out lives as normal
                             if burst_chunks:
-                                track_end_time = datetime.datetime.now().timestamp() + track_info.length
+                                track_end_time = datetime.datetime.now().timestamp() + length
                                 LoRadServer.current_data = deque(burst_chunks)
                                 burst_chunks = False
                                 continue
@@ -135,6 +167,8 @@ class Streamer():
                         #  so that we're sending data faster to avoid buffering but we also make users
                         #  have some pre-buffered future data. This is mitigated below.
                         sleep(sleep_time)
+                        self.currently_playing = ""
+                        self.current_filepath = ""
                     else:
                         logger.info("Playback interrupted.")
                         break
@@ -152,6 +186,6 @@ class Streamer():
             self.free = True
             LoRadServer.track_ended = True
 
-    def cleanup(self, filename):
-        if os.path.exists(filename):
-            os.remove(filename)
+    def cleanup(self):
+        if os.path.exists(self.current_filepath):
+            os.remove(self.current_filepath)

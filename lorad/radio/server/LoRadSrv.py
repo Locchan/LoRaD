@@ -127,11 +127,8 @@ class LoRadServer(BaseHTTPRequestHandler):
                     if len(current_data) > 0:
                         data_to_push = current_data[-1]
                         if data_to_push != pushed_data:
-                            if isinstance(data_to_push, bytes) and not isinstance(data_to_push, type_err):
-                                type_err = type(data_to_push)
-                                logger.error(f"Wrong data type! Got [{type_err}] as data to push!")
+                            if not isinstance(data_to_push, bytes):
                                 continue
-                            type_err = bytes
                             # logger.debug(f"[{client_id}] Sending a chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]; Length: {len(data_to_push)}")
                             self.wfile.write(data_to_push)
                             self.wfile.flush()
@@ -139,7 +136,7 @@ class LoRadServer(BaseHTTPRequestHandler):
                                 LoRadServer.add_data(False)
                         pushed_data = data_to_push
                     sleep(0.1)
-        except (BrokenPipeError, ConnectionResetError):
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             logger.info(f"Client [{client_id} ({self.client_address[0]})] disconnected. Connected clients: {LoRadServer.connected_clients-1}")
         except RuntimeError as e:
             logger.info(f"Client [{client_id} ({self.client_address[0]})] was kicked: ({e}) Connected clients: {LoRadServer.connected_clients-1}")
