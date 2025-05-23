@@ -3,13 +3,12 @@ import os
 
 import lorad.common.utils.globs as globs
 from lorad.common.utils.logger import get_logger
-from lorad.common.utils.misc import read_config
 
 logger = get_logger()
 
 class GenericPrg():
-    def __init__(self, start_times: list[datetime.time], name: str, preparation_needed_mins: int):
-        config = read_config()
+    def __init__(self, start_times: list[datetime.time], name: str, name_pretty: str, preparation_needed_mins: int):
+        self.name_pretty = name_pretty
         self.name = name
         self.start_times  = start_times
         self.preparation_needed_mins = preparation_needed_mins
@@ -23,8 +22,9 @@ class GenericPrg():
         logger.info(f"Program will start in {self.preparation_needed_mins} minutes.")
         self.prepared_program = self._prepare_program_impl() 
     
-    def _prepare_program_impl(self):
-        pass
+    # Should return {"track_name": "track_filepath", ...}
+    def _prepare_program_impl(self) -> dict:
+        return {} #dummy
 
     def start_program(self):
         if self.prepared_program is None:
@@ -33,15 +33,15 @@ class GenericPrg():
             return
         try:
             self.program_running = True
-            for aprogram in self.prepared_program:
-                if not os.path.exists(aprogram):
-                    logger.error(f"Can't run program [{self.name}]: file [{aprogram}] does not exist!")
+            for aname, afile in self.prepared_program.items():
+                if not os.path.exists(afile):
+                    logger.error(f"Can't run program [{self.name}]: file [{afile}] does not exist!")
                     return
             logger.info(f"Running a scheduled program: [{self.name}]...")
             globs.RADIO_STREAMER.stop_carousel()
             for anum, afile in enumerate(self.prepared_program):
                 logger.info(f"Program: {self.name}; Track {anum+1}/{len(self.prepared_program)}")
-                globs.RADIO_STREAMER.serve_file(afile)
+                globs.RADIO_STREAMER.serve_file(afile, track_name=aname)
             logger.info(f"Program [{self.name}] finished. Restarting carousel.")
         except Exception as e:
             logger.error(f"Failed to run the program: {e.__class__.__name__}")

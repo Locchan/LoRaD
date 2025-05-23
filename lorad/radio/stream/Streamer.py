@@ -3,7 +3,7 @@ import datetime
 import math
 import os
 from time import sleep
-from lorad.radio.music.Connector import Connector
+from lorad.radio.music.Ride import Ride
 from lorad.radio.server.LoRadSrv import LoRadServer
 from lorad.common.utils.logger import get_logger
 from mutagen.mp3 import MP3
@@ -13,17 +13,19 @@ from lorad.common.utils.misc import read_config
 logger = get_logger()
 
 class Streamer():
-    def __init__(self, connectors: list[Connector], server: LoRadServer):
+    def __init__(self, connectors: list[Ride], server: LoRadServer):
         logger.debug("Initializing carousel...")
         config = read_config()
         self.fallback_index = 0
         self.server = server
         self.connectors = connectors
         self.connector_index = 0
-        self.current_connector = self.connectors[self.connector_index]
+        self.current_ride = self.connectors[self.connector_index]
         self.carousel_enabled = False
         self.chunk_size = config["CHUNK_SIZE_KB"]
         self.chunk_size_bytes = self.chunk_size * 1024
+        self.currently_playing = ""
+        self.current_filepath = ""
         self.interrupt = False
         self.free = True
         self.initial_burst_chunks = 8
@@ -33,23 +35,23 @@ class Streamer():
         while True:
             if self.carousel_enabled:
                 try:
-                    if not self.current_connector.initialized:
-                        self.current_connector.initialize()
-                    filepath = self.current_connector.get_current_track_file()
+                    if not self.current_ride.initialized:
+                        self.current_ride.initialize()
+                    self.currently_playing, self.current_filepath = self.current_ride.get_current_track()
                     # Serve chunks and exit when the end of the file is reached
-                    self.serve_file(filepath)
-                    self.cleanup(filepath)
-                    self.current_connector.next_track()
+                    self.serve_file(self.current_filepath)
+                    self.cleanup(self.current_filepath)
+                    self.current_ride.next_track()
                 except Exception as e:
-                    logger.warn(f"Could not get the next track from {self.current_connector.__class__.__name__}: [{e.__class__.__name__}: {e}]")
+                    logger.warn(f"Could not get the next track from {self.current_ride.__class__.__name__}: [{e.__class__.__name__}: {e}]")
                     self.stop_carousel()
                     self.fallback()
                 # Rotating connectors if possible
                 self.connector_index += 1
                 if len(self.connectors) > self.connector_index:
-                    self.current_connector = self.connectors[self.connector_index]
+                    self.current_ride = self.connectors[self.connector_index]
                 else:
-                    self.current_connector = self.connectors[0]
+                    self.current_ride = self.connectors[0]
             else:
                 sleep(1)
 
@@ -81,7 +83,9 @@ class Streamer():
         else:
             logger.warn("Tried to stop carousel when it is already stoppped")
 
-    def serve_file(self, filepath):
+    def serve_file(self, filepath, track_name=None):
+        if track_name is not None:
+            self.currently_playing = track_name
         # Wait if some other thread is in here
         while True:
             if not self.free:

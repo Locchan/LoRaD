@@ -11,9 +11,10 @@ logger = get_logger()
 
 class NewsPrgS(GenericPrg):
     name = "NewsSmall"
+    name_pretty = "News (small)"
 
     def __init__(self, start_times: datetime.time, preparation_needed_mins: int):
-        super().__init__(start_times, NewsPrgS.name, preparation_needed_mins)
+        super().__init__(start_times, NewsPrgS.name, NewsPrgS.name_pretty, preparation_needed_mins)
         self.config = read_config()
         self.jingle_path = os.path.join(self.config["RESDIR"], self.config["ENABLED_PROGRAMS"][NewsPrgS.name]["jingle_path"])
 
@@ -31,10 +32,11 @@ class NewsPrgS(GenericPrg):
         news_files = get_filelist(news_ids)
 
         # Re-encode neuro files to 320kbps 44100 so that we don't change quality dramatically
-        news_digest = self._reencode_news(news_files)
+        news_digest_filepath = self._reencode_news(news_files)
         logger.info("Program prepared")
         News.mark_as_read(news_ids)
-        return [news_digest]
+        news_name = f"{self.name_pretty}: {(datetime.datetime.now() + datetime.timedelta(hours=1)).strftime("%Y-%m-%d %H")}"
+        return {news_name: news_digest_filepath}
     
     def _reencode_news(self, news_files) -> str:
         reencode_date = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")

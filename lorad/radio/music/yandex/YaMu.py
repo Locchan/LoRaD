@@ -4,13 +4,13 @@ import yandex_music
 import hashlib
 
 import lorad.common.utils.globs as globs
-from lorad.radio.music.Connector import Connector
+from lorad.radio.music.Ride import Ride
 from lorad.radio.music.yandex.Radio import Radio
 from lorad.common.utils.logger import get_logger
 
 logger = get_logger()
 
-class YaMu(Connector):
+class YaMu(Ride):
     def __init__(self, token, bitrate):
         super().__init__()
         self.bitrate : int = bitrate
@@ -77,8 +77,8 @@ class YaMu(Connector):
         self.current_track_name = f"{','.join(artists)} - {self.current_track.title}"
         self.__download_current_track()
 
-    def get_current_track_file(self):
+    def get_current_track(self):
         if self.current_track_path is None:
             logger.error("Could not get track: No current track path")
         else:
-            return self.current_track_path
+            return self.current_track_path, self.current_track_name

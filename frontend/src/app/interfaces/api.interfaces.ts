@@ -24,7 +24,7 @@ export interface YandexStationsResponse {
   [key: string]: string; // station name -> station id
 }
 
-export interface CurrentTrackResponse {
+export interface WhatsPlayingResponse {
   track: string;
 }
 

@@ -9,7 +9,7 @@ import {
   WhoAmIResponse,
   UserResponse,
   YandexStationsResponse,
-  CurrentTrackResponse,
+  WhatsPlayingResponse,
   CurrentStationResponse
 } from '../interfaces/api.interfaces';
 
@@ -95,9 +95,9 @@ export class ApiService {
     );
   }
 
-  getCurrentTrack(): Observable<CurrentTrackResponse> {
-    return this.http.get<CurrentTrackResponse>(
-      `${this.apiUrl}/yandex/current_track`,
+  getCurrentTrack(): Observable<WhatsPlayingResponse> {
+    return this.http.get<WhatsPlayingResponse>(
+      `${this.apiUrl}/whatsplaying`,
       { headers: this.getAuthHeaders() }
     );
   }

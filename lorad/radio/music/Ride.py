@@ -1,4 +1,4 @@
-class Connector():
+class Ride():
     def __init__(self):
         self.initialized = False
         pass
@@ -9,7 +9,7 @@ class Connector():
     def download_current_track(self):
         pass
 
-    def get_current_track_file(self):
+    def get_current_track(self):
         pass
 
     def next_track(self):

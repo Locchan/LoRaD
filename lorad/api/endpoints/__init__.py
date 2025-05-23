@@ -20,7 +20,7 @@ from lorad.api.endpoints.users import remove
 
 from lorad.api.endpoints.yandex import available_stations
 from lorad.api.endpoints.yandex import current_station
-from lorad.api.endpoints.yandex import current_track
+from lorad.api.endpoints import current_track
 from lorad.api.endpoints.yandex import switch_station
 
 endpoints_to_register : list[ModuleType] = \
