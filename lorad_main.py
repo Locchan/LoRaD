@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import glob
 from http.server import ThreadingHTTPServer
 import os
 import signal
@@ -10,7 +11,8 @@ from lorad.radio.programs.news.neuro.neuronews import neurify_news
 from lorad.radio.programs.news.newsparser import parse_news
 from lorad.radio.programs.program_mgr import prg_sched_loop
 from lorad.common.utils.logger import get_logger, setdebug
-from lorad.common.utils.misc import read_config, signal_stop, splash
+from lorad.common.utils.misc import feature_enabled, read_config, signal_stop, splash
+from lorad.radio.stream.ReStreamer import ReStreamer
 
 logger = get_logger()
 
@@ -34,29 +36,44 @@ carousel_providers = []
 globs.TEMPDIR = config["TEMPDIR"]
 
 from lorad.radio.server import LoRadSrv
-from lorad.radio.stream.Streamer import Streamer
-from lorad.radio.music.yandex.YaMu import YaMu
+from lorad.radio.stream.FileStreamer import FileStreamer
+from lorad.radio.sources.yandex.YaMu import YaMu
 from lorad.radio.server.LoRadSrv import LoRadServer
-
-globs.RADIO_YAMU = YaMu(config["YAMU_TOKEN"], config["BITRATE_KBPS"])
-carousel_providers.append(globs.RADIO_YAMU)
 
 logger.info("Starting LoRaD...")
 server = ThreadingHTTPServer(("0.0.0.0", config["LISTEN_PORT"]), LoRadServer)
 logger.info(f"Enabled features: {config['ENABLED_FEATURES']}")
-globs.RADIO_STREAMER = Streamer(carousel_providers, server)
+
+PLAYERS = []
 
 enabled_threads = [
-    Thread(name="Streamer", target=globs.RADIO_STREAMER.carousel),
-    Thread(name="HTTPServer", target=LoRadSrv.start, args=(server,))
+    Thread(name="HTTPServer", target=LoRadSrv.start, args=(server,)),
 ]
 
-if globs.FEAT_NEURONEWS in config["ENABLED_FEATURES"]:
+if feature_enabled(globs.FEAT_FILESTREAMER):
+    if feature_enabled(globs.FEAT_FILESTREAMER_YANDEX):
+        globs.RADIO_YANDEX = YaMu(config["YAMU_TOKEN"], config["BITRATE_KBPS"])
+        carousel_providers.append(globs.RADIO_YANDEX)
+    if len(carousel_providers) > 1:
+        globs.RADIO_STREAMER = FileStreamer(carousel_providers, server)
+        enabled_threads.append(Thread(name="Streamer", target=globs.RADIO_STREAMER.carousel))
+        PLAYERS.append(globs.RADIO_STREAMER)
+    else:
+        logger.error("Filesteamer is enabled but no providers are configured!")
+
+if feature_enabled(globs.FEAT_RESTREAMER):
+    globs.RESTREAMER = ReStreamer(server)
+    default_station = config["RESTREAMER"]["STATION"] if "RESTREAMER" in config and "STATION" in config["RESTREAMER"] else "default"
+    globs.RESTREAMER.current_station = default_station
+    enabled_threads.append(Thread(name="ReStreamer", target=globs.RESTREAMER.standby))
+    PLAYERS.append(globs.RESTREAMER)
+
+if feature_enabled(globs.FEAT_NEURONEWS):
     enabled_threads.append(Thread(name="NewsParser", target=parse_news))
     enabled_threads.append(Thread(name="Neuro", target=neurify_news))
     enabled_threads.append(Thread(name="ProgramMgr", target=prg_sched_loop))
 
-if globs.FEAT_REST in config["ENABLED_FEATURES"]:
+if feature_enabled(globs.FEAT_REST):
     from lorad.api.LoRadAPISrv import start_api_server
     enabled_threads.append(Thread(name="API", target=start_api_server))
 
@@ -66,7 +83,14 @@ for athread in enabled_threads:
     sleep(0.2)
 
 logger.info("All threads started.")
-globs.RADIO_STREAMER.start_carousel()
+players_num = len(PLAYERS)
+if players_num == 0:
+    logger.error("No players are ready after all threads are started. Nothing to play. Exiting...")
+    exit(1)
+else:
+    logger.info(f"{players_num} players registered: {', '.join(x.__class__.__name__ for x in PLAYERS)}")
+    logger.info("Defaulting to the first player")
+    PLAYERS[0].start()
 
 while True:
     for athread in enabled_threads:

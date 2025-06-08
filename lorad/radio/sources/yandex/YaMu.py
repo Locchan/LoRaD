@@ -4,13 +4,13 @@ import yandex_music
 import hashlib
 
 import lorad.common.utils.globs as globs
-from lorad.radio.music.Ride import Ride
-from lorad.radio.music.yandex.Radio import Radio
+from lorad.radio.sources.FileRide import FileRide
+from lorad.radio.sources.yandex.Radio import Radio
 from lorad.common.utils.logger import get_logger
 
 logger = get_logger()
 
-class YaMu(Ride):
+class YaMu(FileRide):
     def __init__(self, token, bitrate):
         super().__init__()
         self.bitrate : int = bitrate

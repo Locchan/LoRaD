@@ -9,4 +9,4 @@ RESULT_EXAMPLE = "{'station': 'genre:pop'}"
 @lrd_api_endp
 @lrd_auth(globs.CAP_BASIC_USER)
 def impl_GET(headers):
-    return {"station": globs.RADIO_YAMU.radio.station_id}
+    return {"station": globs.RADIO_YANDEX.radio.station_id}

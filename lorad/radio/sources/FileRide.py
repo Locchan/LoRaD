@@ -1,4 +1,4 @@
-class Ride():
+class FileRide():
     def __init__(self):
         self.initialized = False
         pass

@@ -7,7 +7,7 @@ from time import sleep
 from typing import Tuple
 
 from openai.types.beta.threads import Run
-from lorad.radio.music.Ride import Ride
+from lorad.radio.sources.FileRide import FileRide
 from lorad.radio.server.LoRadSrv import LoRadServer
 from lorad.common.utils.logger import get_logger
 from mutagen.mp3 import MP3
@@ -17,8 +17,8 @@ from lorad.common.utils.misc import read_config
 
 logger = get_logger()
 
-class Streamer():
-    def __init__(self, connectors: list[Ride], server: LoRadServer):
+class FileStreamer():
+    def __init__(self, connectors: list[FileRide], server: LoRadServer):
         logger.debug("Initializing carousel...")
         config = read_config()
         self.fallback_index = 0
@@ -77,6 +77,12 @@ class Streamer():
         self.serve_file()
         self.fallback_index += 1
         self.start_carousel()
+
+    def start(self):
+        self.start_carousel()
+
+    def stop(self):
+        self.stop_carousel()
 
     def start_carousel(self):
         if self.carousel_enabled:
@@ -160,12 +166,12 @@ class Streamer():
                                 LoRadServer.track_ended = True
                                 break
                             else:
-                                # Serving the chunk to LoRadServer which will sending the chunk to the clients
+                                # Serving the chunk to LoRadServer which will send the chunk to the clients
                                 LoRadServer.add_data(chunk)
 
                         # If we're sending a packet per .256 seconds , we'll wait for .24 seconds (check how sleep_time is created)
-                        #  so that we're sending data faster to avoid buffering but we also make users
-                        #  have some pre-buffered future data. This is mitigated below.
+                        #  so that we're sending data faster to avoid buffering while also making users
+                        #  have some pre-buffered future data. The problem of users having future data is mitigated below.
                         sleep(sleep_time)
                         self.currently_playing = ""
                         self.current_filepath = ""

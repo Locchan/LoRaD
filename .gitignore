@@ -1,4 +1,5 @@
 config.json
+stations.json
 __pycache__
 *.log
 dist/

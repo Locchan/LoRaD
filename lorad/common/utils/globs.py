@@ -1,15 +1,21 @@
-from lorad.radio.music.yandex.YaMu import YaMu
-from lorad.radio.stream.Streamer import Streamer
+from lorad.radio.sources.yandex.YaMu import YaMu
+from lorad.radio.stream.FileStreamer import FileStreamer
+from lorad.radio.stream.ReStreamer import ReStreamer
 
 FEATURE_FLAGS = []
 TEMPDIR = ""
 
-RADIO_STREAMER : Streamer = None
-RADIO_YAMU : YaMu = None
+RADIO_STREAMER : FileStreamer = None
+RADIO_YANDEX : YaMu = None
+
+RESTREAMER : ReStreamer = None
 
 FLG_DEBUG = "DEBUG"
 FLG_NO_DOWNLOADING = "NO_DOWNLOADING"
 
+FEAT_FILESTREAMER = "FILESTREAMER"
+FEAT_FILESTREAMER_YANDEX = "FILESTREAMER:YANDEX"
+FEAT_RESTREAMER = "RESTREAMER"
 FEAT_NEURONEWS = "NEURONEWS"
 FEAT_REST = "REST"
 
@@ -20,3 +26,5 @@ LOGIN_INCORRECT_PASSWORD = 2
 CAP_IMBA = "ALL"
 CAP_ADMIN = "ADMIN"
 CAP_BASIC_USER = "BU"
+
+RESTREAMER_DEFAULT_FORMAT = "mp3"

@@ -1,4 +1,7 @@
 Features that can be enabled via config:
+- FILESTREAMER
+- FILESTREAMER:YANDEX
+- RESTREAMER
 - NEURONEWS
 - API
 

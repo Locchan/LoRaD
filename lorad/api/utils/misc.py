@@ -9,8 +9,8 @@ def get_username_from_headers(headers):
 def hash_password(password):
     return hashlib.sha512(password.encode('utf-8') + "Mei8HrFsNkEnEXs$J5#q22DA4hdZZ#4964EEvYL2$4G4WDRBJ%z&&Nfg8&EBxRHK".encode("utf-8")).hexdigest()
 
-def get_stations():
-    stations = globs.RADIO_YAMU.radio.get_stations()
+def get_yandex_stations():
+    stations = globs.RADIO_YANDEX.radio.get_stations()
     stations_parsed = {}
     for astation in stations:
         stations_parsed[astation['station']['name']] = f"{astation['station']['id']['type']}:{astation['station']['id']['tag']}"

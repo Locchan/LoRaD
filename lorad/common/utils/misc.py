@@ -16,6 +16,20 @@ def read_config(filepath="config.json"):
             print(f"Could not read config file {filepath}: {e.__class__.__name__}")
             exit(1)
 
+def feature_enabled(feature_name):
+    config = read_config()
+    return feature_name in config["ENABLED_FEATURES"]
+    
+def read_stations(filepath="stations.json"):
+    if "STATIONS_FILE_PATH" in os.environ:
+        filepath = os.environ["STATIONS_FILE_PATH"]
+    with open(filepath, "r", encoding="utf-8") as config_file:
+        try:
+            return json.load(config_file)
+        except Exception as e:
+            print(f"Could not read config file {filepath}: {e.__class__.__name__}")
+            exit(1)
+
 def signal_stop(_signo, _stack_frame):
     logger = get_logger()
     logger.info(f"Caught {signal.Signals(_signo).name}. Shutting down...")

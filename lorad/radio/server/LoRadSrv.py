@@ -37,7 +37,8 @@ class LoRadServer(BaseHTTPRequestHandler):
 
     @staticmethod
     def add_data(data):
-        LoRadServer.current_data.popleft()
+        if len(LoRadServer.current_data) > 0:
+            LoRadServer.current_data.popleft()
         LoRadServer.current_data.append(data)
 
     @staticmethod
@@ -52,7 +53,7 @@ class LoRadServer(BaseHTTPRequestHandler):
 
     def do_GET(self):
         # If X-Real-IP exists, then we're proxied.
-        # When we're proxied, self.client address will have our proxy IP inside, not the clients IP
+        # When we're proxied, self.client address will have our proxy IP inside, not the real client's IP
         ip_from_headers = self.headers.get('X-Real-IP')
         if ip_from_headers is not None:
             self.client_address = (ip_from_headers, self.client_address[1])
@@ -103,7 +104,7 @@ class LoRadServer(BaseHTTPRequestHandler):
                         data_to_push = bytes()
                         for data_to_push in current_data:
                             if data_to_push:
-                                #logger.debug(f"[{client_id}] Sending a burst chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]; Length: {len(data_to_push)}")
+                                logger.debug(f"[{client_id}] Sending a burst chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]; Length: {len(data_to_push)}")
                                 self.wfile.write(data_to_push)
                                 self.wfile.flush()
                                 pushed_data = data_to_push
@@ -129,7 +130,7 @@ class LoRadServer(BaseHTTPRequestHandler):
                         if data_to_push != pushed_data:
                             if not isinstance(data_to_push, bytes):
                                 continue
-                            # logger.debug(f"[{client_id}] Sending a chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]; Length: {len(data_to_push)}")
+                            #logger.debug(f"[{client_id}] Sending a chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]; Length: {len(data_to_push)}")
                             self.wfile.write(data_to_push)
                             self.wfile.flush()
                             if LoRadServer.track_ended:

@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.session import Session
 from lorad.common.database.Base import Base
 import lorad.common.utils.globs as globs
-from lorad.common.utils.misc import read_config
+from lorad.common.utils.misc import feature_enabled, read_config
 from lorad.common.utils.logger import get_logger
 
 logger = get_logger()
@@ -28,9 +28,9 @@ class MySQL():
         return sessionmaker(autoflush=True, bind=MySQL.engine)()
 
     def _register_orm(self):
-        if globs.FEAT_NEURONEWS in config["ENABLED_FEATURES"]:
+        if feature_enabled(globs.FEAT_NEURONEWS):
             from lorad.radio.programs.news.orm.News import News
-        if globs.FEAT_REST in config["ENABLED_FEATURES"]:
+        if feature_enabled(globs.FEAT_REST):
             from lorad.api.orm.Group import Group
             from lorad.api.orm.User import User
         Base.metadata.create_all(MySQL.engine)
