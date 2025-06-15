@@ -1,9 +1,9 @@
 import datetime
 import os
 import ffmpeg
-from lorad.radio.programs.GenericPrg import GenericPrg
-from lorad.radio.programs.news.orm import News
-from lorad.radio.programs.news.neuro.neurovoice import check_voiced, get_filelist, voice_news
+from lorad.audio.programs.GenericPrg import GenericPrg
+from lorad.audio.programs.news.orm import News
+from lorad.audio.programs.news.neuro.neurovoice import check_voiced, get_filelist, voice_news
 from lorad.common.utils.logger import get_logger
 from lorad.common.utils.misc import read_config
 

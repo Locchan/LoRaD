@@ -1,6 +1,6 @@
 import re
 from time import sleep
-from lorad.radio.programs.news.orm import News
+from lorad.audio.programs.news.orm import News
 from lorad.common.utils.logger import get_logger
 from lorad.common.utils.misc import read_config
 from openai import OpenAI

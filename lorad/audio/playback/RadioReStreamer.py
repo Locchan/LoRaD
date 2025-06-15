@@ -2,16 +2,16 @@ import requests
 from lorad.api.LoRadAPISrv import read_config
 from lorad.common.utils.logger import get_logger
 from lorad.common.utils.misc import read_stations
-from lorad.radio.server import LoRadSrv
-from lorad.radio.stream.FileStreamer import sleep
-from lorad.radio.server.LoRadSrv import LoRadServer
-from lorad.radio.stream.utils import FFMPEGFeedError
-from lorad.radio.stream.utils.Transcoder import Transcoder
+from lorad.audio.server import LoRadSrv
+from lorad.audio.playback.FileStreamer import sleep
+from lorad.audio.server.LoRadSrv import LoRadServer
+from lorad.audio.playback.utils import FFMPEGFeedError
+from lorad.audio.playback.utils.Transcoder import Transcoder
 
 logger = get_logger()
 config = read_config()
 
-class ReStreamer:
+class RadioReStreamer:
     def __init__(self, server: LoRadSrv):
         self.server = server
         self.enabled = False

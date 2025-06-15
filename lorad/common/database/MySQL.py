@@ -29,7 +29,7 @@ class MySQL():
 
     def _register_orm(self):
         if feature_enabled(globs.FEAT_NEURONEWS):
-            from lorad.radio.programs.news.orm.News import News
+            from lorad.audio.programs.news.orm.News import News
         if feature_enabled(globs.FEAT_REST):
             from lorad.api.orm.Group import Group
             from lorad.api.orm.User import User

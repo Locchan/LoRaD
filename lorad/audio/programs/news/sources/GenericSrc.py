@@ -1,4 +1,4 @@
-from lorad.radio.programs.news.orm.News import News
+from lorad.audio.programs.news.orm.News import News
 
 
 class GenericSource():

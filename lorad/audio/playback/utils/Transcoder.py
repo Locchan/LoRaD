@@ -5,9 +5,9 @@ import sys
 from threading import Thread
 from typing import Deque
 from lorad.common.utils.logger import get_logger
-from lorad.radio.server.LoRadSrv import sleep
-from lorad.radio.stream.FileStreamer import deque
-from lorad.radio.stream.utils import FFMPEGFeedError
+from lorad.audio.server.LoRadSrv import sleep
+from lorad.audio.playback.FileStreamer import deque
+from lorad.audio.playback.utils import FFMPEGFeedError
 
 
 logger = get_logger()

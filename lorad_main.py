@@ -7,12 +7,12 @@ import signal
 from threading import Thread
 from time import sleep
 import lorad.common.utils.globs as globs
-from lorad.radio.programs.news.neuro.neuronews import neurify_news
-from lorad.radio.programs.news.newsparser import parse_news
-from lorad.radio.programs.program_mgr import prg_sched_loop
+from lorad.audio.programs.news.neuro.neuronews import neurify_news
+from lorad.audio.programs.news.newsparser import parse_news
+from lorad.audio.programs.program_mgr import prg_sched_loop
 from lorad.common.utils.logger import get_logger, setdebug
 from lorad.common.utils.misc import feature_enabled, read_config, signal_stop, splash
-from lorad.radio.stream.ReStreamer import ReStreamer
+from lorad.audio.playback.RadioReStreamer import RadioReStreamer
 
 logger = get_logger()
 
@@ -35,10 +35,10 @@ carousel_providers = []
 
 globs.TEMPDIR = config["TEMPDIR"]
 
-from lorad.radio.server import LoRadSrv
-from lorad.radio.stream.FileStreamer import FileStreamer
-from lorad.radio.sources.yandex.YaMu import YaMu
-from lorad.radio.server.LoRadSrv import LoRadServer
+from lorad.audio.server import LoRadSrv
+from lorad.audio.playback.FileStreamer import FileStreamer
+from lorad.audio.file_sources.yandex.YaMu import YaMu
+from lorad.audio.server.LoRadSrv import LoRadServer
 
 logger.info("Starting LoRaD...")
 server = ThreadingHTTPServer(("0.0.0.0", config["LISTEN_PORT"]), LoRadServer)
@@ -62,7 +62,7 @@ if feature_enabled(globs.FEAT_FILESTREAMER):
         logger.error("Filesteamer is enabled but no providers are configured!")
 
 if feature_enabled(globs.FEAT_RESTREAMER):
-    globs.RESTREAMER = ReStreamer(server)
+    globs.RESTREAMER = RadioReStreamer(server)
     default_station = config["RESTREAMER"]["STATION"] if "RESTREAMER" in config and "STATION" in config["RESTREAMER"] else "default"
     globs.RESTREAMER.current_station = default_station
     enabled_threads.append(Thread(name="ReStreamer", target=globs.RESTREAMER.standby))

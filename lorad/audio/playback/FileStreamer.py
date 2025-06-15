@@ -7,8 +7,8 @@ from time import sleep
 from typing import Tuple
 
 from openai.types.beta.threads import Run
-from lorad.radio.sources.FileRide import FileRide
-from lorad.radio.server.LoRadSrv import LoRadServer
+from lorad.audio.file_sources.FileRide import FileRide
+from lorad.audio.server.LoRadSrv import LoRadServer
 from lorad.common.utils.logger import get_logger
 from mutagen.mp3 import MP3
 from mutagen.easyid3 import EasyID3

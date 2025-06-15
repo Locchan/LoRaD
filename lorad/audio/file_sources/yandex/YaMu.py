@@ -4,8 +4,8 @@ import yandex_music
 import hashlib
 
 import lorad.common.utils.globs as globs
-from lorad.radio.sources.FileRide import FileRide
-from lorad.radio.sources.yandex.Radio import Radio
+from lorad.audio.file_sources.FileRide import FileRide
+from lorad.audio.file_sources.yandex.Radio import Radio
 from lorad.common.utils.logger import get_logger
 
 logger = get_logger()

@@ -1,6 +1,6 @@
-from lorad.radio.sources.yandex.YaMu import YaMu
-from lorad.radio.stream.FileStreamer import FileStreamer
-from lorad.radio.stream.ReStreamer import ReStreamer
+from lorad.audio.file_sources.yandex.YaMu import YaMu
+from lorad.audio.playback.FileStreamer import FileStreamer
+from lorad.audio.playback.RadioReStreamer import RadioReStreamer
 
 FEATURE_FLAGS = []
 TEMPDIR = ""
@@ -8,7 +8,7 @@ TEMPDIR = ""
 RADIO_STREAMER : FileStreamer = None
 RADIO_YANDEX : YaMu = None
 
-RESTREAMER : ReStreamer = None
+RESTREAMER : RadioReStreamer = None
 
 FLG_DEBUG = "DEBUG"
 FLG_NO_DOWNLOADING = "NO_DOWNLOADING"

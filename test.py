@@ -3,9 +3,9 @@
 from http.server import ThreadingHTTPServer
 from threading import Thread
 from lorad.common.utils.logger import setdebug
-from lorad.radio.server import LoRadSrv
-from lorad.radio.server.LoRadSrv import LoRadServer
-from lorad.radio.stream.ReStreamer import ReStreamer
+from lorad.audio.server import LoRadSrv
+from lorad.audio.server.LoRadSrv import LoRadServer
+from lorad.audio.playback.RadioReStreamer import RadioReStreamer
 from lorad.common.utils.misc import get_version, read_config
 
 
@@ -18,5 +18,5 @@ loradsrvthread = Thread(name="HTTPServer", target=LoRadSrv.start, args=(server,)
 
 loradsrvthread.start()
 
-restreamer = ReStreamer(None)
+restreamer = RadioReStreamer(None)
 restreamer.start("belarus")
