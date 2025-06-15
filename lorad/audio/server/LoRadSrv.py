@@ -52,6 +52,12 @@ class LoRadServer(BaseHTTPRequestHandler):
         super().__init__(request, client_address, server)
 
     def do_GET(self):
+        if self.path != '/':
+            self.send_response(404)
+            self.end_headers()
+            self.wfile.write("<html><h1>404</h1></html>".encode("utf-8"))
+            self.wfile.flush()
+            return
         # If X-Real-IP exists, then we're proxied.
         # When we're proxied, self.client address will have our proxy IP inside, not the real client's IP
         ip_from_headers = self.headers.get('X-Real-IP')

@@ -129,7 +129,19 @@ class RadReStreamer:
             logger.error("Could not feed ffmpeg.")
     
     def consume_external_stream(self, stream_url):
+        error_iterations = 0
         while True:
-            for adata in requests.get(stream_url, stream=True):
-                #logger.debug(f"Yielded {len(adata)} BOD from the remote stream")
-                yield adata
+            try:
+                for adata in requests.get(stream_url, stream=True):
+                    #logger.debug(f"Yielded {len(adata)} BOD from the remote stream")
+                    error_iterations = 0
+                    yield adata
+            # Retry rightaway on the first error. If still erroring out, then sleep error_iterations * 2 but no more than 15 seconds.
+            except Exception as e:
+                error_iterations += 1
+                if error_iterations > 1:
+                    retry_time = error_iterations * 2
+                    if retry_time > 15:
+                        retry_time = 15
+                        logger.warning(f"Error while reading {stream_url}: {e.__class__.__name__}. Retrying in {retry_time}s.")
+                        sleep(retry_time)
