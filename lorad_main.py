@@ -12,7 +12,7 @@ from lorad.audio.programs.news.newsparser import parse_news
 from lorad.audio.programs.program_mgr import prg_sched_loop
 from lorad.common.utils.logger import get_logger, setdebug
 from lorad.common.utils.misc import feature_enabled, read_config, signal_stop, splash
-from lorad.audio.playback.RadioReStreamer import RadioReStreamer
+from lorad.audio.playback.RadReStreamer import RadReStreamer
 
 logger = get_logger()
 
@@ -62,7 +62,7 @@ if feature_enabled(globs.FEAT_FILESTREAMER):
         logger.error("Filesteamer is enabled but no providers are configured!")
 
 if feature_enabled(globs.FEAT_RESTREAMER):
-    globs.RESTREAMER = RadioReStreamer(server)
+    globs.RESTREAMER = RadReStreamer(server)
     default_station = config["RESTREAMER"]["STATION"] if "RESTREAMER" in config and "STATION" in config["RESTREAMER"] else "default"
     globs.RESTREAMER.current_station = default_station
     enabled_threads.append(Thread(name="ReStreamer", target=globs.RESTREAMER.standby))

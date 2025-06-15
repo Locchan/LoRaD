@@ -1,23 +1,23 @@
-from io import BytesIO
 import os
 import subprocess
-import sys
 from threading import Thread
 from typing import Deque
 from lorad.common.utils.logger import get_logger
 from lorad.audio.server.LoRadSrv import sleep
 from lorad.audio.playback.FileStreamer import deque
-from lorad.audio.playback.utils import FFMPEGFeedError
+from lorad.common.utils.misc import read_config
 
 
 logger = get_logger()
+config = read_config()
+
 
 class Transcoder():
     def __init__(self, output_bitrate, input_format, output_format="mp3"):
         self.data_in : Deque[bytes] = deque()
         self.data_out : Deque[bytes] = deque()
         self.output_bitrate = int(output_bitrate)
-        self.bytes_per_chunk = int(((self.output_bitrate / 8) * 1000) * 0.25)
+        self.bytes_per_chunk = config["CHUNK_SIZE_KB"] * 1024
         logger.debug(f"Transcoder bytes per chunk {self.bytes_per_chunk}")
         self.input_format = input_format
         self.output_format = output_format

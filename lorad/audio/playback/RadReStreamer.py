@@ -11,7 +11,7 @@ from lorad.audio.playback.utils.Transcoder import Transcoder
 logger = get_logger()
 config = read_config()
 
-class RadioReStreamer:
+class RadReStreamer:
     def __init__(self, server: LoRadSrv):
         self.server = server
         self.enabled = False

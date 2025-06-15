@@ -3,7 +3,11 @@ import sys
 import os
 from os import W_OK
 
-_log_format = "%(asctime)s - [%(levelname)-7s] - LoRaD (%(threadName)-10s): %(filename)16s:%(lineno)-3s | %(message)s"
+from lorad.common.utils.misc import read_config
+
+config = read_config()
+
+_log_format = "%(asctime)s - [%(levelname)-7s] - " + config["NAME"] + " (%(threadName)-10s): %(filename)16s:%(lineno)-3s | %(message)s"
 
 if os.name == 'nt' or not os.access("/var/log/", W_OK):
     log_path = "lorad.log"

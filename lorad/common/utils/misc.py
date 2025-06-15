@@ -2,10 +2,6 @@ import json
 import os
 import signal
 
-from yandex_music import Track
-
-from lorad.common.utils.logger import get_logger
-
 def read_config(filepath="config.json"):
     if "CFGFILE_PATH" in os.environ:
         filepath = os.environ["CFGFILE_PATH"]
@@ -31,11 +27,13 @@ def read_stations(filepath="stations.json"):
             exit(1)
 
 def signal_stop(_signo, _stack_frame):
+    from lorad.common.utils.logger import get_logger
     logger = get_logger()
     logger.info(f"Caught {signal.Signals(_signo).name}. Shutting down...")
     os._exit(0)
 
 def splash():
+    from lorad.common.utils.logger import get_logger
     logger = get_logger()
     splash = """
   _           _____       _____  
