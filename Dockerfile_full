@@ -1,6 +1,6 @@
 FROM python:3.12-alpine
 
-ARG VERSION
+ENV VERSION
 
 RUN mkdir /tmp/lorad
 WORKDIR /tmp/lorad
