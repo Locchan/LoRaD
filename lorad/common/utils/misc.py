@@ -8,6 +8,7 @@ CONFIG = {}
 #  Passing reload as True will force the function to actually re-read the config from disk.
 def read_config(filepath="config.json", reload=False):
     global CONFIG
+
     if "CFGFILE_PATH" in os.environ:
         filepath = os.environ["CFGFILE_PATH"]
 
@@ -35,13 +36,14 @@ def feature_enabled(feature_name):
 def read_stations(filepath="stations.json"):
     config = read_config()
 
+    if "STATIONS_FILE_PATH" in config:
+        filepath = config["STATIONS_FILE_PATH"]
+
     if not os.path.exists(filepath):
-        print("Stations config file not found. The file should reside in path provided by STATIONS_FILE_PATH main configuration entry or in './stations.json'.")
+        print("Stations config file not found. The file should reside in path provided by STATIONS_FILE_PATH main configuration file entry or in './stations.json'.")
         print(f"Expected to find the stations config file at '{filepath}'")
         exit(1)
 
-    if "STATIONS_FILE_PATH" in config:
-        filepath = config["STATIONS_FILE_PATH"]
     with open(filepath, "r", encoding="utf-8") as config_file:
         try:
             return json.load(config_file)
