@@ -13,4 +13,4 @@ def impl_GET(headers):
     if globs.YANDEX_OBJ.radio is not None:
         return {"station": globs.YANDEX_OBJ.radio.station_id}
     else:
-        return {"rc": 406, "message": "Yandex is not initialized."}
+        return {"rc": 406, "data": {"message": "Yandex is not initialized."}}
