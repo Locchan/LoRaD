@@ -2,7 +2,12 @@ import json
 import os
 import signal
 
-def read_config(filepath="config.json"):
+CONFIG = {}
+
+# This will read config only once on startup and then return this every time it is called.
+#  Passing reload as True will force the function to actually re-read the config from disk.
+def read_config(filepath="config.json", reload=False):
+    global CONFIG
     if "CFGFILE_PATH" in os.environ:
         filepath = os.environ["CFGFILE_PATH"]
 
@@ -10,13 +15,17 @@ def read_config(filepath="config.json"):
         print("Config file not found. The file should reside in path provided by CFGFILE_PATH environment variable or in './config.json'.")
         print(f"Expected to find the config file at '{filepath}'")
         exit(1)
-
-    with open(filepath, "r", encoding="utf-8") as config_file:
-        try:
-            return json.load(config_file)
-        except Exception as e:
-            print(f"Could not read config file {filepath}: {e.__class__.__name__}")
-            exit(1)
+    if CONFIG == {} and not reload:
+        with open(filepath, "r", encoding="utf-8") as config_file:
+            try:
+                CONFIG = json.load(config_file)
+                if "DEBUG" in CONFIG and CONFIG["DEBUG"]:
+                    print(f"Read config:\n{json.dumps(CONFIG, indent=2)}")
+            except Exception as e:
+                print(f"Could not read config file {filepath}: {e.__class__.__name__}")
+                exit(1)
+    else:
+        return CONFIG
 
 def feature_enabled(feature_name):
     config = read_config()
@@ -26,7 +35,7 @@ def read_stations(filepath="stations.json"):
     config = read_config()
 
     if not os.path.exists(filepath):
-        print("Stations config file not found. The file should reside in path provided by STATIONS_FILE_PATH environment variable or in './stations.json'.")
+        print("Stations config file not found. The file should reside in path provided by STATIONS_FILE_PATH main configuration entry or in './stations.json'.")
         print(f"Expected to find the stations config file at '{filepath}'")
         exit(1)
 
