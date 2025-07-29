@@ -17,6 +17,8 @@ def validate(headers, data):
         if areq not in data or areq == "":
             return f"This method requires {REQUIRED_FIELDS['POST']} to be specified."
     stations = get_yandex_stations()
+    if stations is None:
+        return {"rc": 406, "message": "Yandex is not initialized."}
     found = False
     for astation in stations:
         if astation == data["new_station"]:

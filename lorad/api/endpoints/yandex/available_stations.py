@@ -12,4 +12,6 @@ RESULT_EXAMPLE = "{'Pop':'genre:pop','Meditation':'genre:meditation'}"
 @lrd_feat_req(FEAT_FILESTREAMER_YANDEX)
 @lrd_api_endp
 def impl_GET(headers):
-    return get_yandex_stations()
+    stations = get_yandex_stations()
+    if stations is None:
+        return {"rc": 406, "message": "Yandex is not initialized."}

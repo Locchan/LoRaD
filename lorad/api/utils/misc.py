@@ -70,8 +70,11 @@ def get_radio_stations():
     return stations_parsed
 
 def get_yandex_stations():
-    stations = globs.YANDEX_OBJ.radio.get_stations()
-    stations_parsed = {}
-    for astation in stations:
-        stations_parsed[astation['station']['name']] = f"{astation['station']['id']['type']}:{astation['station']['id']['tag']}"
-    return stations_parsed
+    if globs.YANDEX_OBJ.radio is not None:
+        stations = globs.YANDEX_OBJ.radio.get_stations()
+        stations_parsed = {}
+        for astation in stations:
+            stations_parsed[astation['station']['name']] = f"{astation['station']['id']['type']}:{astation['station']['id']['tag']}"
+        return stations_parsed
+    else:
+        return None

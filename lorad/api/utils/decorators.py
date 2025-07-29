@@ -44,9 +44,15 @@ def lrd_api_endp(func):
             result = func(*args, **kwargs)
             if isinstance(result, tuple):
                 return {"rc": result[0], "data": result[1]}
-            if isinstance(result, dict) or isinstance(result, str):
+            elif isinstance(result, dict):
+                if "rc" in result:
+                    return result
+                else:
+                    return {"rc": 200, "data": result}
+            elif isinstance(result, str):
                 return {"rc": 200, "data": result}
-            return {"rc": 500, "data": {"error": "Incorrect output from the endpoint function."}}
+            else:
+                return {"rc": 500, "data": {"error": "Incorrect output from the endpoint function."}}
         except Exception as e:
             logger.exception(e)
             return {"rc": 500, "data": {"error": f"Error ({e.__class__.__name__}). Details are in the server log."}}
@@ -59,6 +65,9 @@ def lrd_validate(validate_func):
     def decorator(func):
         def lrd_wrp_endp(*args, **kwargs):
             validate_error = validate_func(*args, **kwargs)
+            if isinstance(validate_error, dict):
+                if "rc" in validate_error:
+                    return validate_error
             if validate_error is not None:
                 return {"rc": 400, "data": {"error": validate_error}}
             else:
