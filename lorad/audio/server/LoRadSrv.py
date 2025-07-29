@@ -123,7 +123,6 @@ class LoRadServer(BaseHTTPRequestHandler):
                     sleep(0.1)
 
                 while True:
-                    print("A")
                     # If we get a new track, we should burst data. We burst data by breaking from this [while True:]
                     #  We detect a new track by detecting that our current_data has completely changed
                     #  (for every new track our streamer sends us a fresh batch of data, not just a single chunk)\
