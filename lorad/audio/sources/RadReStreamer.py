@@ -33,7 +33,13 @@ class RadReStreamer:
     def standby(self):
         while True:
             if self.running:
-                self.__prepare_and_start(self.current_station)
+                # Non-None return from this means that we detected an unrecoverable error, thus we break.
+                result = self.__prepare_and_start(self.current_station)
+                if result is not None:
+                    logger.error("Could not start stream. Check logs.")
+                    return
+                else:
+                    logger.error("Exited from radio loop. Crashed?")
             else:
                 sleep(0.5)
     
@@ -57,7 +63,7 @@ class RadReStreamer:
             station_url = stations[station]["url"]
         if station_url == "":
             logger.error(f"Station not found: {station}")
-            return
+            return False
         else:
             self.currently_playing = stations[station]["name"]
             self.currently_playing = stations[station]["name"]
