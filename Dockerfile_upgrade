@@ -1,4 +1,4 @@
-FROM localhost/locchan/lorad:latest
+FROM locchan/lorad:latest
 
 ARG VERSION
 
