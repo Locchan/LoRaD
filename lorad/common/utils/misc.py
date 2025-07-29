@@ -21,6 +21,7 @@ def read_config(filepath="config.json", reload=False):
                 CONFIG = json.load(config_file)
                 if "DEBUG" in CONFIG and CONFIG["DEBUG"]:
                     print(f"Read config:\n{json.dumps(CONFIG, indent=2)}")
+                return CONFIG
             except Exception as e:
                 print(f"Could not read config file {filepath}: {e.__class__.__name__}")
                 exit(1)
