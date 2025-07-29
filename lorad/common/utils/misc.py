@@ -5,6 +5,12 @@ import signal
 def read_config(filepath="config.json"):
     if "CFGFILE_PATH" in os.environ:
         filepath = os.environ["CFGFILE_PATH"]
+
+    if not os.path.exists(filepath):
+        print("Config file not found. The file should reside in path provided by CFGFILE_PATH environment variable or in './config.json'.")
+        print(f"Expected to find the config file at '{filepath}'")
+        exit(1)
+
     with open(filepath, "r", encoding="utf-8") as config_file:
         try:
             return json.load(config_file)
@@ -17,8 +23,15 @@ def feature_enabled(feature_name):
     return feature_name in config["ENABLED_FEATURES"]
     
 def read_stations(filepath="stations.json"):
-    if "STATIONS_FILE_PATH" in os.environ:
-        filepath = os.environ["STATIONS_FILE_PATH"]
+    config = read_config()
+
+    if not os.path.exists(filepath):
+        print("Stations config file not found. The file should reside in path provided by STATIONS_FILE_PATH environment variable or in './stations.json'.")
+        print(f"Expected to find the stations config file at '{filepath}'")
+        exit(1)
+
+    if "STATIONS_FILE_PATH" in config:
+        filepath = config["STATIONS_FILE_PATH"]
     with open(filepath, "r", encoding="utf-8") as config_file:
         try:
             return json.load(config_file)

@@ -13,6 +13,7 @@
 - **FEATURE_FLAGS**: The list of available feature flags. See above for the available feature flags
 - **ENABLED_FEATURES**: The list of enabled features. See above for the available features.
 - **DEFAULT_AUDIO_FORMAT**: The format to which all audio will be encoded.
+- **STATIONS_FILE_PATH**: Path to the stations file. Default: /data/stations.json
 - **RESTREAMER**: (RESTREAMER) Radio restreamer configuration. \
 Example:\
 {"STATION": "default"}
