@@ -16,7 +16,7 @@ class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     pass
 
 
-class LoRadServer(BaseHTTPRequestHandler):
+class AudioStream(BaseHTTPRequestHandler):
     connected_clients = 0
     MAX_CLIENTS = config["MAX_CLIENTS"] if "MAX_CLIENTS" in config else 10
     thread_count = 1
@@ -41,9 +41,9 @@ class LoRadServer(BaseHTTPRequestHandler):
 
     @staticmethod
     def add_data(data):
-        if len(LoRadServer.current_data) > 0:
-            LoRadServer.current_data.popleft()
-        LoRadServer.current_data.append(data)
+        if len(AudioStream.current_data) > 0:
+            AudioStream.current_data.popleft()
+        AudioStream.current_data.append(data)
 
     @staticmethod
     def log_message(*args):
@@ -74,22 +74,22 @@ class LoRadServer(BaseHTTPRequestHandler):
         while True:
             client_id = hashlib.sha256((self.client_address[0] + str(self.client_address[1]))
                                        .encode("utf-8")).hexdigest()[:4]
-            if client_id not in LoRadServer.clients:
-                LoRadServer.clients.append((client_id, self.client_address[0]))
+            if client_id not in AudioStream.clients:
+                AudioStream.clients.append((client_id, self.client_address[0]))
                 break
-        LoRadServer.thread_count += 1
-        threading.current_thread().name = f"WRK#{LoRadServer.thread_count}"
-        LoRadServer.connected_clients += 1
+        AudioStream.thread_count += 1
+        threading.current_thread().name = f"WRK#{AudioStream.thread_count}"
+        AudioStream.connected_clients += 1
         pushed_data = bytes()
-        logger.info(f"Client [{client_id} ({self.client_address[0]})] connected. Connected clients: {LoRadServer.connected_clients}")
+        logger.info(f"Client [{client_id} ({self.client_address[0]})] connected. Connected clients: {AudioStream.connected_clients}")
         try:
 
             # If we're in kick list, we get kicked (nuff said)
-            if self.client_address[0] in LoRadServer.kick_list:
+            if self.client_address[0] in AudioStream.kick_list:
                 self.gtfo()
                 raise RuntimeError(f"[{self.client_address[0]}] is in kick list.")
 
-            if LoRadServer.connected_clients > LoRadServer.MAX_CLIENTS:
+            if AudioStream.connected_clients > AudioStream.MAX_CLIENTS:
                 self.ddos_protection()
                 raise RuntimeError("Asked to wait for a while")
 
@@ -104,13 +104,13 @@ class LoRadServer(BaseHTTPRequestHandler):
             while True:
 
                 # Stop sending data to a kicked client.
-                if self.client_address[0] in LoRadServer.kick_list:
+                if self.client_address[0] in AudioStream.kick_list:
                     raise RuntimeError(f"[{self.client_address[0]}] is in kick list.")
 
                 # Sending initial burst of data for the newly-connected clients (or when the track starts)
                 #  current_data is being copied to be thread-safe
                 while True:
-                    current_data = deque(LoRadServer.current_data)
+                    current_data = deque(AudioStream.current_data)
                     if len(current_data) > 0:
                         data_to_push = bytes()
                         for data_to_push in current_data:
@@ -127,13 +127,13 @@ class LoRadServer(BaseHTTPRequestHandler):
                     #  We detect a new track by detecting that our current_data has completely changed
                     #  (for every new track our streamer sends us a fresh batch of data, not just a single chunk)\
                     if self.track_ended:
-                        if self.detect_new_track(current_data, LoRadServer.current_data):
+                        if self.detect_new_track(current_data, AudioStream.current_data):
                             logger.debug(f"[{client_id}] New track detected.")
-                            LoRadServer.track_ended = False
+                            AudioStream.track_ended = False
                             break
                     
                     #  Current_data is being copied to be thread-safe
-                    current_data = deque(LoRadServer.current_data)
+                    current_data = deque(AudioStream.current_data)
 
                     if len(current_data) > 0:
                         data_to_push = current_data[-1]
@@ -143,45 +143,45 @@ class LoRadServer(BaseHTTPRequestHandler):
                             logger.debug(f"[{client_id}] Sending a chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]; Length: {len(data_to_push)}")
                             self.wfile.write(data_to_push)
                             self.wfile.flush()
-                            if LoRadServer.track_ended:
-                                LoRadServer.add_data(False)
+                            if AudioStream.track_ended:
+                                AudioStream.add_data(False)
                         pushed_data = data_to_push
                     sleep(0.1)
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
-            logger.info(f"Client [{client_id} ({self.client_address[0]})] disconnected. Connected clients: {LoRadServer.connected_clients-1}")
+            logger.info(f"Client [{client_id} ({self.client_address[0]})] disconnected. Connected clients: {AudioStream.connected_clients - 1}")
         except RuntimeError as e:
-            logger.info(f"Client [{client_id} ({self.client_address[0]})] was kicked: ({e}) Connected clients: {LoRadServer.connected_clients-1}")
+            logger.info(f"Client [{client_id} ({self.client_address[0]})] was kicked: ({e}) Connected clients: {AudioStream.connected_clients - 1}")
         except Exception as e:
-            logger.info(f"Client [{client_id} ({self.client_address[0]})] disconnected with an error: ({e.__class__.__name__}) Connected clients: {LoRadServer.connected_clients-1}")
+            logger.info(f"Client [{client_id} ({self.client_address[0]})] disconnected with an error: ({e.__class__.__name__}) Connected clients: {AudioStream.connected_clients - 1}")
             logger.exception(e)
         finally:
             self.remove_client(client_id)
-            LoRadServer.thread_count -= 1
-            LoRadServer.connected_clients -= 1
+            AudioStream.thread_count -= 1
+            AudioStream.connected_clients -= 1
         
     def detect_new_track(self, current_data, old_data):
         return not set(current_data) & set(old_data)
 
     def remove_client(self, client_id):
         num_to_delete = -1
-        for anum, anitem in enumerate(LoRadServer.clients):
+        for anum, anitem in enumerate(AudioStream.clients):
             if anitem[0] == client_id:
                 num_to_delete = anum
         if num_to_delete >= 0:
-            del LoRadServer.clients[num_to_delete]
+            del AudioStream.clients[num_to_delete]
         else:
             logger.error(f"Was told to remove client [{client_id}] but the client does not exist!")
 
     # Considering every IP with >2 connections a DUDOSER
     def ddos_protection(self):
-        logger.warn(f"Too many clients ({LoRadServer.connected_clients}/{LoRadServer.MAX_CLIENTS})! DDOS?")
+        logger.warn(f"Too many clients ({AudioStream.connected_clients}/{AudioStream.MAX_CLIENTS})! DDOS?")
         logger.info("Searching for dudoseri...")
-        ip_list = [x[1] for x in LoRadServer.clients]
+        ip_list = [x[1] for x in AudioStream.clients]
         ip_frequency = dict(Counter(ip_list))
         for anitem in ip_frequency:
             if ip_frequency[anitem] > 2:
                 logger.info(f"Dudoser: {anitem}")
-                LoRadServer.kick_list.append(anitem)
+                AudioStream.kick_list.append(anitem)
         self.ddosed()
 
     def ddosed(self):

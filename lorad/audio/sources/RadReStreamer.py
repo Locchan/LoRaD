@@ -3,9 +3,9 @@ from lorad.api.LoRadAPISrv import read_config
 from lorad.common.localization.localization import get_loc
 from lorad.common.utils.logger import get_logger
 from lorad.common.utils.misc import read_stations
-from lorad.audio.server import LoRadSrv
+from lorad.audio.server import AudioStream
 from lorad.audio.sources.FileStreamer import sleep
-from lorad.audio.server.LoRadSrv import LoRadServer
+from lorad.audio.server.AudioStream import AudioStream
 from lorad.audio.sources.utils import FFMPEGFeedError
 from lorad.audio.sources.utils.Transcoder import Transcoder
 
@@ -13,7 +13,7 @@ logger = get_logger()
 config = read_config()
 
 class RadReStreamer:
-    def __init__(self, server: LoRadSrv):
+    def __init__(self, server: AudioStream):
         self.name_readable = get_loc("PLAYER_NAME_RADRESTREAMER")
         self.name_tech = "player_radio"
         self.server = server
@@ -116,7 +116,7 @@ class RadReStreamer:
                 if self.running:
                     chunk = raw_chunk
                     if chunk:
-                        LoRadServer.add_data(chunk)
+                        AudioStream.add_data(chunk)
                 else:
                     ext_strm_data_generator.close()
                     break
@@ -134,7 +134,7 @@ class RadReStreamer:
                     self.transcoder.add_data(raw_chunk)
                     transcoded_chunk = self.transcoder.get_transcoded_slab()
                     if transcoded_chunk and transcoded_chunk is not None:
-                        LoRadServer.add_data(transcoded_chunk)
+                        AudioStream.add_data(transcoded_chunk)
                 else:
                     ext_strm_data_generator.close()
                     break

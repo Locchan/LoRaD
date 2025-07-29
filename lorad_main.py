@@ -38,18 +38,18 @@ carousel_providers = []
 
 globs.TEMPDIR = config["TEMPDIR"]
 
-from lorad.audio.server import LoRadSrv
+from lorad.audio.server import AudioStream
 from lorad.audio.sources.FileStreamer import FileStreamer
 from lorad.audio.file_sources.yandex.YaMu import YaMu
-from lorad.audio.server.LoRadSrv import LoRadServer
+from lorad.audio.server.AudioStream import AudioStream
 
 logger.info("Starting LoRaD...")
-globs.CURRENT_DATA_STREAMER = ThreadingHTTPServer(("0.0.0.0", config["LISTEN_PORT"]), LoRadServer)
+globs.CURRENT_DATA_STREAMER = ThreadingHTTPServer(("0.0.0.0", config["LISTEN_PORT"]), AudioStream)
 
 logger.info(f"Enabled features: {config['ENABLED_FEATURES']}")
 
 enabled_threads = [
-    Thread(name="HTTPServer", target=LoRadSrv.start, args=(globs.CURRENT_DATA_STREAMER,)),
+    Thread(name="HTTPServer", target=AudioStream.start, args=(globs.CURRENT_DATA_STREAMER,)),
 ]
 
 if feature_enabled(globs.FEAT_RESTREAMER):

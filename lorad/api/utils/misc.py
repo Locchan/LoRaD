@@ -3,7 +3,7 @@ from collections import deque
 from time import sleep
 
 import lorad.common.utils.globs as globs
-from lorad.audio.server import LoRadSrv
+from lorad.audio.server import AudioStream
 from lorad.audio.sources.FileStreamer import FileStreamer
 from lorad.audio.sources.RadReStreamer import RadReStreamer
 
@@ -39,12 +39,12 @@ def switch_players(new_player_name):
         prev_player = get_current_player()
         globs.CURRENT_PLAYER_NAME = new_player_name
         new_player = get_current_player()
-        LoRadSrv.player_switch = True
-        LoRadSrv.current_data = deque()
+        AudioStream.player_switch = True
+        AudioStream.current_data = deque()
         prev_player.stop()
         sleep(1)
         new_player.start()
-        LoRadSrv.player_switch = False
+        AudioStream.player_switch = False
 
 def start_player(player_name):
     from lorad.common.utils.logger import get_logger

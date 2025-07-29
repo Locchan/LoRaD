@@ -5,7 +5,7 @@ from lorad.audio.programs.GenericPrg import GenericPrg
 from lorad.audio.programs.NewsPrgS import NewsPrgS
 from lorad.common.utils.logger import get_logger
 from lorad.common.utils.misc import read_config
-from lorad.audio.server.LoRadSrv import LoRadServer
+from lorad.audio.server.AudioStream import AudioStream
 
 
 AVAILABLE_PROGRAMS: list[GenericPrg] = [NewsPrgS]
@@ -37,12 +37,12 @@ def prg_sched_loop():
         for aprogram in ENABLED_PROGRAMS:
             for atime in aprogram.start_times:
                 if is_now_the_minute(atime):
-                    if not aprogram.program_running and LoRadServer.connected_clients > 0:
+                    if not aprogram.program_running and AudioStream.connected_clients > 0:
                             logger.debug("Starting a program")
                             program_start_thread = Thread(name="PrgRunner", target=aprogram.start_program)
                             program_start_thread.start()
                 if is_now_the_minute(atime, 0 - aprogram.preparation_needed_mins):
-                    if not aprogram.preparations_started and LoRadServer.connected_clients > 0:
+                    if not aprogram.preparations_started and AudioStream.connected_clients > 0:
                         logger.debug("Starting program preparation")
                         program_prep_thread = Thread(name="PrgPrep", target=aprogram.prepare_program)
                         program_prep_thread.start()

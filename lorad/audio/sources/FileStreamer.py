@@ -8,7 +8,7 @@ from typing import Tuple
 
 from openai.types.beta.threads import Run
 from lorad.audio.file_sources.FileRide import FileRide
-from lorad.audio.server.LoRadSrv import LoRadServer
+from lorad.audio.server.AudioStream import AudioStream
 from lorad.common.localization.localization import get_loc
 from lorad.common.utils.logger import get_logger
 from mutagen.mp3 import MP3
@@ -19,7 +19,7 @@ from lorad.common.utils.misc import read_config
 logger = get_logger()
 
 class FileStreamer:
-    def __init__(self, connectors: list[FileRide], server: LoRadServer):
+    def __init__(self, connectors: list[FileRide], server: AudioStream):
         logger.debug("Initializing carousel...")
         config = read_config()
         self.name_readable = get_loc("PLAYER_NAME_FILESTREAMER")
@@ -152,12 +152,12 @@ class FileStreamer:
                 burst_chunks = [mp3file.read(self.chunk_size_bytes) for _ in range(self.initial_burst_chunks)]
                 while True:
                     if not self.interrupt:
-                        if LoRadServer.connected_clients != 0:
+                        if AudioStream.connected_clients != 0:
                             # If we have burst_chunks var, this means that we're sending the initial burst of data
                             #  thus we just set current_data in the server and continue with out lives as normal
                             if burst_chunks:
                                 track_end_time = datetime.datetime.now().timestamp() + length
-                                LoRadServer.current_data = deque(burst_chunks)
+                                AudioStream.current_data = deque(burst_chunks)
                                 burst_chunks = False
                                 continue
                             
@@ -166,11 +166,11 @@ class FileStreamer:
                             # If the last chunk
                             if not chunk:
                                 serve_end = datetime.datetime.now().timestamp()
-                                LoRadServer.track_ended = True
+                                AudioStream.track_ended = True
                                 break
                             else:
                                 # Serving the chunk to LoRadServer which will send the chunk to the clients
-                                LoRadServer.add_data(chunk)
+                                AudioStream.add_data(chunk)
 
                         # If we're sending a packet per .256 seconds , we'll wait for .24 seconds (check how sleep_time is created)
                         #  so that we're sending data faster to avoid buffering while also making users
@@ -193,7 +193,7 @@ class FileStreamer:
                     sleep(serve_delay)
         finally:
             self.free = True
-            LoRadServer.track_ended = True
+            AudioStream.track_ended = True
 
     def cleanup(self):
         if os.path.exists(self.current_filepath):

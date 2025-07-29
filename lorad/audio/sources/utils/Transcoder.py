@@ -3,7 +3,7 @@ import subprocess
 from threading import Thread
 from typing import Deque
 from lorad.common.utils.logger import get_logger
-from lorad.audio.server.LoRadSrv import sleep
+from lorad.audio.server.AudioStream import sleep
 from lorad.audio.sources.FileStreamer import deque
 from lorad.common.utils.misc import read_config
 

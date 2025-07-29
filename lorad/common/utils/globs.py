@@ -1,5 +1,5 @@
 from lorad.audio.file_sources.yandex.YaMu import YaMu
-from lorad.audio.server import LoRadSrv
+from lorad.audio.server import AudioStream
 from lorad.audio.sources.FileStreamer import FileStreamer
 from lorad.audio.sources.RadReStreamer import RadReStreamer
 
@@ -8,7 +8,7 @@ TEMPDIR = ""
 
 LOCALE = ""
 
-CURRENT_DATA_STREAMER : LoRadSrv = None
+CURRENT_DATA_STREAMER : AudioStream = None
 
 FILESTREAMER : FileStreamer = None
 YANDEX_OBJ : YaMu = None
