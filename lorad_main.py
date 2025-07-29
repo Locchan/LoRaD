@@ -41,10 +41,9 @@ globs.TEMPDIR = config["TEMPDIR"]
 from lorad.audio.server import AudioStream
 from lorad.audio.sources.FileStreamer import FileStreamer
 from lorad.audio.file_sources.yandex.YaMu import YaMu
-from lorad.audio.server.AudioStream import AudioStream
 
 logger.info("Starting LoRaD...")
-globs.CURRENT_DATA_STREAMER = ThreadingHTTPServer(("0.0.0.0", config["LISTEN_PORT"]), AudioStream)
+globs.CURRENT_DATA_STREAMER = ThreadingHTTPServer(("0.0.0.0", config["LISTEN_PORT"]), AudioStream.AudioStream)
 
 logger.info(f"Enabled features: {config['ENABLED_FEATURES']}")
 
