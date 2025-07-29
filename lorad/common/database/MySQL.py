@@ -33,6 +33,7 @@ class MySQL():
         if feature_enabled(globs.FEAT_REST):
             from lorad.api.orm.Group import Group
             from lorad.api.orm.User import User
+            from lorad.api.orm.Token import Token
         Base.metadata.create_all(MySQL.engine)
 
     def __reconnect(self) -> None:
