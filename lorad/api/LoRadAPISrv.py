@@ -64,7 +64,10 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
             if self.path in endpoints["GET"]:
                 endpoint_exec_result = endpoints["GET"][self.path](self.headers)
                 self.send_response(endpoint_exec_result["rc"])
-                self.send_header('Content-type', 'application/json')
+                content_type = "application/json"
+                if "content-type" in endpoint_exec_result:
+                    content_type = endpoint_exec_result["content-type"]
+                self.send_header('Content-type', content_type)
                 self.end_headers()
                 if isinstance(endpoint_exec_result["data"], dict):
                     response = json.dumps(endpoint_exec_result["data"])
@@ -104,7 +107,10 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
                     return
                 endpoint_exec_result = endpoints["POST"][self.path](self.headers, data)
                 self.send_response(endpoint_exec_result["rc"])
-                self.send_header('Content-type', 'application/json')
+                content_type = "application/json"
+                if "content-type" in endpoint_exec_result:
+                    content_type = endpoint_exec_result["content-type"]
+                self.send_header('Content-type', content_type)
                 self.end_headers()
                 if isinstance(endpoint_exec_result["data"], dict):
                     response = json.dumps(endpoint_exec_result["data"])

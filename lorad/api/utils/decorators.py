@@ -14,6 +14,8 @@ logger = get_logger()
 
 # All decorators that are above @lrd_api_endp should return responses in the raw format
 #  Example: {"rc": "200", "data": {"success": True}}
+# Decorators can return content type if it is not 'application/json' by setting "content-type:
+#  Example: {"rc": "200", "content-type": "text/html", "data": "<html>test</html>"}
 # All decorators below @lrd_api_endp are shielded by @lrd_api_endp's data handler so these can return whatever.
 
 # Makes endpoint inaccessible if a feature (or a range of features) is/are not enabled.

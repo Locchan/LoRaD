@@ -22,12 +22,16 @@ def validate(headers, data):
 
 @lrd_api_endp
 def impl_GET(headers):
-    return get_apidoc()
+    default_format = "html"
+    return {"rc": 200, "data": get_apidoc(default_format), "content-type": "text/html"}
 
 @lrd_validate(validate)
 @lrd_api_endp
 def impl_POST(headers, data):
-    format = "plain"
+    data_format = "plain"
     if "format" in data:
-        format = data["format"]
-    return get_apidoc(format)
+        data_format = data["format"]
+    if data_format == "html":
+        return {"rc": 200, "data": get_apidoc(data_format), "content-type": "text/html"}
+    else:
+        return get_apidoc(data_format)
