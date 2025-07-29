@@ -36,8 +36,11 @@ class RadReStreamer:
                 # Non-None return from this means that we detected an unrecoverable error, thus we break.
                 result = self.__prepare_and_start(self.current_station)
                 if result is not None:
-                    logger.error("Could not start stream. Check logs.")
-                    return
+                    if not result:
+                        logger.error("Could not start stream. Check logs.")
+                        return
+                    else:
+                        logger.info("Exited from radio loop")
                 else:
                     logger.error("Exited from radio loop. Crashed?")
             else:
@@ -84,6 +87,9 @@ class RadReStreamer:
                 # If we are outside __stream_data and were not interrupted, we crashed
                 if self.running:
                     logger.error("ReStreamer crashed. See previous errors.")
+                    return False
+                else:
+                    return True
     
     # This checks the radio and gets some info like the audio format, bitrate, etc.
     def preflight_request(self, station_url):
