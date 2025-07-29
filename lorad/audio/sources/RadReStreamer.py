@@ -1,20 +1,23 @@
 import requests
 from lorad.api.LoRadAPISrv import read_config
+from lorad.common.localization.localization import get_loc
 from lorad.common.utils.logger import get_logger
 from lorad.common.utils.misc import read_stations
 from lorad.audio.server import LoRadSrv
-from lorad.audio.playback.FileStreamer import sleep
+from lorad.audio.sources.FileStreamer import sleep
 from lorad.audio.server.LoRadSrv import LoRadServer
-from lorad.audio.playback.utils import FFMPEGFeedError
-from lorad.audio.playback.utils.Transcoder import Transcoder
+from lorad.audio.sources.utils import FFMPEGFeedError
+from lorad.audio.sources.utils.Transcoder import Transcoder
 
 logger = get_logger()
 config = read_config()
 
 class RadReStreamer:
     def __init__(self, server: LoRadSrv):
+        self.name_readable = get_loc("PLAYER_NAME_RADRESTREAMER")
+        self.name_tech = "player_radio"
         self.server = server
-        self.enabled = False
+        self.running = False
         self.transmitting = False
         self.stations = {}
         self.station_info = {}
@@ -29,19 +32,19 @@ class RadReStreamer:
     
     def standby(self):
         while True:
-            if self.enabled:
+            if self.running:
                 self.__prepare_and_start(self.current_station)
             else:
                 sleep(0.5)
     
     def start(self):
-        self.enabled = True
+        self.running = True
     
     # Stop everything, wait for the transmission to finish
     def stop(self):
         if self.transcoder is not None:
             self.transcoder.stop()
-        self.enabled = False
+        self.running = False
         while True:
             if not self.transmitting:
                 return
@@ -51,28 +54,29 @@ class RadReStreamer:
         stations = self.get_stations()
         station_url = ""
         if station in stations:
-            station_url = stations[station]
+            station_url = stations[station]["url"]
         if station_url == "":
             logger.error(f"Station not found: {station}")
             return
         else:
+            self.currently_playing = stations[station]["name"]
+            self.currently_playing = stations[station]["name"]
             if self.preflight_request(station_url):
                 if self.station_info["format"] != self.default_format:
-                    bitrate = self.station_info["bitrate"] if "bitrate" in self.station_info else 320
-                    self.transcoder = Transcoder(bitrate, self.station_info["format"], self.default_format)
+                    self.transcoder = Transcoder( self.station_info["format"], self.default_format)
                 logger.info(f"Starting streaming '{station}'. Stream settings:")
                 logger.info(f"URL: {station_url}")
                 for akey, aval in self.station_info.items():
                     logger.info(f"{akey.capitalize()}: {aval}")
-                logger.info(f"Transcoder enabled: {self.transcoder is not None}")
+                logger.info(f"Transcoder running: {self.transcoder is not None}")
                 if self.transcoder is not None:
                     self.transcoder.start()
                     self.__stream_transcoded(station_url)
                 else:
                     self.__stream_untranscoded(station_url)
 
-                # If we are outside of __stream_data and were not interrupted, we crashed
-                if self.enabled:
+                # If we are outside __stream_data and were not interrupted, we crashed
+                if self.running:
                     logger.error("ReStreamer crashed. See previous errors.")
     
     # This checks the radio and gets some info like the audio format, bitrate, etc.
@@ -97,7 +101,7 @@ class RadReStreamer:
         try:
             self.transmitting = True
             for raw_chunk in ext_strm_data_generator:
-                if self.enabled:
+                if self.running:
                     chunk = raw_chunk
                     if chunk:
                         LoRadServer.add_data(chunk)
@@ -114,7 +118,7 @@ class RadReStreamer:
         try:
             self.transmitting = True
             for raw_chunk in ext_strm_data_generator:
-                if self.enabled:
+                if self.running:
                     self.transcoder.add_data(raw_chunk)
                     transcoded_chunk = self.transcoder.get_transcoded_slab()
                     if transcoded_chunk and transcoded_chunk is not None:
@@ -136,7 +140,7 @@ class RadReStreamer:
                     #logger.debug(f"Yielded {len(adata)} BOD from the remote stream")
                     error_iterations = 0
                     yield adata
-            # Retry rightaway on the first error. If still erroring out, then sleep error_iterations * 2 but no more than 15 seconds.
+            # Retry right away on the first error. If still erroring out, then sleep error_iterations * 2 but no more than 15 seconds.
             except Exception as e:
                 error_iterations += 1
                 if error_iterations > 1:

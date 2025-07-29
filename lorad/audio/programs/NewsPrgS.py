@@ -49,9 +49,9 @@ class NewsPrgS(GenericPrg):
         for afile in news_files:
             tmpfilename = afile + reencode_date + ".mp3"
             tempfiles.append(tmpfilename)
-            ffmpeg.input(afile).output(tmpfilename, audio_bitrate='320k', ar=44100, acodec='libmp3lame', loglevel="quiet", ac=2, af="apad=pad_dur=2").run(overwrite_output=True)
+            ffmpeg.input(afile).output(tmpfilename, audio_bitrate=f'{self.config["BITRATE_KBPS"]}k', ar=44100, acodec='libmp3lame', loglevel="quiet", ac=2, af="apad=pad_dur=2").run(overwrite_output=True)
         logger.info("Concatenating news files into a digest")
         inputs = [ffmpeg.input(f) for f in tempfiles]
-        concatenated = ffmpeg.concat(*inputs, v=0, a=1).output(news_file, audio_bitrate='320k', ar=44100, loglevel="quiet")
+        concatenated = ffmpeg.concat(*inputs, v=0, a=1).output(news_file, audio_bitrate=f'{self.config["BITRATE_KBPS"]}k', ar=44100, loglevel="quiet")
         ffmpeg.run(concatenated)
         return news_file

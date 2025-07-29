@@ -29,6 +29,8 @@ def register_endpoints():
                 except AttributeError:
                     continue
 
+                logger.debug(f"Registering: {amethod} - {endpoint_module.ENDP_PATH}")
+
                 if endpoint_module.ENDP_PATH not in endpoints[amethod]:
                     endpoints[amethod][endpoint_module.ENDP_PATH] = getattr(endpoint_module, f"impl_{amethod}")
                     registered_endpoints+=1
@@ -62,6 +64,7 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
             if self.path in endpoints["GET"]:
                 endpoint_exec_result = endpoints["GET"][self.path](self.headers)
                 self.send_response(endpoint_exec_result["rc"])
+                self.send_header('Content-type', 'application/json')
                 self.end_headers()
                 if isinstance(endpoint_exec_result["data"], dict):
                     response = json.dumps(endpoint_exec_result["data"])
@@ -101,6 +104,7 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
                     return
                 endpoint_exec_result = endpoints["POST"][self.path](self.headers, data)
                 self.send_response(endpoint_exec_result["rc"])
+                self.send_header('Content-type', 'application/json')
                 self.end_headers()
                 if isinstance(endpoint_exec_result["data"], dict):
                     response = json.dumps(endpoint_exec_result["data"])

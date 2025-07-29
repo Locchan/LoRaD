@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 
-import glob
 from http.server import ThreadingHTTPServer
 import os
 import signal
 from threading import Thread
 from time import sleep
 import lorad.common.utils.globs as globs
+from lorad.api.utils.misc import start_player
 from lorad.audio.programs.news.neuro.neuronews import neurify_news
 from lorad.audio.programs.news.newsparser import parse_news
 from lorad.audio.programs.program_mgr import prg_sched_loop
+from lorad.common.localization.localization import init_localization
 from lorad.common.utils.logger import get_logger, setdebug
 from lorad.common.utils.misc import feature_enabled, read_config, signal_stop, splash
-from lorad.audio.playback.RadReStreamer import RadReStreamer
+from lorad.audio.sources.RadReStreamer import RadReStreamer
 
 logger = get_logger()
 
@@ -23,6 +24,8 @@ splash()
 
 logger.info("Loading config...")
 config = read_config("config.json")
+
+init_localization()
 
 globs.FEATURE_FLAGS = config["FEATURE_FLAGS"] if "FEATURE_FLAGS" in config else []
 
@@ -36,37 +39,36 @@ carousel_providers = []
 globs.TEMPDIR = config["TEMPDIR"]
 
 from lorad.audio.server import LoRadSrv
-from lorad.audio.playback.FileStreamer import FileStreamer
+from lorad.audio.sources.FileStreamer import FileStreamer
 from lorad.audio.file_sources.yandex.YaMu import YaMu
 from lorad.audio.server.LoRadSrv import LoRadServer
 
 logger.info("Starting LoRaD...")
-server = ThreadingHTTPServer(("0.0.0.0", config["LISTEN_PORT"]), LoRadServer)
+globs.CURRENT_DATA_STREAMER = ThreadingHTTPServer(("0.0.0.0", config["LISTEN_PORT"]), LoRadServer)
+
 logger.info(f"Enabled features: {config['ENABLED_FEATURES']}")
 
-PLAYERS = []
-
 enabled_threads = [
-    Thread(name="HTTPServer", target=LoRadSrv.start, args=(server,)),
+    Thread(name="HTTPServer", target=LoRadSrv.start, args=(globs.CURRENT_DATA_STREAMER,)),
 ]
 
-if feature_enabled(globs.FEAT_FILESTREAMER):
-    if feature_enabled(globs.FEAT_FILESTREAMER_YANDEX):
-        globs.RADIO_YANDEX = YaMu(config["YAMU_TOKEN"], config["BITRATE_KBPS"])
-        carousel_providers.append(globs.RADIO_YANDEX)
-    if len(carousel_providers) > 1:
-        globs.RADIO_STREAMER = FileStreamer(carousel_providers, server)
-        enabled_threads.append(Thread(name="Streamer", target=globs.RADIO_STREAMER.carousel))
-        PLAYERS.append(globs.RADIO_STREAMER)
-    else:
-        logger.error("Filesteamer is enabled but no providers are configured!")
-
 if feature_enabled(globs.FEAT_RESTREAMER):
-    globs.RESTREAMER = RadReStreamer(server)
+    globs.RESTREAMER = RadReStreamer(globs.CURRENT_DATA_STREAMER)
     default_station = config["RESTREAMER"]["STATION"] if "RESTREAMER" in config and "STATION" in config["RESTREAMER"] else "default"
     globs.RESTREAMER.current_station = default_station
     enabled_threads.append(Thread(name="ReStreamer", target=globs.RESTREAMER.standby))
-    PLAYERS.append(globs.RESTREAMER)
+    globs.PLAYERS.append(globs.RESTREAMER)
+
+if feature_enabled(globs.FEAT_FILESTREAMER):
+    if feature_enabled(globs.FEAT_FILESTREAMER_YANDEX):
+        globs.YANDEX_OBJ = YaMu(config["YAMU_TOKEN"], config["BITRATE_KBPS"])
+        carousel_providers.append(globs.YANDEX_OBJ)
+    if len(carousel_providers) > 0:
+        globs.FILESTREAMER = FileStreamer(carousel_providers, globs.CURRENT_DATA_STREAMER)
+        enabled_threads.append(Thread(name="Streamer", target=globs.FILESTREAMER.carousel))
+        globs.PLAYERS.append(globs.FILESTREAMER)
+    else:
+        logger.error("Filesteamer is enabled but no providers are configured!")
 
 if feature_enabled(globs.FEAT_NEURONEWS):
     enabled_threads.append(Thread(name="NewsParser", target=parse_news))
@@ -83,14 +85,14 @@ for athread in enabled_threads:
     sleep(0.2)
 
 logger.info("All threads started.")
-players_num = len(PLAYERS)
+players_num = len(globs.PLAYERS)
 if players_num == 0:
     logger.error("No players are ready after all threads are started. Nothing to play. Exiting...")
     exit(1)
 else:
-    logger.info(f"{players_num} players registered: {', '.join(x.__class__.__name__ for x in PLAYERS)}")
+    logger.info(f"{players_num} players registered: {', '.join(x.__class__.__name__ for x in globs.PLAYERS)}")
     logger.info("Defaulting to the first player")
-    PLAYERS[0].start()
+    start_player(globs.PLAYERS[0].name_tech)
 
 while True:
     for athread in enabled_threads:

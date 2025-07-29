@@ -1,3 +1,4 @@
+import datetime
 from collections import Counter, deque
 import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -33,6 +34,9 @@ class LoRadServer(BaseHTTPRequestHandler):
     #  in current_data before it gets completely rewritten by the new track
     track_ended = False
 
+    # This flag should be used to switch station. This makes all threads to stop sending current data and get new data
+    player_switch = False
+
     clients = []
 
     @staticmethod
@@ -48,6 +52,7 @@ class LoRadServer(BaseHTTPRequestHandler):
     def __init__(self, request, client_address, server):
         self.client_address = client_address
         self.server_version = f"LoRaD Radio v.{get_version()}"
+        self.player_switched = 0
         self.sys_version = ""
         super().__init__(request, client_address, server)
 
@@ -95,7 +100,7 @@ class LoRadServer(BaseHTTPRequestHandler):
             self.send_header("Client-ID", f"{client_id}")
             self.end_headers()
 
-            # Main loop. Each iteration is a new track
+            # Main loop. Each iteration is a new track (radio is just an infinite track in this regard)
             while True:
 
                 # Stop sending data to a kicked client.
@@ -118,10 +123,10 @@ class LoRadServer(BaseHTTPRequestHandler):
                     sleep(0.1)
 
                 while True:
-
+                    print("A")
                     # If we get a new track, we should burst data. We burst data by breaking from this [while True:]
                     #  We detect a new track by detecting that our current_data has completely changed
-                    #  (for every new track our streamer sends us a fresh batch of data, not just a single chunk)
+                    #  (for every new track our streamer sends us a fresh batch of data, not just a single chunk)\
                     if self.track_ended:
                         if self.detect_new_track(current_data, LoRadServer.current_data):
                             logger.debug(f"[{client_id}] New track detected.")
@@ -136,7 +141,7 @@ class LoRadServer(BaseHTTPRequestHandler):
                         if data_to_push != pushed_data:
                             if not isinstance(data_to_push, bytes):
                                 continue
-                            #logger.debug(f"[{client_id}] Sending a chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]; Length: {len(data_to_push)}")
+                            logger.debug(f"[{client_id}] Sending a chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]; Length: {len(data_to_push)}")
                             self.wfile.write(data_to_push)
                             self.wfile.flush()
                             if LoRadServer.track_ended:

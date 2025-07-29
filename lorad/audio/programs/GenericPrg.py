@@ -38,16 +38,16 @@ class GenericPrg():
                     logger.error(f"Can't run program [{self.name}]: file [{afile}] does not exist!")
                     return
             logger.info(f"Running a scheduled program: [{self.name}]...")
-            globs.RADIO_STREAMER.stop_carousel()
+            globs.FILESTREAMER.stop_carousel()
             for anum, afile in enumerate(self.prepared_program):
                 logger.info(f"Program: {self.name}; Track {anum+1}/{len(self.prepared_program)}")
-                globs.RADIO_STREAMER.serve_file(afile, track_name=aname)
+                globs.FILESTREAMER.serve_file(afile, track_name=aname)
             logger.info(f"Program [{self.name}] finished. Restarting carousel.")
         except Exception as e:
             logger.error(f"Failed to run the program: {e.__class__.__name__}")
             logger.info("Falling back to the carousel")
         finally:
-            globs.RADIO_STREAMER.start_carousel()
+            globs.FILESTREAMER.start_carousel()
             self.prepared_program = None
             self.preparations_started = False
             self.program_running = False

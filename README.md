@@ -20,7 +20,8 @@ Example:\
 Example:\
 {"LISTEN_PORT": 5476,"MAX_DATA_LEN_BYTES": 1024000,"TOKEN_EXPIRATION_MIN": 1440}
 - **YAMU_TOKEN**: (FILESTREAMER:YANDEX) Yandex Music token.
-- **NAME**: The name of the radio,
+- **NAME**: The name of the radio.
+- **LOCALE**: Locale (language). See lorad/common/localization/dictionary.py for available locales.
 - **MAX_SINGLE_IP_CLIENTS**: Maximum number of clients from a single IP.
 - **MAX_CLIENTS**: Maximum listeners on the LISTEN_PORT.
 - **BITRATE_KBPS**: The constant bitrate which the we will try to maintain.

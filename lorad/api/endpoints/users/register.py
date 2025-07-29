@@ -21,9 +21,9 @@ def validate(headers, data):
         return "The password has to be at least 8 characters"
     return
 
-@lrd_api_endp
-@lrd_validate(validate)
 @lrd_auth(globs.CAP_ADMIN)
+@lrd_validate(validate)
+@lrd_api_endp
 def impl_POST(headers, data):
     register_result = user_register(data["username"], data["password"])
     if register_result is None:

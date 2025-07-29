@@ -1,14 +1,22 @@
 from lorad.audio.file_sources.yandex.YaMu import YaMu
-from lorad.audio.playback.FileStreamer import FileStreamer
-from lorad.audio.playback.RadReStreamer import RadReStreamer
+from lorad.audio.server import LoRadSrv
+from lorad.audio.sources.FileStreamer import FileStreamer
+from lorad.audio.sources.RadReStreamer import RadReStreamer
 
 FEATURE_FLAGS = []
 TEMPDIR = ""
 
-RADIO_STREAMER : FileStreamer = None
-RADIO_YANDEX : YaMu = None
+LOCALE = ""
+
+CURRENT_DATA_STREAMER : LoRadSrv = None
+
+FILESTREAMER : FileStreamer = None
+YANDEX_OBJ : YaMu = None
 
 RESTREAMER : RadReStreamer = None
+
+PLAYERS = []
+CURRENT_PLAYER_NAME = ""
 
 FLG_DEBUG = "DEBUG"
 FLG_NO_DOWNLOADING = "NO_DOWNLOADING"

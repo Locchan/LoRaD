@@ -24,8 +24,8 @@ def validate(headers, data):
 def impl_GET(headers):
     return get_apidoc()
 
-@lrd_api_endp
 @lrd_validate(validate)
+@lrd_api_endp
 def impl_POST(headers, data):
     format = "plain"
     if "format" in data:

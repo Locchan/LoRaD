@@ -20,9 +20,9 @@ def validate(headers, data):
         return "Such user cannot possibly exist"
     return
 
-@lrd_api_endp
-@lrd_validate(validate)
 @lrd_auth(globs.CAP_ADMIN)
+@lrd_validate(validate)
+@lrd_api_endp
 def impl_POST(headers, data):
     register_result = user_remove(data["username"])
     if register_result is None:

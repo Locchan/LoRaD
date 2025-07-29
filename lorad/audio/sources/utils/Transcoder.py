@@ -4,21 +4,20 @@ from threading import Thread
 from typing import Deque
 from lorad.common.utils.logger import get_logger
 from lorad.audio.server.LoRadSrv import sleep
-from lorad.audio.playback.FileStreamer import deque
+from lorad.audio.sources.FileStreamer import deque
 from lorad.common.utils.misc import read_config
 
 
 logger = get_logger()
-config = read_config()
 
 
-class Transcoder():
-    def __init__(self, output_bitrate, input_format, output_format="mp3"):
+class Transcoder:
+    def __init__(self, input_format, output_format="mp3"):
+        self.config = read_config()
         self.data_in : Deque[bytes] = deque()
         self.data_out : Deque[bytes] = deque()
-        self.output_bitrate = int(output_bitrate)
-        self.bytes_per_chunk = config["CHUNK_SIZE_KB"] * 1024
-        logger.debug(f"Transcoder bytes per chunk {self.bytes_per_chunk}")
+        self.bytes_per_chunk = self.config["CHUNK_SIZE_KB"] * 1024
+        logger.debug(f"Transcoder chunk size: {self.bytes_per_chunk}b")
         self.input_format = input_format
         self.output_format = output_format
         self.ffmpeg_process = None
@@ -120,12 +119,12 @@ class Transcoder():
             '-f', self.input_format,
             '-i', 'pipe:0',
             '-c:a', self.output_format,
-            '-b:a', f'{self.output_bitrate}k',
+            '-b:a', f'{self.config["BITRATE_KBPS"]}k',
+            '-ar', '44100',
             '-f', 'mp3',
             'pipe:1'
         ]
-        logger.info("Starting ffmpeg: ")
-        logger.info(" ".join(command))
+        logger.info("Starting: " + " ".join(command))
         self.ffmpeg_process = subprocess.Popen(
             command,
             stdin=subprocess.PIPE,

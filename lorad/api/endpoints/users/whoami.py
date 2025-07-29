@@ -7,7 +7,7 @@ LOGIN_REQUIRED = True
 DOCSTRING = {"GET": "Returns the username of the logged in user."}
 RESULT_EXAMPLE = "{'whoami': 'admin'}"
 
-@lrd_api_endp
 @lrd_auth(globs.CAP_BASIC_USER)
+@lrd_api_endp
 def impl_GET(headers):
     return {"whoami": get_username_from_headers(headers)}

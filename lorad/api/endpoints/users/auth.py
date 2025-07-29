@@ -22,8 +22,8 @@ def validate(headers, data):
             return f"This method requires {REQUIRED_FIELDS["POST"]} to be specified."
     return
 
-@lrd_api_endp
 @lrd_validate(validate_func=validate)
+@lrd_api_endp
 def impl_POST(headers, data):
     login_result = User.user_login(data["username"], data["password"])
     if login_result == globs.LOGIN_NO_SUCH_USER:

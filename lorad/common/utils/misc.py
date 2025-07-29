@@ -35,7 +35,7 @@ def signal_stop(_signo, _stack_frame):
 def splash():
     from lorad.common.utils.logger import get_logger
     logger = get_logger()
-    splash = """
+    splash_text = """
   _           _____       _____  
  | |         |  __ \\     |  __ \\ 
  | |     ___ | |__) |__ _| |  | |
@@ -43,7 +43,7 @@ def splash():
  | |___| (_) | | \\ \\ (_| | |__| |
  |______\\___/|_|  \\_\\__,_|_____/ 
 """
-    lines = splash.split("\n")
+    lines = splash_text.split("\n")
     for aline in lines:
         logger.info(aline)
     logger.info(get_version())

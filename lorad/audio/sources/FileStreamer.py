@@ -9,6 +9,7 @@ from typing import Tuple
 from openai.types.beta.threads import Run
 from lorad.audio.file_sources.FileRide import FileRide
 from lorad.audio.server.LoRadSrv import LoRadServer
+from lorad.common.localization.localization import get_loc
 from lorad.common.utils.logger import get_logger
 from mutagen.mp3 import MP3
 from mutagen.easyid3 import EasyID3
@@ -17,10 +18,12 @@ from lorad.common.utils.misc import read_config
 
 logger = get_logger()
 
-class FileStreamer():
+class FileStreamer:
     def __init__(self, connectors: list[FileRide], server: LoRadServer):
         logger.debug("Initializing carousel...")
         config = read_config()
+        self.name_readable = get_loc("PLAYER_NAME_FILESTREAMER")
+        self.name_tech = "player_streaming"
         self.fallback_index = 0
         self.server = server
         self.connectors = connectors
