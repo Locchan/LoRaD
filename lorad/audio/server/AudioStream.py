@@ -130,7 +130,7 @@ class AudioStream(BaseHTTPRequestHandler):
                 while True:
                     # If we get a new track, we should burst data. We burst data by breaking from this [while True:]
                     #  We detect a new track by detecting that our current_data has completely changed
-                    #  (for every new track our streamer sends us a fresh batch of data, not just a single chunk)\
+                    #  (for every new track our streamer sends us a fresh batch of data, not just a single chunk)
                     if self.track_ended:
                         if self.detect_new_track(current_data, AudioStream.current_data):
                             logger.debug(f"[{client_id}] New track detected.")

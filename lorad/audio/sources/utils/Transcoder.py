@@ -14,7 +14,8 @@ logger = get_logger()
 
 
 class Transcoder:
-    def __init__(self, input_format, output_format="mp3"):
+    def __init__(self, input_format, output_format="mp3", respect_chunk_size=False):
+        self.respect_chunk_size = respect_chunk_size
         self.config = read_config()
         self.data_in : Deque[bytes] = deque()
         self.bytes_per_chunk = self.config["CHUNK_SIZE_KB"] * 1024
@@ -27,12 +28,16 @@ class Transcoder:
         self.ffmpeg_process = None
         self.loop_thread = None
         self.interrupt = False
+        self.burst_done = False
     
     def ffmpeg_alive(self):
         return self.ffmpeg_process and self.ffmpeg_process.poll() is None
     
     def start(self):
         logger.info(f"Starting transcoder: {self.input_format} -> {self.output_format}")
+        logger.info(f"Output bitrate: {self.config["BITRATE_KBPS"]}")
+        if self.respect_chunk_size:
+            logger.info(f"Chunk size (respected): {self.bytes_per_chunk}")
         self.__start_ffmpeg()
         self.loop_thread = Thread(name="Transcoder", target=self.transcoder_loop)
         self.loop_thread.start()
@@ -83,16 +88,39 @@ class Transcoder:
     #  Returns whatever is left here if someone has said that no more data is present
     #  Returns b'EOTD' if there is no more data, and we've used the whole transcoder buffer
     def get_transcoded_chunk(self) -> bytes:
+
+
+        # Create a burst chunk when the transcoder starts (this happens on start or on station/source switch)
+        #  Without this, the user may experience buffering as they have a very small buffer.
+        if not self.burst_done:
+            if len(self.transcoder_buffer) >= self.bytes_per_chunk * 2:
+                logger.info("Sending a burst chunk to AudioStream from a fresh transcoder instance.")
+                tmpbuf = self.transcoder_buffer
+                self.transcoder_buffer = b''
+                self.burst_done = True
+                return tmpbuf
+            else:
+                return b''
+
         if self.transcoder_buffer is None:
             return END_OF_TRANSCODED_DATA
-        if len(self.transcoder_buffer) >= self.bytes_per_chunk:
-            chunk = self.transcoder_buffer[:self.bytes_per_chunk]
-            self.transcoder_buffer = self.transcoder_buffer[self.bytes_per_chunk:]
-            return chunk
-        if self.no_more_data and len(self.transcoder_buffer) < self.bytes_per_chunk:
-            tmpbuf = self.transcoder_buffer
-            self.transcoder_buffer = None
-            return tmpbuf
+
+        if self.respect_chunk_size:
+            if len(self.transcoder_buffer) >= self.bytes_per_chunk:
+                chunk = self.transcoder_buffer[:self.bytes_per_chunk]
+                self.transcoder_buffer = self.transcoder_buffer[self.bytes_per_chunk:]
+                return chunk
+            if self.no_more_data and len(self.transcoder_buffer) < self.bytes_per_chunk:
+                tmpbuf = self.transcoder_buffer
+                self.transcoder_buffer = None
+                return tmpbuf
+        else:
+            if self.no_more_data and not self.transcoder_buffer:
+                self.transcoder_buffer = None
+            else:
+                tmpbuf = self.transcoder_buffer
+                self.transcoder_buffer = b''
+                return tmpbuf
         return b''
 
     def add_data(self, data: bytes):
@@ -134,7 +162,7 @@ class Transcoder:
             '-f', 'mp3',
             'pipe:1'
         ]
-        logger.info("Starting: " + " ".join(command))
+        logger.debug("Starting: " + " ".join(command))
         self.ffmpeg_process = subprocess.Popen(
             command,
             stdin=subprocess.PIPE,

@@ -147,7 +147,7 @@ class FileStreamer:
 
             source_bitrate, seconds_per_chunk, length = self.get_track_info()
 
-            self.transcoder = Transcoder(input_format="mp3")
+            self.transcoder = Transcoder(input_format="mp3", respect_chunk_size=True)
 
             with open(self.current_filepath, 'rb') as mp3file:
                 self.transcoder.start()

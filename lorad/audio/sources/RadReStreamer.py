@@ -78,13 +78,8 @@ class RadReStreamer:
                 logger.info(f"URL: {station_url}")
                 for akey, aval in self.station_info.items():
                     logger.info(f"{akey.capitalize()}: {aval}")
-                logger.info(f"Transcoder running: {self.transcoder is not None}")
-                if self.transcoder is not None:
-                    self.transcoder.start()
-                    self.__stream(station_url)
-                else:
-                    logger.error("Transcoder failed to start!")
-                    os._exit(1)
+                self.transcoder.start()
+                self.__stream(station_url)
 
                 # If we are outside __stream_data and were not interrupted, we crashed
                 if self.running:
