@@ -32,10 +32,11 @@ def get_players_names():
 def switch_players(new_player_name):
     from lorad.common.utils.logger import get_logger
     logger = get_logger()
-    logger.info(f"Switching players: from '{globs.CURRENT_PLAYER_NAME}' to '{new_player_name}'.")
     if new_player_name == globs.CURRENT_PLAYER_NAME:
+        logger.info("The new player is the same as the old one. Nothing to do.")
         return
     else:
+        logger.info(f"Switching players: from '{globs.CURRENT_PLAYER_NAME}' to '{new_player_name}'.")
         prev_player = get_current_player()
         globs.CURRENT_PLAYER_NAME = new_player_name
         new_player = get_current_player()

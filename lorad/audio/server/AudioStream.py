@@ -40,10 +40,15 @@ class AudioStream(BaseHTTPRequestHandler):
     clients = []
 
     @staticmethod
-    def add_data(data):
-        if len(AudioStream.current_data) > 0:
-            AudioStream.current_data.popleft()
-        AudioStream.current_data.append(data)
+    def add_data(data, only_if_listeners_there=False):
+        accept_data = True
+        if only_if_listeners_there and AudioStream.connected_clients == 0:
+            accept_data = False
+        if accept_data:
+            if len(AudioStream.current_data) > 0:
+                AudioStream.current_data.popleft()
+            AudioStream.current_data.append(data)
+        return accept_data
 
     @staticmethod
     def log_message(*args):
@@ -115,7 +120,7 @@ class AudioStream(BaseHTTPRequestHandler):
                         data_to_push = bytes()
                         for data_to_push in current_data:
                             if data_to_push:
-                                logger.debug(f"[{client_id}] Sending a burst chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]; Length: {len(data_to_push)}")
+                                #logger.debug(f"[{client_id}] Sending a burst chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]; Length: {len(data_to_push)}")
                                 self.wfile.write(data_to_push)
                                 self.wfile.flush()
                                 pushed_data = data_to_push
@@ -140,7 +145,7 @@ class AudioStream(BaseHTTPRequestHandler):
                         if data_to_push != pushed_data:
                             if not isinstance(data_to_push, bytes):
                                 continue
-                            logger.debug(f"[{client_id}] Sending a chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]; Length: {len(data_to_push)}")
+                            #logger.debug(f"[{client_id}] Sending a chunk [{hashlib.sha256(data_to_push).hexdigest()[:8]}]; Length: {len(data_to_push)}")
                             self.wfile.write(data_to_push)
                             self.wfile.flush()
                             if AudioStream.track_ended:

@@ -1,3 +1,5 @@
+import os
+
 import requests
 from lorad.api.LoRadAPISrv import read_config
 from lorad.common.localization.localization import get_loc
@@ -71,8 +73,7 @@ class RadReStreamer:
             self.currently_playing = stations[station]["name"]
             self.currently_playing = stations[station]["name"]
             if self.preflight_request(station_url):
-                if self.station_info["format"] != self.default_format:
-                    self.transcoder = Transcoder( self.station_info["format"], self.default_format)
+                self.transcoder = Transcoder(self.station_info["format"], self.default_format)
                 logger.info(f"Starting streaming '{station}'. Stream settings:")
                 logger.info(f"URL: {station_url}")
                 for akey, aval in self.station_info.items():
@@ -80,9 +81,10 @@ class RadReStreamer:
                 logger.info(f"Transcoder running: {self.transcoder is not None}")
                 if self.transcoder is not None:
                     self.transcoder.start()
-                    self.__stream_transcoded(station_url)
+                    self.__stream(station_url)
                 else:
-                    self.__stream_untranscoded(station_url)
+                    logger.error("Transcoder failed to start!")
+                    os._exit(1)
 
                 # If we are outside __stream_data and were not interrupted, we crashed
                 if self.running:
@@ -108,23 +110,7 @@ class RadReStreamer:
             self.station_info["format"] = headers['Content-Type'].split("/")[-1]
         return True
     
-    def __stream_untranscoded(self, station_url):
-        ext_strm_data_generator = self.consume_external_stream(station_url)
-        try:
-            self.transmitting = True
-            for raw_chunk in ext_strm_data_generator:
-                if self.running:
-                    chunk = raw_chunk
-                    if chunk:
-                        AudioStream.add_data(chunk)
-                else:
-                    ext_strm_data_generator.close()
-                    break
-            self.transmitting = False
-        except GeneratorExit:
-            logger.info("Playback interrupted.")
-    
-    def __stream_transcoded(self, station_url):
+    def __stream(self, station_url):
         ext_strm_data_generator = self.consume_external_stream(station_url)
         transcoded_chunk = b''
         try:
@@ -132,7 +118,7 @@ class RadReStreamer:
             for raw_chunk in ext_strm_data_generator:
                 if self.running:
                     self.transcoder.add_data(raw_chunk)
-                    transcoded_chunk = self.transcoder.get_transcoded_slab()
+                    transcoded_chunk = self.transcoder.get_transcoded_chunk()
                     if transcoded_chunk and transcoded_chunk is not None:
                         AudioStream.add_data(transcoded_chunk)
                 else:

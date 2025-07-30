@@ -1,19 +1,14 @@
-from lorad.audio.file_sources.yandex.YaMu import YaMu
-from lorad.audio.server import AudioStream
-from lorad.audio.sources.FileStreamer import FileStreamer
-from lorad.audio.sources.RadReStreamer import RadReStreamer
-
 FEATURE_FLAGS = []
 TEMPDIR = ""
 
 LOCALE = ""
 
-CURRENT_DATA_STREAMER : AudioStream = None
+CURRENT_DATA_STREAMER = None
 
-FILESTREAMER : FileStreamer = None
-YANDEX_OBJ : YaMu = None
+FILESTREAMER = None
+YANDEX_OBJ = None
 
-RESTREAMER : RadReStreamer = None
+RESTREAMER = None
 
 PLAYERS = []
 CURRENT_PLAYER_NAME = ""
@@ -36,3 +31,5 @@ CAP_ADMIN = "ADMIN"
 CAP_BASIC_USER = "BU"
 
 RESTREAMER_DEFAULT_FORMAT = "mp3"
+
+END_OF_TRANSCODED_DATA = b'EOTD'

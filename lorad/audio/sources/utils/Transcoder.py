@@ -1,10 +1,12 @@
 import os
 import subprocess
+import time
+from collections import deque
 from threading import Thread
 from typing import Deque
+
+from lorad.common.utils.globs import END_OF_TRANSCODED_DATA
 from lorad.common.utils.logger import get_logger
-from lorad.audio.server.AudioStream import sleep
-from lorad.audio.sources.FileStreamer import deque
 from lorad.common.utils.misc import read_config
 
 
@@ -15,9 +17,11 @@ class Transcoder:
     def __init__(self, input_format, output_format="mp3"):
         self.config = read_config()
         self.data_in : Deque[bytes] = deque()
-        self.data_out : Deque[bytes] = deque()
         self.bytes_per_chunk = self.config["CHUNK_SIZE_KB"] * 1024
         logger.debug(f"Transcoder chunk size: {self.bytes_per_chunk}b")
+        self.transcoder_buffer = b''
+        # This should be set to True when you have finished passing file data to the transcoder.
+        self.no_more_data = False
         self.input_format = input_format
         self.output_format = output_format
         self.ffmpeg_process = None
@@ -45,7 +49,7 @@ class Transcoder:
                 else:
                     logger.info("Transcoder thread is stopped.")
                     break
-                sleep(0.5)
+                time.sleep(0.5)
         else:
             logger.warn("Transcoder was already stopped")
     
@@ -63,7 +67,7 @@ class Transcoder:
                             self.__feed_ffmpeg(slab)
                             break
                 else:
-                    sleep(0.1)
+                    time.sleep(0.1)
                 self.__get_transcoded_data()
             else:
                 logger.info("Exiting transcoder loop.")
@@ -73,17 +77,23 @@ class Transcoder:
         chunk = self.ffmpeg_process.stdout.read()
         if chunk:
             #logger.debug(f"Got {len(chunk)}b from ffmpeg.")
-            self.data_out.append(chunk)
+            self.transcoder_buffer += chunk
 
-    def get_transcoded_slab(self):
-        slab = b''
-        if len(self.data_out) > 0:
-            while True:
-                chunk = self.data_out.popleft()
-                if chunk and chunk is not None:
-                    slab += chunk
-                if len(self.data_out) == 0:
-                    return slab
+    # Returns data from self.transcoder_buffer one chunk at a call
+    #  Returns whatever is left here if someone has said that no more data is present
+    #  Returns b'EOTD' if there is no more data, and we've used the whole transcoder buffer
+    def get_transcoded_chunk(self) -> bytes:
+        if self.transcoder_buffer is None:
+            return END_OF_TRANSCODED_DATA
+        if len(self.transcoder_buffer) >= self.bytes_per_chunk:
+            chunk = self.transcoder_buffer[:self.bytes_per_chunk]
+            self.transcoder_buffer = self.transcoder_buffer[self.bytes_per_chunk:]
+            return chunk
+        if self.no_more_data and len(self.transcoder_buffer) < self.bytes_per_chunk:
+            tmpbuf = self.transcoder_buffer
+            self.transcoder_buffer = None
+            return tmpbuf
+        return b''
 
     def add_data(self, data: bytes):
         #logger.debug(f"Adding {len(data)}b of data to transcoder queue.")

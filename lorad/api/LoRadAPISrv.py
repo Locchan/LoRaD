@@ -1,3 +1,4 @@
+import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
@@ -61,6 +62,9 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
 
     def do_GET(self):
         try:
+            ip_from_headers = self.headers.get('X-Real-IP')
+            if ip_from_headers is not None:
+                self.client_address = (ip_from_headers, self.client_address[1])
             if self.path in endpoints["GET"]:
                 endpoint_exec_result = endpoints["GET"][self.path](self.headers)
                 self.send_response(endpoint_exec_result["rc"])
@@ -75,7 +79,7 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
                     response = endpoint_exec_result["data"]
                 self.wfile.write(response.encode("utf-8"))
                 self.wfile.flush()
-                logger.info(f"RQ: GET {self.path}: {endpoint_exec_result["rc"]}." +
+                logger.info(f"[{self.client_address[0]}] - RQ: GET {self.path}: {endpoint_exec_result["rc"]}." +
                             f" Data: TX:{sys.getsizeof(response)}b")
                 logger.debug(f"RQ Headers: {self.headers}")
                 if sys.getsizeof(response) < 8192:
@@ -95,6 +99,9 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
+            ip_from_headers = self.headers.get('X-Real-IP')
+            if ip_from_headers is not None:
+                self.client_address = (ip_from_headers, self.client_address[1])
             if self.path in endpoints["POST"]:
                 data_length = int(self.headers.get('Content-Length'))
                 if data_length > MAX_DATA_LEN:
@@ -118,7 +125,7 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
                     response = endpoint_exec_result["data"]
                 self.wfile.write(response.encode("utf-8"))
                 self.wfile.flush()
-                logger.info(f"RQ: POST {self.path}: {endpoint_exec_result["rc"]}." +
+                logger.info(f"[{self.client_address[0]}] - RQ: POST {self.path}: {endpoint_exec_result["rc"]}." +
                             f" Data: RX:{data_length}b" +
                             f" TX:{sys.getsizeof(endpoint_exec_result["data"])}b")
                 logger.debug(f"RQ Headers: {self.headers}")

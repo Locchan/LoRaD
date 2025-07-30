@@ -1,15 +1,15 @@
-from collections import deque
-import datetime
+import time
 import math
 import os
 from pathlib import Path
 from time import sleep
 from typing import Tuple
 
-from openai.types.beta.threads import Run
 from lorad.audio.file_sources.FileRide import FileRide
 from lorad.audio.server.AudioStream import AudioStream
+from lorad.audio.sources.utils.Transcoder import Transcoder
 from lorad.common.localization.localization import get_loc
+from lorad.common.utils.globs import END_OF_TRANSCODED_DATA
 from lorad.common.utils.logger import get_logger
 from mutagen.mp3 import MP3
 from mutagen.easyid3 import EasyID3
@@ -18,6 +18,7 @@ from lorad.common.utils.misc import read_config
 
 logger = get_logger()
 
+# Supports only mp3 as it's hardcoded in the Transcoder class creation and was default since the first attempts at this project.
 class FileStreamer:
     def __init__(self, connectors: list[FileRide], server: AudioStream):
         logger.debug("Initializing carousel...")
@@ -31,10 +32,13 @@ class FileStreamer:
         self.current_ride = self.connectors[self.connector_index]
         self.carousel_enabled = False
         self.chunk_size = config["CHUNK_SIZE_KB"]
-        self.chunk_size_bytes = self.chunk_size * 1024
+        self.chunk_size_bytes = self.chunk_size * 102
         self.currently_playing = ""
         self.current_filepath = ""
-        self.interrupt = False
+        self.transcoder : Transcoder | None = None
+        self.target_bitrate = int(config["BITRATE_KBPS"])
+        self.default_format = config["DEFAULT_AUDIO_FORMAT"]
+        self.running = False
         self.free = True
         self.initial_burst_chunks = 8
 
@@ -78,8 +82,9 @@ class FileStreamer:
             self.fallback_index = 0
         self.current_filepath = os.path.join(config["FALLBACK_TRACK_DIR"], fallback_tracks[self.fallback_index])
         self.serve_file()
-        self.fallback_index += 1
-        self.start_carousel()
+        if self.carousel_enabled:
+            self.fallback_index += 1
+            self.start_carousel()
 
     def start(self):
         self.start_carousel()
@@ -95,12 +100,11 @@ class FileStreamer:
             self.carousel_enabled = True
 
     def stop_carousel(self):
-        if self.carousel_enabled:
-            logger.info("Stopping carousel")
-            self.interrupt = True
-            self.carousel_enabled = False
-        else:
-            logger.warn("Tried to stop carousel when it is already stoppped")
+        if not self.carousel_enabled:
+            logger.warn("Tried to stop carousel when it is already stopped")
+        logger.info("Stopping carousel")
+        self.running = False
+        self.carousel_enabled = False
 
     # If we don't have track name from whoever wants us to play it, try getting it from metadata.
     # If even this fails, just cut the file extension use the rest as the track title
@@ -117,16 +121,12 @@ class FileStreamer:
 
     def get_track_info(self) -> tuple:
         track_info =  MP3(self.current_filepath).info
-        seconds_per_chunk = self.chunk_size_bytes / (track_info.bitrate / 8)
-        sleep_time = (math.floor(seconds_per_chunk * 100) - 1) / 100.0
+        source_bitrate = track_info.bitrate / 1000
+        seconds_per_chunk = self.chunk_size_bytes / ( (source_bitrate * 1000) / 8)
+        logger.debug(f"Seconds per chunk: {seconds_per_chunk}")
         logger.info(f"Starting to serve the next track...")
-        logger.info(f"Track name: '{self.currently_playing}'")
-        logger.info(f"Track bitrate: {int(track_info.bitrate/1000)}kbps")
-        logger.info(f"Seconds per chunk (approx.): {seconds_per_chunk}; Chunk size: {self.chunk_size}kB")
-        logger.info(f"Traffic per client (approx.): {int(self.chunk_size / seconds_per_chunk)}kBps")
-        logger.info(f"Delay betweek chunk sends (approx.): {sleep_time}s")
         logger.info(f"Track duration: {track_info.length}s")
-        return seconds_per_chunk, sleep_time, track_info.length
+        return source_bitrate, seconds_per_chunk, track_info.length
 
     def serve_file(self, track_name=None):
         if track_name is not None:
@@ -139,59 +139,48 @@ class FileStreamer:
             else:
                 break
 
-        self.interrupt = False
+        self.running = True
         self.free = False
         try:
             if self.currently_playing == "":
                 self.set_track_name_from_metadata()
 
-            seconds_per_chunk, sleep_time, length = self.get_track_info()
+            source_bitrate, seconds_per_chunk, length = self.get_track_info()
+
+            self.transcoder = Transcoder(input_format="mp3")
 
             with open(self.current_filepath, 'rb') as mp3file:
-                # Get chunks for the initial burst
-                burst_chunks = [mp3file.read(self.chunk_size_bytes) for _ in range(self.initial_burst_chunks)]
+                self.transcoder.start()
+                data_accepted = True
                 while True:
-                    if not self.interrupt:
-                        if AudioStream.connected_clients != 0:
-                            # If we have burst_chunks var, this means that we're sending the initial burst of data
-                            #  thus we just set current_data in the server and continue with out lives as normal
-                            if burst_chunks:
-                                track_end_time = datetime.datetime.now().timestamp() + length
-                                AudioStream.current_data = deque(burst_chunks)
-                                burst_chunks = False
-                                continue
-                            
-                            chunk = mp3file.read(self.chunk_size_bytes)
-                            
-                            # If the last chunk
-                            if not chunk:
-                                serve_end = datetime.datetime.now().timestamp()
-                                AudioStream.track_ended = True
-                                break
+                    if self.running:
+                        # AudioStream will refuse data if no one is listening.
+                        if data_accepted:
+                            source_chunk = mp3file.read(self.chunk_size_bytes)
+                            if not source_chunk:
+                                self.transcoder.no_more_data = True
                             else:
-                                # Serving the chunk to LoRadServer which will send the chunk to the clients
-                                AudioStream.add_data(chunk)
-
-                        # If we're sending a packet per .256 seconds , we'll wait for .24 seconds (check how sleep_time is created)
-                        #  so that we're sending data faster to avoid buffering while also making users
-                        #  have some pre-buffered future data. The problem of users having future data is mitigated below.
-                        sleep(sleep_time)
-                        self.currently_playing = ""
-                        self.current_filepath = ""
+                                self.transcoder.add_data(source_chunk)
+                            transcoder_chunk = self.transcoder.get_transcoded_chunk()
+                            if transcoder_chunk is None:
+                                logger.error("Transcoder error. See logs!")
+                                self.transcoder.stop()
+                                return
+                            elif not transcoder_chunk:
+                                pass
+                            elif transcoder_chunk == END_OF_TRANSCODED_DATA:
+                                self.transcoder.stop()
+                                return
+                            else:
+                                data_accepted = AudioStream.add_data(transcoder_chunk, only_if_listeners_there=True)
+                        else:
+                            data_accepted = AudioStream.add_data(transcoder_chunk, only_if_listeners_there=True)
                     else:
-                        logger.info("Playback interrupted.")
+                        self.transcoder.stop()
                         break
-            
-            # We're sending data *too* fast sometimes
-            #  The code below is to compensate for being such a fast boi
-            #  We know the track duration and we know how long we've been transferring it
-            #   so we sleep the difference after we're done with transferring the track
-            if not self.interrupt:
-                serve_delay = track_end_time - serve_end - (self.initial_burst_chunks * seconds_per_chunk)
-                if serve_delay > 0:
-                    logger.info(f"Serve delay is {serve_delay}.")
-                    sleep(serve_delay)
+                    time.sleep(seconds_per_chunk)
         finally:
+            logger.info("Exiting file playback method.")
             self.free = True
             AudioStream.track_ended = True
 
