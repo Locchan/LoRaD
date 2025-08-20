@@ -51,13 +51,6 @@ enabled_threads = [
     Thread(name="HTTPServer", target=AudioStream.start, args=(globs.CURRENT_DATA_STREAMER,)),
 ]
 
-if feature_enabled(globs.FEAT_RESTREAMER):
-    globs.RESTREAMER = RadReStreamer(globs.CURRENT_DATA_STREAMER)
-    default_station = config["RESTREAMER"]["STATION"] if "RESTREAMER" in config and "STATION" in config["RESTREAMER"] else "default"
-    globs.RESTREAMER.current_station = default_station
-    enabled_threads.append(Thread(name="ReStreamer", target=globs.RESTREAMER.standby))
-    globs.PLAYERS.append(globs.RESTREAMER)
-
 if feature_enabled(globs.FEAT_FILESTREAMER):
     if feature_enabled(globs.FEAT_FILESTREAMER_YANDEX):
         globs.YANDEX_OBJ = YaMu(config["YAMU_TOKEN"], config["BITRATE_KBPS"])
@@ -68,6 +61,13 @@ if feature_enabled(globs.FEAT_FILESTREAMER):
         globs.PLAYERS.append(globs.FILESTREAMER)
     else:
         logger.error("Filesteamer is enabled but no providers are configured!")
+
+if feature_enabled(globs.FEAT_RESTREAMER):
+    globs.RESTREAMER = RadReStreamer(globs.CURRENT_DATA_STREAMER)
+    default_station = config["RESTREAMER"]["STATION"] if "RESTREAMER" in config and "STATION" in config["RESTREAMER"] else "default"
+    globs.RESTREAMER.current_station = default_station
+    enabled_threads.append(Thread(name="ReStreamer", target=globs.RESTREAMER.standby))
+    globs.PLAYERS.append(globs.RESTREAMER)
 
 if feature_enabled(globs.FEAT_NEURONEWS):
     enabled_threads.append(Thread(name="NewsParser", target=parse_news))
