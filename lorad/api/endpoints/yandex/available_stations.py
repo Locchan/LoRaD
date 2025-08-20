@@ -15,3 +15,5 @@ def impl_GET(headers):
     stations = get_yandex_stations()
     if stations is None:
         return {"rc": 406, "data": {"message": "Yandex is not initialized."}}
+    else:
+        return stations
