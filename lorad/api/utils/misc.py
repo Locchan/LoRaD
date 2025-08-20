@@ -67,7 +67,7 @@ def get_radio_stations():
     stations = globs.RESTREAMER.get_stations()
     stations_parsed = {}
     for anitem in stations:
-        stations_parsed[anitem] = stations[anitem]["name"]
+        stations_parsed[stations[anitem]["name"]] = anitem
     return stations_parsed
 
 def get_yandex_stations():
