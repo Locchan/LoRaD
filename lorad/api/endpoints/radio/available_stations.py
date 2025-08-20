@@ -5,7 +5,7 @@ import lorad.common.utils.globs as globs
 ENDP_PATH = "/radio/available_stations"
 LOGIN_REQUIRED = True
 DOCSTRING = {"GET": "Returns available radio stations."}
-RESULT_EXAMPLE = "{'love': 'Love Radio','euro': 'Euroradio'}"
+RESULT_EXAMPLE = {"GET": "{'love': 'Love Radio','euro': 'Euroradio'}"}
 
 @lrd_auth(globs.CAP_BASIC_USER)
 @lrd_feat_req(globs.FEAT_RESTREAMER)

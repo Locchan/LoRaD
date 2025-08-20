@@ -9,7 +9,7 @@ LOGIN_REQUIRED = False
 DOCSTRING = {
         "POST": "Authenticates a user and returns an auth token"
 }
-RESULT_EXAMPLE = "{'token': 'abcdefghi'}"
+RESULT_EXAMPLE = {"POST": "{'token': 'abcdefghi'}"}
 REQUIRED_FIELDS = {
     "POST": ["username", "password"]
 }

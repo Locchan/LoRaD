@@ -6,7 +6,7 @@ from lorad.common.utils.globs import FEAT_FILESTREAMER_YANDEX
 ENDP_PATH = "/yandex/available_stations"
 LOGIN_REQUIRED = True
 DOCSTRING = {"GET": "Returns available radio stations from Yandex."}
-RESULT_EXAMPLE = "{'Pop':'genre:pop','Meditation':'genre:meditation'}"
+RESULT_EXAMPLE = {"GET": "{'Pop':'genre:pop','Meditation':'genre:meditation'}"}
 
 @lrd_auth(globs.CAP_BASIC_USER)
 @lrd_feat_req(FEAT_FILESTREAMER_YANDEX)

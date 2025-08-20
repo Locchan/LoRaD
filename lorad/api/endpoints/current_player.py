@@ -5,7 +5,7 @@ from lorad.api.utils.misc import get_current_player
 ENDP_PATH = "/current_player"
 LOGIN_REQUIRED = True
 DOCSTRING = {"GET": "Returns the current player (Yandex/Radio/etc.)."}
-RESULT_EXAMPLE = "{'player': 'player_radio'}"
+RESULT_EXAMPLE = {"GET": "{'player': 'player_radio'}"}
 
 @lrd_auth(globs.CAP_BASIC_USER)
 @lrd_api_endp

@@ -5,7 +5,7 @@ from lorad.common.utils.misc import read_config
 ENDP_PATH = "/enabled_features"
 LOGIN_REQUIRED = True
 DOCSTRING = {"GET": "Returns features enabled in the backend."}
-RESULT_EXAMPLE = "{'features': ['REST', 'RESTREAMER', 'FILESTREAMER', 'FILESTREAMER:YANDEX']}"
+RESULT_EXAMPLE = {"GET": "{'features': ['REST', 'RESTREAMER', 'FILESTREAMER', 'FILESTREAMER:YANDEX']}"}
 
 @lrd_auth(globs.CAP_BASIC_USER)
 @lrd_api_endp

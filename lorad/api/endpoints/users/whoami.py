@@ -5,7 +5,7 @@ import lorad.common.utils.globs as globs
 ENDP_PATH = "/user/whoami"
 LOGIN_REQUIRED = True
 DOCSTRING = {"GET": "Returns the username of the logged in user."}
-RESULT_EXAMPLE = "{'whoami': 'admin'}"
+RESULT_EXAMPLE = {"GET": "{'whoami': 'admin'}"}
 
 @lrd_auth(globs.CAP_BASIC_USER)
 @lrd_api_endp

@@ -55,6 +55,12 @@ def generate_endpoint_fragment(anendpoint):
                 html += '</ul>'
                 has_params = True
 
+            if hasattr(anendpoint, "RESULT_EXAMPLE"):
+                html += '<div class="section-title">Response example:</div><ul>'
+                html += f'<li><code>{anendpoint.RESULT_EXAMPLE[amethod]}</code></li>'
+                html += '</ul>'
+                has_params = True
+
             if not has_params:
                 html += '<p><em>No parameters.</em></p>'
             html += '</div>'

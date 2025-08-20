@@ -4,7 +4,7 @@ import lorad.common.utils.globs as globs
 ENDP_PATH = "/locale"
 LOGIN_REQUIRED = True
 DOCSTRING = {"GET": "Returns the server locale (language)."}
-RESULT_EXAMPLE = "{'locale': 'RU'}"
+RESULT_EXAMPLE = {"GET": "{'locale': 'RU'}"}
 
 @lrd_auth(globs.CAP_BASIC_USER)
 @lrd_api_endp
