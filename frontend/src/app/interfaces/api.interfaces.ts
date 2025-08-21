@@ -22,7 +22,7 @@ export interface UserResponse {
 }
 
 export interface YandexStationsResponse {
-  stations: string[];
+  [key: string]: string;
 }
 
 export interface CurrentTrackResponse {
@@ -44,3 +44,14 @@ export interface WhatsPlayingResponse {
 export interface CurrentPlayerResponse {
   player: string;
 }
+
+export interface AvailablePlayersResponse {
+  [key: string]: string;
+}
+
+export interface RadioStationsResponse {
+  [key: string]: string;
+}export interface SwitchPlayerRequest {
+  new_player: string;
+}
+

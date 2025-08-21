@@ -3,14 +3,16 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
-  AuthRequest,
   AuthResponse,
-  VersionResponse,
   WhoAmIResponse,
   UserResponse,
   YandexStationsResponse,
   CurrentTrackResponse,
   CurrentStationResponse,
+  AvailablePlayersResponse,
+  RadioStationsResponse,
+  CurrentPlayerResponse,
+  WhatsPlayingResponse,
 } from '../interfaces/api.interfaces';
 
 @Injectable({
@@ -34,10 +36,7 @@ export class ApiService {
     return new HttpHeaders().set('Authorization', `${this.username}, ${this.authToken}`);
   }
 
-  // Version endpoint
-  getVersion(): Observable<VersionResponse> {
-    return this.http.get<VersionResponse>(`${this.apiUrl}/version`);
-  }
+
 
   // User management endpoints
   login(username: string, password: string): Observable<AuthResponse> {
@@ -95,9 +94,9 @@ export class ApiService {
     );
   }
 
-  getCurrentTrack(): Observable<CurrentTrackResponse> {
-    return this.http.get<CurrentTrackResponse>(
-      `${this.apiUrl}/yandex/current_track`,
+  getCurrentTrack(): Observable<WhatsPlayingResponse> {
+    return this.http.get<WhatsPlayingResponse>(
+      `${this.apiUrl}/whatsplaying`,
       { headers: this.getAuthHeaders() }
     );
   }
@@ -106,6 +105,43 @@ export class ApiService {
     return this.http.post<UserResponse>(
       `${this.apiUrl}/yandex/switch_station`,
       { new_station: newStation },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  // Player management endpoints
+  getAvailablePlayers(): Observable<AvailablePlayersResponse> {
+    return this.http.get<AvailablePlayersResponse>(
+      `${this.apiUrl}/available_players`,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  getRadioStations(): Observable<RadioStationsResponse> {
+    return this.http.get<RadioStationsResponse>(
+      `${this.apiUrl}/radio/available_stations`,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  getCurrentPlayer(): Observable<CurrentPlayerResponse> {
+    return this.http.get<CurrentPlayerResponse>(
+      `${this.apiUrl}/current_player`,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  switchPlayer(newPlayer: string): Observable<UserResponse> {
+    return this.http.post<UserResponse>(
+      `${this.apiUrl}/switch_player`,
+      { new_player: newPlayer },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  getRadioCurrentStation(): Observable<CurrentStationResponse> {
+    return this.http.get<CurrentStationResponse>(
+      `${this.apiUrl}/radio/current_station`,
       { headers: this.getAuthHeaders() }
     );
   }
