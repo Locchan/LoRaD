@@ -1,7 +1,3 @@
-export interface VersionResponse {
-  version: string;
-}
-
 export interface AuthRequest {
   username: string;
   password: string;
@@ -9,29 +5,42 @@ export interface AuthRequest {
 
 export interface AuthResponse {
   token: string;
+  message?: string;
+}
+
+export interface VersionResponse {
+  version: string;
 }
 
 export interface WhoAmIResponse {
-  whoami: string;
+  username: string;
 }
 
 export interface UserResponse {
+  message: string;
   success: boolean;
-  error?: string;
 }
 
 export interface YandexStationsResponse {
-  [key: string]: string; // station name -> station id
+  stations: string[];
 }
 
 export interface CurrentTrackResponse {
   track: string;
+  artist?: string;
+  album?: string;
 }
 
 export interface CurrentStationResponse {
   station: string;
 }
 
-export interface ErrorResponse {
-  error: string;
+export interface WhatsPlayingResponse {
+  player_readable: string;
+  player_tech: string;
+  playing: string;
+}
+
+export interface CurrentPlayerResponse {
+  player: string;
 }

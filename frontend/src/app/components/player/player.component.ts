@@ -40,12 +40,15 @@ export class PlayerComponent implements OnInit, OnDestroy {
   private initializePlayer() {
     // Get current user
     this.apiService.whoami().subscribe(response => {
-      this.currentUser = response.whoami;
+      this.currentUser = response.username;
     });
 
     // Get available stations
     this.apiService.getAvailableStations().subscribe(stations => {
-      this.availableStations = stations;
+      this.availableStations = stations.stations.reduce((acc, station) => {
+        acc[station] = station;
+        return acc;
+      }, {} as { [key: string]: string });
     });
 
     // Get current station

@@ -10,7 +10,7 @@ import {
   UserResponse,
   YandexStationsResponse,
   CurrentTrackResponse,
-  CurrentStationResponse
+  CurrentStationResponse,
 } from '../interfaces/api.interfaces';
 
 @Injectable({
