@@ -1,6 +1,7 @@
 import datetime
 import os
 
+from lorad.api.utils.misc import switch_players
 import lorad.common.utils.globs as globs
 from lorad.common.utils.logger import get_logger
 
@@ -27,6 +28,7 @@ class GenericPrg():
         return {} #dummy
 
     def start_program(self):
+        player_before_program = globs.CURRENT_PLAYER_NAME
         if self.prepared_program is None:
             logger.error(f"Can't run program [{self.name}]: not prepared!")
             self.preparations_started = False
@@ -38,16 +40,22 @@ class GenericPrg():
                     logger.error(f"Can't run program [{self.name}]: file [{afile}] does not exist!")
                     return
             logger.info(f"Running a scheduled program: [{self.name}]...")
-            globs.FILESTREAMER.stop_carousel()
-            for anum, afile in enumerate(self.prepared_program):
+            globs.FILESTREAMER.stop()
+            for anum, aprogram in enumerate(self.prepared_program.items()):
                 logger.info(f"Program: {self.name}; Track {anum+1}/{len(self.prepared_program)}")
-                globs.FILESTREAMER.serve_file(afile, track_name=aname)
+                if player_before_program == globs.FILESTREAMER.name_tech:
+                    switch_players(globs.FILESTREAMER.name_tech)
+                globs.FILESTREAMER.serve_file(track_filepath=aprogram[1])
             logger.info(f"Program [{self.name}] finished. Restarting carousel.")
         except Exception as e:
             logger.error(f"Failed to run the program: {e.__class__.__name__}")
             logger.info("Falling back to the carousel")
+            logger.exception(e)
         finally:
-            globs.FILESTREAMER.start_carousel()
+            if player_before_program == globs.FILESTREAMER.name_tech:
+                globs.FILESTREAMER.start()
+            else:
+                switch_players(player_before_program)
             self.prepared_program = None
             self.preparations_started = False
             self.program_running = False

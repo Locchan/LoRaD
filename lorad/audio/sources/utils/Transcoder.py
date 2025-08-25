@@ -82,7 +82,8 @@ class Transcoder:
         chunk = self.ffmpeg_process.stdout.read()
         if chunk:
             #logger.debug(f"Got {len(chunk)}b from ffmpeg.")
-            self.transcoder_buffer += chunk
+            if self.transcoder_buffer is not None:
+                self.transcoder_buffer += chunk
 
     # Returns data from self.transcoder_buffer one chunk at a call
     #  Returns whatever is left here if someone has said that no more data is present

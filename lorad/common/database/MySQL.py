@@ -5,6 +5,7 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.session import Session
+from urllib.parse import quote_plus
 from lorad.common.database.Base import Base
 import lorad.common.utils.globs as globs
 from lorad.common.utils.misc import feature_enabled, read_config
@@ -46,10 +47,16 @@ class MySQL():
             try:
                 c = config["MYSQL"]
                 if "CHARSET" in c:
-                    charset = c["CHARSET"]
+                    charset = quote_plus(c["CHARSET"])
                 else:
                     charset = "utf8mb4"
-                return f"mysql+pymysql://{c['USERNAME']}:{c['PASSWORD']}@{c['ADDRESS']}/{c['DATABASE']}?charset={charset}"
+                # Escape special characters
+                username = quote_plus(c["USERNAME"])
+                password = quote_plus(c["PASSWORD"])
+                address = c["ADDRESS"]
+                database = quote_plus(c["DATABASE"])
+                
+                return f"mysql+pymysql://{username}:{password}@{address}/{database}?charset={charset}"
             except Exception as e:
                 logger.error(f"Could not generate connection string: [{e.__class__.__name__}, {e}], something is missing in config.")
                 os._exit(1)

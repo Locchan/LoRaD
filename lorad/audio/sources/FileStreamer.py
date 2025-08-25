@@ -80,8 +80,7 @@ class FileStreamer:
             os._exit(1)
         if self.fallback_index == len(fallback_tracks):
             self.fallback_index = 0
-        self.current_filepath = os.path.join(config["FALLBACK_TRACK_DIR"], fallback_tracks[self.fallback_index])
-        self.serve_file()
+        self.serve_file(os.path.join(config["FALLBACK_TRACK_DIR"], fallback_tracks[self.fallback_index]))
         if self.carousel_enabled:
             self.fallback_index += 1
             self.start_carousel()
@@ -120,7 +119,7 @@ class FileStreamer:
             self.currently_playing = Path(self.current_filepath).stem
 
     def get_track_info(self) -> tuple:
-        track_info =  MP3(self.current_filepath).info
+        track_info = MP3(self.current_filepath).info
         source_bitrate = track_info.bitrate / 1000
         seconds_per_chunk = self.chunk_size_bytes / ( (source_bitrate * 1000) / 8)
         logger.debug(f"Seconds per chunk: {seconds_per_chunk}")
@@ -128,7 +127,9 @@ class FileStreamer:
         logger.info(f"Track duration: {track_info.length}s")
         return source_bitrate, seconds_per_chunk, track_info.length
 
-    def serve_file(self, track_name=None):
+    def serve_file(self, track_filepath=None, track_name=None):
+        if track_filepath is not None:
+            self.current_filepath = track_filepath
         if track_name is not None:
             self.currently_playing = track_name
         # Wait if some other thread is in here
@@ -186,4 +187,5 @@ class FileStreamer:
 
     def cleanup(self):
         if os.path.exists(self.current_filepath):
-            os.remove(self.current_filepath)
+            pass
+            #os.remove(self.current_filepath)

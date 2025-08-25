@@ -1,9 +1,9 @@
 import datetime
 import os
-import ffmpeg
 from lorad.audio.programs.GenericPrg import GenericPrg
 from lorad.audio.programs.news.orm import News
 from lorad.audio.programs.news.neuro.neurovoice import check_voiced, get_filelist, voice_news
+from lorad.audio.utils.ffmpeg_utils import ffmpeg_concatenate, ffmpeg_reencode
 from lorad.common.utils.logger import get_logger
 from lorad.common.utils.misc import read_config
 
@@ -31,7 +31,7 @@ class NewsPrgS(GenericPrg):
         # TODO: Jingles by source (or news source name being clearly spoken at the end/start of the block)
         news_files = get_filelist(news_ids)
 
-        # Re-encode neuro files to 320kbps 44100 so that we don't change quality dramatically
+        # Re-encode neuro files to self.config["BITRATE_KBPS"] and 44100 sample rate so that we don't change the stream dramatically
         news_digest_filepath = self._reencode_news(news_files)
         logger.info("Program prepared")
         News.mark_as_read(news_ids)
@@ -47,11 +47,10 @@ class NewsPrgS(GenericPrg):
         tempfiles = [self.jingle_path]
         logger.info("Reencoding news...")
         for afile in news_files:
-            tmpfilename = afile + reencode_date + ".mp3"
+            tmpfilename = afile[:-4] + "_reenc" + ".mp3"
             tempfiles.append(tmpfilename)
-            ffmpeg.input(afile).output(tmpfilename, audio_bitrate=f'{self.config["BITRATE_KBPS"]}k', ar=44100, acodec='libmp3lame', loglevel="quiet", ac=2, af="apad=pad_dur=2").run(overwrite_output=True)
+            if not os.path.exists(tmpfilename):
+                ffmpeg_reencode(afile, ["-b:a", f"{self.config["BITRATE_KBPS"]}k", "-c:a", "libmp3lame", "-ar", "44100", "-ac", "2", "-af", "apad=pad_dur=2"], tmpfilename)
         logger.info("Concatenating news files into a digest")
-        inputs = [ffmpeg.input(f) for f in tempfiles]
-        concatenated = ffmpeg.concat(*inputs, v=0, a=1).output(news_file, audio_bitrate=f'{self.config["BITRATE_KBPS"]}k', ar=44100, loglevel="quiet")
-        ffmpeg.run(concatenated)
+        ffmpeg_concatenate(tempfiles, news_file, artist="NeuroNews", title=f"Новости за {datetime.datetime.now().strftime("%Y-%m-%d %H")}")
         return news_file

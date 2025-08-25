@@ -9,7 +9,7 @@ logger = get_logger()
 
 class MdzSrc(GenericSource):
     rss_feeds = [
-        "https://meduza.io/rss/news",
+        "https://de.locchan.dev/meduza/rss/news",
     ]
     name = "Медуза"
 
