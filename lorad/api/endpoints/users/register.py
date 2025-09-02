@@ -31,4 +31,4 @@ def impl_POST(headers, data):
     if register_result:
         return {"success": True}
     else:
-        return (409, {"error": f"User {data["username"]} already exists"})
+        return (409, {"error": f"User '{data["username"]}' already exists"})
