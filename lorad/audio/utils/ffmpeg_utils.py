@@ -12,7 +12,7 @@ def ffmpeg_reencode(filename: str, params: list[str], output_filename: str):
     ffmpeg_command = ["ffmpeg", "-i", filename]
     ffmpeg_command.extend(params)
     if not ("DEBUG" in config and config["DEBUG"]):
-        ffmpeg_command.extend(["loglevel", "quiet"])
+        ffmpeg_command.extend(["-loglevel", "quiet"])
     ffmpeg_command.append(output_filename)
     logger.debug(f"Re-encoder command: {' '.join(ffmpeg_command)}")
     subprocess.call(ffmpeg_command)
