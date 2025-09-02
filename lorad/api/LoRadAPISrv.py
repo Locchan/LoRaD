@@ -79,7 +79,10 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
                     response = endpoint_exec_result["data"]
                 self.wfile.write(response.encode("utf-8"))
                 self.wfile.flush()
-                logger.info(f"[{self.client_address[0]}] - RQ: GET {self.path}: {endpoint_exec_result["rc"]}." +
+                real_ip = self.headers.get('X-Real-IP')
+                if real_ip is None:
+                    real_ip = self.client_address[0]
+                logger.info(f"[{real_ip}] - RQ: GET {self.path}: {endpoint_exec_result["rc"]}." +
                             f" Data: TX:{sys.getsizeof(response)}b")
                 logger.debug(f"RQ Headers: {self.headers}")
                 if sys.getsizeof(response) < 8192:
@@ -125,7 +128,10 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
                     response = endpoint_exec_result["data"]
                 self.wfile.write(response.encode("utf-8"))
                 self.wfile.flush()
-                logger.info(f"[{self.client_address[0]}] - RQ: POST {self.path}: {endpoint_exec_result["rc"]}." +
+                real_ip = self.headers.get('X-Real-IP')
+                if real_ip is None:
+                    real_ip = self.client_address[0]
+                logger.info(f"[{real_ip}] - RQ: POST {self.path}: {endpoint_exec_result["rc"]}." +
                             f" Data: RX:{data_length}b" +
                             f" TX:{sys.getsizeof(endpoint_exec_result["data"])}b")
                 logger.debug(f"RQ Headers: {self.headers}")
