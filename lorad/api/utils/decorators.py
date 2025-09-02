@@ -92,7 +92,7 @@ def lrd_auth(cap_required):
                     if check_caps(auth_split[0], cap_required):
                         return func(*args, **kwargs)
                     else:
-                        return {"rc": 401, "data": {"error": "Insufficient permissions"}}
+                        return {"rc": 403, "data": {"error": "Insufficient permissions"}}
                 else:
                     return {"rc": 401, "data": {"error": "Unauthorized"}}
             else:
