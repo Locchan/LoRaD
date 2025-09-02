@@ -19,7 +19,10 @@ def ffmpeg_reencode(filename: str, params: list[str], output_filename: str):
     
 
 def ffmpeg_concatenate(filenames: list[str], output_filename: str, artist=None, title=None):
-    ffmpeg_command = ["ffmpeg", "-f", "concat", "-safe", "0", "-i"]
+    if "DEBUG" in config and config["DEBUG"]:
+        ffmpeg_command = ["ffmpeg", "-f", "concat", "-safe", "0", "-i"]
+    else:
+        ffmpeg_command = ["ffmpeg", "-loglevel", "quiet", "-f", "concat", "-safe", "0", "-i"]
     list_filename = ""
     with tempfile.NamedTemporaryFile("w", dir=".", delete=False, suffix=".txt") as f:
         for filename in filenames:
