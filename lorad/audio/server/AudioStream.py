@@ -61,6 +61,16 @@ class AudioStream(BaseHTTPRequestHandler):
         self.sys_version = ""
         super().__init__(request, client_address, server)
 
+    def do_HEAD(self):
+        if self.path != '/':
+            self.send_response(404)
+            self.end_headers()
+            self.wfile.write("<html><h1>404</h1></html>".encode("utf-8"))
+            self.wfile.flush()
+            return
+        self.send_response(200)
+        self.end_headers()
+    
     def do_GET(self):
         if self.path != '/':
             self.send_response(404)
