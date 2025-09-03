@@ -1,36 +1,161 @@
 <div class="player-container">
-  <header>
-    <h1>LoRaD Radio</h1>
+  <header class="player-header">
+    <div class="logo-section">
+      <h1 class="app-title">
+        <i class="fas fa-radio"></i>
+        LoRaD Radio
+      </h1>
+      <p class="app-subtitle">Your Personal Radio Station</p>
+    </div>
+    
     <div class="user-info">
-      <span>{{ currentUser }}</span>
-      <button class="logout-button transition-all" (click)="onLogout()">Logout</button>
+      <span class="username">{{ currentUser }}</span>
+      <button class="logout-button" (click)="onLogout()">
+        <i class="fas fa-sign-out-alt"></i>
+        Выйти
+      </button>
     </div>
   </header>
 
-  <div class="player-controls">
-    <div class="station-selector transition-all">
-      <label for="station">Station:</label>
-      <select 
-        id="station" 
-        [(ngModel)]="selectedStation" 
-        (change)="onStationChange(selectedStation)"
-        class="transition-all">
-        <option value="">Select a station</option>
-        <option *ngFor="let station of availableStations | keyvalue" [value]="station.value">
-          {{ station.key }}
-        </option>
-      </select>
+  <div class="main-content">
+    <!-- Player Selection Section -->
+    <div class="player-section">
+      <div class="section-header">
+        <h2><i class="fas fa-play-circle"></i> Выбор плеера</h2>
+      </div>
+      
+      <div class="player-selector">
+        <label for="player" class="player-label">Плеер:</label>
+        <div class="select-wrapper">
+          <select 
+            id="player" 
+            [(ngModel)]="selectedPlayer" 
+            (change)="onPlayerChange(selectedPlayer)"
+            class="player-select"
+            [disabled]="isPlayerLoading">
+            <option value="">Выберите плеер</option>
+            <option *ngFor="let player of availablePlayers | keyvalue" [value]="player.key">
+              {{ getPlayerDisplayName(player.key) }}
+            </option>
+          </select>
+          <i class="fas fa-chevron-down select-arrow"></i>
+        </div>
+        <div class="loading-indicator" *ngIf="isPlayerLoading">
+          <i class="fas fa-spinner fa-spin"></i> Переключение плеера...
+        </div>
+      </div>
     </div>
 
-    <div class="current-track transition-all">
-      <h2>Now Playing</h2>
-      <p>{{ currentTrack || 'Loading...' }}</p>
+    <!-- Station Selection Section -->
+    <div class="station-section">
+      <div class="section-header">
+        <h2><i class="fas fa-broadcast-tower"></i> Выбор станции</h2>
+      </div>
+      
+      <div class="station-selector">
+        <label for="station" class="station-label">Станция:</label>
+        <div class="select-wrapper">
+          <select 
+            id="station" 
+            [(ngModel)]="selectedStation" 
+            (change)="onStationChange(selectedStation)"
+            class="station-select"
+            [disabled]="isLoading || isPlayerLoading">
+            <option value="">Выберите станцию</option>
+            <option *ngFor="let station of availableStations | keyvalue" [value]="station.key">
+              {{ getStationDisplayName(station.key) }}
+            </option>
+          </select>
+          <i class="fas fa-chevron-down select-arrow"></i>
+        </div>
+      </div>
     </div>
 
-    <div class="playback-controls">
-      <button class="play-button transition-all" (click)="playPause()">
-        {{ audioPlayer?.paused ? '▶' : '⏸' }}
-      </button>
+    <!-- Loading State -->
+    <div class="loading-section" *ngIf="isLoading">
+      <div class="loading-card">
+        <i class="fas fa-spinner fa-spin"></i>
+        <p>Загрузка плеера и станций...</p>
+        <div class="loading-steps">
+          <p>Инициализация плеера...</p>
+          <p>Загрузка доступных станций...</p>
+          <p>Получение текущей станции...</p>
+          <p>Автоматический запуск музыки...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Beautiful Player Section -->
+    <div class="audio-player-section" *ngIf="currentTrack && !isLoading">
+      <div class="player-card">
+        <div class="player-header">
+          <div class="now-playing">
+            <span class="now-playing-label">Сейчас играет</span>
+            <div class="station-info">
+              <i class="fas fa-radio"></i>
+              <span class="station-name">{{ selectedStation || 'Неизвестная станция' }}</span>
+            </div>
+          </div>
+          <div class="player-controls">
+            <button 
+              class="control-btn play-pause-btn" 
+              [class.playing]="!audioPlayer?.paused"
+              (click)="playPause()"
+              [disabled]="!currentTrack">
+              <i class="fas" [class.fa-play]="audioPlayer?.paused" [class.fa-pause]="!audioPlayer?.paused"></i>
+            </button>
+            <button 
+              class="control-btn refresh-btn" 
+              (click)="refreshStream()"
+              title="Обновить поток">
+              <i class="fas fa-sync-alt"></i>
+            </button>
+          </div>
+        </div>
+        
+        <div class="track-info">
+          <div class="track-artwork">
+            <i class="fas fa-music"></i>
+          </div>
+          <div class="track-details">
+            <div class="track-title">{{ currentTrack || 'Загрузка...' }}</div>
+            <div class="track-artist" *ngIf="currentTrack && currentTrack !== 'Loading...'">Трек загружается...</div>
+            <div class="track-album" *ngIf="currentTrack && currentTrack !== 'Loading...'">Пожалуйста, подождите</div>
+          </div>
+        </div>
+        
+        <div class="player-footer">
+          <div class="volume-control">
+            <i class="fas fa-volume-up"></i>
+            <input 
+              type="range" 
+              min="0" 
+              max="100" 
+              [value]="volume" 
+              (input)="onVolumeChange($event)"
+              class="volume-slider"
+              title="Громкость">
+            <span class="volume-value">{{ volume }}%</span>
+          </div>
+          <div class="status-indicator">
+            <span class="status-dot" [class.active]="!audioPlayer?.paused"></span>
+            <span class="status-text">{{ !audioPlayer?.paused ? 'Воспроизводится' : 'Остановлено' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fallback Track Display -->
+    <div class="track-display" *ngIf="!currentTrack && selectedStation">
+      <div class="track-info-simple">
+        <div class="simple-track-card">
+          <i class="fas fa-radio"></i>
+          <div class="simple-track-text">
+            <span class="station-name-simple">Станция: {{ selectedStation }}</span>
+            <span class="track-status">{{ !audioPlayer?.paused ? 'Воспроизводится' : 'Остановлено' }}</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
