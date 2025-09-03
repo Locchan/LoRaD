@@ -10,21 +10,15 @@
 
 from types import ModuleType
 
-from lorad.api.endpoints import version
-
-from lorad.api.endpoints.users import auth
-from lorad.api.endpoints.users import whoami
-from lorad.api.endpoints.users import register
-from lorad.api.endpoints.users import remove
-
-from lorad.api.endpoints.yandex import available_stations
-from lorad.api.endpoints.yandex import current_station
-from lorad.api.endpoints.yandex import current_track
-from lorad.api.endpoints.yandex import switch_station
+from lorad.api.endpoints import openapi, version, apidoc, whatsplaying, current_player, available_players, locale, switch_player, enabled_features
+from lorad.api.endpoints import users
+from lorad.api.endpoints import yandex
+from lorad.api.endpoints import radio
 
 endpoints_to_register : list[ModuleType] = \
 [
-version, # root
-auth, whoami, register, remove, # user
-available_stations, current_station, switch_station, current_track #yandex
+version, apidoc, openapi, whatsplaying, current_player, available_players, locale, switch_player, enabled_features, # root
+users.auth, users.whoami, users.register, users.remove, # user
+yandex.available_stations, yandex.current_station, yandex.switch_station, #yandex
+radio.available_stations, radio.current_station, radio.switch_station #radio
 ]

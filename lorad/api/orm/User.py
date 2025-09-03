@@ -24,6 +24,11 @@ def user_register(username, password) -> bool:
         if user_obj is not None:
             return False
         default_group = session.scalar(select(Group).where(Group.name == "default"))
+        if default_group is None:
+            default_group = Group(name="default", capabilities=globs.CAP_BASIC_USER)
+            session.add(default_group)
+            session.commit()
+            default_group = session.scalar(select(Group).where(Group.name == "default"))
         new_user_obj = User(name=username, password_hash=hash_password(password), group=default_group.id)
         session.add(new_user_obj)
         session.commit()
