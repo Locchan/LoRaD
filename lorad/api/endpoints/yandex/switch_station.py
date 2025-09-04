@@ -19,6 +19,8 @@ def validate(headers, data):
     stations = get_yandex_stations()
     if stations is None:
         return {"rc": 406, "data": {"message": "Yandex is not initialized."}}
+    if globs.CURRENT_PLAYER_NAME != globs.FILESTREAMER.name_tech:
+        return {"rc": 406, "data": {"message": "Yandex is not the current player."}}
     found = False
     for astation in stations:
         if stations[astation] == data["new_station"]:
