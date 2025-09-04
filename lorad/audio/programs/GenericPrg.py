@@ -43,7 +43,7 @@ class GenericPrg():
             globs.FILESTREAMER.stop()
             for anum, aprogram in enumerate(self.prepared_program.items()):
                 logger.info(f"Program: {self.name}; Track {anum+1}/{len(self.prepared_program)}")
-                if player_before_program == globs.FILESTREAMER.name_tech:
+                if player_before_program != globs.FILESTREAMER.name_tech:
                     switch_players(globs.FILESTREAMER.name_tech)
                 globs.FILESTREAMER.serve_file(track_filepath=aprogram[1])
             logger.info(f"Program [{self.name}] finished. Restarting carousel.")

@@ -19,8 +19,10 @@ def validate(headers, data):
     stations = get_radio_stations()
     found = False
     for astation in stations:
-        if astation == data["new_station"]:
+        if stations[astation] == data["new_station"]:
             found = True
+    if globs.CURRENT_PLAYER_NAME != globs.RESTREAMER.name_tech:
+        return {"rc": 406, "data": {"message": "Radio is not the current player."}}
     if not found:
         return f"There is no such station: {data["new_station"]}"
     return
