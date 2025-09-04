@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
+import { StorageService } from '../../services/storage.service';
 import { interval, Subscription, forkJoin, of } from 'rxjs';
 import { catchError, switchMap, tap } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
@@ -26,6 +27,12 @@ export class PlayerComponent implements OnInit, OnDestroy {
   currentTrack = '';
   currentStation = '';
   
+  // Radio title from environment
+  radioTitle = environment.radioTitle;
+  
+  // Background image from environment
+  backgroundImage = environment.backgroundImage;
+  
   // Player management
   availablePlayers: { [key: string]: string } = {};
   currentPlayer = '';
@@ -47,10 +54,14 @@ export class PlayerComponent implements OnInit, OnDestroy {
 
   constructor(
     private apiService: ApiService,
+    private storageService: StorageService,
     private router: Router
   ) {}
 
   ngOnInit() {
+    // Load volume from localStorage
+    this.volume = this.storageService.loadVolume();
+    
     this.audioPlayer = new Audio('https://radio.locchan.dev/lorad/live');
     this.audioPlayer.volume = this.volume / 100;
     this.initializePlayer();
@@ -311,6 +322,8 @@ export class PlayerComponent implements OnInit, OnDestroy {
     if (this.audioPlayer) {
       this.audioPlayer.volume = this.volume / 100;
     }
+    // Save volume to localStorage
+    this.storageService.saveVolume(this.volume);
   }
 
   playRadio() {

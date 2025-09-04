@@ -1,9 +1,9 @@
-<div class="player-container">
+<div class="player-container" [style.background-image]="'url(' + backgroundImage + ')'">
   <header class="player-header">
     <div class="logo-section">
       <h1 class="app-title">
         <i class="fas fa-radio"></i>
-        LoRaD Radio
+        {{ radioTitle }}
       </h1>
       <p class="app-subtitle">Your Personal Radio Station</p>
     </div>
@@ -88,31 +88,6 @@
     <!-- Beautiful Player Section -->
     <div class="audio-player-section" *ngIf="currentTrack && !isLoading">
       <div class="player-card">
-        <div class="player-header">
-          <div class="now-playing">
-            <span class="now-playing-label">Сейчас играет</span>
-            <div class="station-info">
-              <i class="fas fa-radio"></i>
-              <span class="station-name">{{ selectedStation || 'Неизвестная станция' }}</span>
-            </div>
-          </div>
-          <div class="player-controls">
-            <button 
-              class="control-btn play-pause-btn" 
-              [class.playing]="!audioPlayer?.paused"
-              (click)="playPause()"
-              [disabled]="!currentTrack">
-              <i class="fas" [class.fa-play]="audioPlayer?.paused" [class.fa-pause]="!audioPlayer?.paused"></i>
-            </button>
-            <button 
-              class="control-btn refresh-btn" 
-              (click)="refreshStream()"
-              title="Обновить поток">
-              <i class="fas fa-sync-alt"></i>
-            </button>
-          </div>
-        </div>
-        
         <div class="track-info">
           <div class="track-artwork">
             <i class="fas fa-music"></i>
@@ -120,6 +95,22 @@
           <div class="track-details">
             <div class="track-title">{{ currentTrack || 'Нет информации о треке' }}</div>
           </div>
+        </div>
+        
+        <div class="player-controls">
+          <button 
+            class="control-btn play-pause-btn" 
+            [class.playing]="!audioPlayer?.paused"
+            (click)="playPause()"
+            [disabled]="!currentTrack">
+            <i class="fas" [class.fa-play]="audioPlayer?.paused" [class.fa-pause]="!audioPlayer?.paused"></i>
+          </button>
+          <button 
+            class="control-btn refresh-btn" 
+            (click)="refreshStream()"
+            title="Обновить поток">
+            <i class="fas fa-sync-alt"></i>
+          </button>
         </div>
         
         <div class="player-footer">

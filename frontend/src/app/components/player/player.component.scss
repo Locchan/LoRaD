@@ -36,11 +36,33 @@ $border-color: #475569;
 // Player Container
 .player-container {
   height: 100vh; // Фиксированная высота вместо min-height
-  @include gradient-bg($dark-bg, #0f172a);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  position: relative;
   padding: 0;
   overflow: hidden; // Убираем скролл только для player
   display: flex;
   flex-direction: column;
+
+  // Overlay для лучшей читаемости
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%);
+    z-index: 1;
+  }
+
+  // Все содержимое должно быть поверх overlay
+  > * {
+    position: relative;
+    z-index: 2;
+  }
 }
 
 // Header
@@ -457,47 +479,6 @@ $border-color: #475569;
         }
       }
 
-      .player-controls {
-        display: flex;
-        gap: 1rem;
-
-        .control-btn {
-          width: 56px;
-          height: 56px;
-          border: none;
-          border-radius: 50%;
-          cursor: pointer;
-          @include smooth-transition;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.25rem;
-
-          &.play-pause-btn {
-            @include gradient-bg($success-color, $accent-color);
-            color: white;
-
-            &:hover {
-              transform: scale(1.1);
-              box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
-            }
-
-            &.playing {
-              @include gradient-bg($warning-color, $error-color);
-            }
-          }
-
-          &.refresh-btn {
-            @include glass-effect;
-            color: $text-primary;
-
-            &:hover {
-              background: rgba(255, 255, 255, 0.2);
-              transform: rotate(180deg);
-            }
-          }
-        }
-      }
     }
 
     .track-info {
@@ -541,6 +522,51 @@ $border-color: #475569;
           font-size: 1rem;
           color: $text-secondary;
           opacity: 0.8;
+        }
+      }
+    }
+
+    .player-controls {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      flex-shrink: 0;
+
+      .control-btn {
+        width: 56px;
+        height: 56px;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        @include smooth-transition;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+
+        &.play-pause-btn {
+          @include gradient-bg($success-color, $accent-color);
+          color: white;
+
+          &:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+          }
+
+          &.playing {
+            @include gradient-bg($warning-color, $error-color);
+          }
+        }
+
+        &.refresh-btn {
+          @include glass-effect;
+          color: $text-primary;
+
+          &:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: rotate(180deg);
+          }
         }
       }
     }
