@@ -118,9 +118,7 @@
             <i class="fas fa-music"></i>
           </div>
           <div class="track-details">
-            <div class="track-title">{{ currentTrack || 'Загрузка...' }}</div>
-            <div class="track-artist" *ngIf="currentTrack && currentTrack !== 'Loading...'">Трек загружается...</div>
-            <div class="track-album" *ngIf="currentTrack && currentTrack !== 'Loading...'">Пожалуйста, подождите</div>
+            <div class="track-title">{{ currentTrack || 'Нет информации о треке' }}</div>
           </div>
         </div>
         

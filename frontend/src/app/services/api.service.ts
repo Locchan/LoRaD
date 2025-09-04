@@ -80,7 +80,7 @@ export class ApiService {
   }
 
   // Yandex Music endpoints
-  getAvailableStations(): Observable<YandexStationsResponse> {
+  getYandexStations(): Observable<YandexStationsResponse> {
     return this.http.get<YandexStationsResponse>(
       `${this.apiUrl}/yandex/available_stations`,
       { headers: this.getAuthHeaders() }
@@ -94,16 +94,24 @@ export class ApiService {
     );
   }
 
-  getCurrentTrack(): Observable<WhatsPlayingResponse> {
+  getWhatsPlaying(): Observable<WhatsPlayingResponse> {
     return this.http.get<WhatsPlayingResponse>(
       `${this.apiUrl}/whatsplaying`,
       { headers: this.getAuthHeaders() }
     );
   }
 
-  switchStation(newStation: string): Observable<UserResponse> {
+  switchYandexStation(newStation: string): Observable<UserResponse> {
     return this.http.post<UserResponse>(
       `${this.apiUrl}/yandex/switch_station`,
+      { new_station: newStation },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  switchRadioStation(newStation: string): Observable<UserResponse> {
+    return this.http.post<UserResponse>(
+      `${this.apiUrl}/radio/switch_station`,
       { new_station: newStation },
       { headers: this.getAuthHeaders() }
     );
