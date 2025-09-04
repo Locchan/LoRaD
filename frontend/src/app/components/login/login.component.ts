@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-login',
@@ -16,6 +17,9 @@ export class LoginComponent {
   password = '';
   isLoading = false;
   error = '';
+  
+  // Radio title from environment
+  radioTitle = environment.radioTitle;
 
   constructor(
     private apiService: ApiService,

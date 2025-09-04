@@ -27,6 +27,9 @@ export class PlayerComponent implements OnInit, OnDestroy {
   currentTrack = '';
   currentStation = '';
   
+  // Radio title from environment
+  radioTitle = environment.radioTitle;
+  
   // Player management
   availablePlayers: { [key: string]: string } = {};
   currentPlayer = '';
