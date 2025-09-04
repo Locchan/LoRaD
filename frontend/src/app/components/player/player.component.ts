@@ -86,68 +86,8 @@ export class PlayerComponent implements OnInit, OnDestroy {
             this.selectedPlayer = currentPlayer.player;
             console.log('Current player loaded:', currentPlayer.player);
             
-            // Step 3: Get available stations (both types)
-            this.apiService.getAvailableStations().subscribe({
-              next: (yandexStations) => {
-                console.log('Yandex stations loaded:', yandexStations);
-                
-                this.apiService.getRadioStations().subscribe({
-                  next: (radioStations) => {
-                    console.log('Radio stations loaded:', radioStations);
-                    
-                    // Combine all stations
-                    this.availableStations = { ...radioStations, ...yandexStations };
-                    
-                    // Step 4: Get current station based on player type
-                    if (this.currentPlayer === 'player_radio') {
-                      this.apiService.getRadioCurrentStation().subscribe({
-                        next: (radioStation) => {
-                          this.currentStation = radioStation.station;
-                          this.selectedStation = radioStation.station;
-                          console.log('Radio current station loaded:', radioStation.station);
-                          this.finalizeInitializationAndPlay();
-                        },
-                        error: (error) => {
-                          console.error('Failed to get radio current station:', error);
-                          this.finalizeInitializationAndPlay();
-                        }
-                      });
-                    } else {
-                      this.apiService.getCurrentStation().subscribe({
-                        next: (yandexStation) => {
-                          this.currentStation = yandexStation.station;
-                          this.selectedStation = yandexStation.station;
-                          console.log('Yandex current station loaded:', yandexStation.station);
-                          this.finalizeInitializationAndPlay();
-                        },
-                        error: (error) => {
-                          console.error('Failed to get yandex current station:', error);
-                          this.finalizeInitializationAndPlay();
-                        }
-                      });
-                    }
-                  },
-                  error: (error) => {
-                    console.error('Failed to load radio stations:', error);
-                    this.availableStations = { ...yandexStations };
-                    this.loadCurrentStationAndPlay();
-                  }
-                });
-              },
-              error: (error) => {
-                console.error('Failed to load yandex stations:', error);
-                this.apiService.getRadioStations().subscribe({
-                  next: (radioStations) => {
-                    this.availableStations = radioStations;
-                    this.loadCurrentStationAndPlay();
-                  },
-                  error: (error) => {
-                    console.error('Failed to load any stations:', error);
-                    this.loadCurrentStationAndPlay();
-                  }
-                });
-              }
-            });
+            // Step 3: Load stations for current player
+            this.loadStationsForCurrentPlayer();
           },
           error: (error) => {
             console.error('Failed to get current player:', error);
@@ -156,7 +96,7 @@ export class PlayerComponent implements OnInit, OnDestroy {
             if (defaultPlayer) {
               this.currentPlayer = defaultPlayer;
               this.selectedPlayer = defaultPlayer;
-              this.loadStationsAndPlay();
+              this.loadStationsForCurrentPlayer();
             } else {
               this.isLoading = false;
             }
@@ -167,68 +107,52 @@ export class PlayerComponent implements OnInit, OnDestroy {
         console.error('Failed to load available players:', error);
         // Set default players
         this.availablePlayers = { player_radio: 'Radio Player', player_streaming: 'Streaming Player' };
-        this.loadStationsAndPlay();
+        this.loadStationsForCurrentPlayer();
       }
     });
   }
 
-  private loadStationsAndPlay() {
-    // Load stations for current player
-    if (this.currentPlayer === 'player_radio') {
-      this.apiService.getRadioStations().subscribe({
-        next: (stations) => {
-          this.availableStations = stations;
-          this.loadCurrentStationAndPlay();
-        },
-        error: (error) => {
-          console.error('Failed to load radio stations:', error);
-          this.loadCurrentStationAndPlay();
-        }
-      });
-    } else {
-      this.apiService.getAvailableStations().subscribe({
-        next: (stations) => {
-          this.availableStations = stations;
-          this.loadCurrentStationAndPlay();
-        },
-        error: (error) => {
-          console.error('Failed to load yandex stations:', error);
-          this.loadCurrentStationAndPlay();
-        }
-      });
-    }
+  private loadStationsForCurrentPlayer() {
+    // Determine which stations to load based on current player
+    const stationsObservable = this.currentPlayer === 'player_radio' 
+      ? this.apiService.getRadioStations() 
+      : this.apiService.getYandexStations();
+
+    stationsObservable.subscribe({
+      next: (stations: { [key: string]: string }) => {
+        this.availableStations = stations;
+        console.log(`${this.currentPlayer} stations loaded:`, stations);
+        this.loadCurrentStationAndPlay();
+      },
+      error: (error: any) => {
+        console.error(`Failed to load ${this.currentPlayer} stations:`, error);
+        this.loadCurrentStationAndPlay();
+      }
+    });
   }
 
   private loadCurrentStationAndPlay() {
-    if (this.currentPlayer === 'player_radio') {
-      this.apiService.getRadioCurrentStation().subscribe({
-        next: (response) => {
-          this.currentStation = response.station;
-          this.selectedStation = response.station;
-          this.finalizeInitializationAndPlay();
-        },
-        error: (error) => {
-          console.error('Failed to get radio current station:', error);
-          this.finalizeInitializationAndPlay();
-        }
-      });
-    } else {
-      this.apiService.getCurrentStation().subscribe({
-        next: (response) => {
-          this.currentStation = response.station;
-          this.selectedStation = response.station;
-          this.finalizeInitializationAndPlay();
-        },
-        error: (error) => {
-          console.error('Failed to get yandex current station:', error);
-          this.finalizeInitializationAndPlay();
-        }
-      });
-    }
+    const currentStationObservable = this.currentPlayer === 'player_radio'
+      ? this.apiService.getRadioCurrentStation()
+      : this.apiService.getCurrentStation();
+
+    currentStationObservable.subscribe({
+      next: (response) => {
+        this.currentStation = response.station;
+        this.selectedStation = response.station;
+        console.log(`Current station loaded: ${response.station} for ${this.currentPlayer}`);
+        this.finalizeInitializationAndPlay();
+      },
+      error: (error: any) => {
+        console.error(`Failed to get current station for ${this.currentPlayer}:`, error);
+        this.finalizeInitializationAndPlay();
+      }
+    });
   }
 
   private finalizeInitializationAndPlay() {
     this.isLoading = false;
+    this.isPlayerLoading = false; // Ensure player loading is also reset
     this.startTrackUpdates();
     
     // Automatically start playing music
@@ -266,21 +190,16 @@ export class PlayerComponent implements OnInit, OnDestroy {
 
   private startTrackUpdates() {
     this.trackUpdateSubscription = interval(2000).subscribe(() => {
-      this.apiService.getCurrentTrack().subscribe({
-        next: (response) => {
-          if (response && typeof response === 'object') {
-            if ('track' in response && response.track && typeof response.track === 'string') {
-              this.currentTrack = response.track;
-            } else if ('player_readable' in response && response.player_readable && typeof response.player_readable === 'string') {
-              this.currentTrack = response.player_readable;
-            } else {
-              this.currentTrack = 'Трек загружается...';
-            }
+      this.apiService.getWhatsPlaying().subscribe({
+        next: (response: any) => {
+          // Use 'playing' field as specified in requirements
+          if (response && response.playing) {
+            this.currentTrack = response.playing;
           } else {
-            this.currentTrack = 'Трек загружается...';
+            this.currentTrack = 'Нет информации о треке';
           }
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('Failed to get current track:', error);
           this.currentTrack = 'Ошибка загрузки трека';
         }
@@ -302,11 +221,8 @@ export class PlayerComponent implements OnInit, OnDestroy {
         this.currentPlayer = player;
         this.selectedPlayer = player;
         
-        // Reload stations based on new player
+        // Reload stations and current station for new player
         this.reloadStationsForPlayer(player);
-        
-        // Get current station for new player
-        this.loadCurrentStationAndPlay();
       },
       error: (error) => {
         console.error('Failed to switch player:', error);
@@ -316,39 +232,47 @@ export class PlayerComponent implements OnInit, OnDestroy {
   }
 
   private reloadStationsForPlayer(player: string) {
-    if (player === 'player_radio') {
-      this.apiService.getRadioStations().subscribe({
-        next: (stations) => {
-          this.availableStations = stations;
-          this.isPlayerLoading = false;
-        },
-        error: (error) => {
-          console.error('Failed to load radio stations:', error);
-          this.isPlayerLoading = false;
-        }
-      });
-    } else {
-      this.apiService.getAvailableStations().subscribe({
-        next: (stations) => {
-          this.availableStations = stations;
-          this.isPlayerLoading = false;
-        },
-        error: (error) => {
-          console.error('Failed to load yandex stations:', error);
-          this.isPlayerLoading = false;
-        }
-      });
-    }
+    const stationsObservable = player === 'player_radio' 
+      ? this.apiService.getRadioStations() 
+      : this.apiService.getYandexStations();
+
+    stationsObservable.subscribe({
+      next: (stations: { [key: string]: string }) => {
+        this.availableStations = stations;
+        console.log(`Stations reloaded for ${player}:`, stations);
+        
+        // After loading stations, get current station for this player
+        this.loadCurrentStationAndPlay();
+      },
+      error: (error: any) => {
+        console.error(`Failed to reload stations for ${player}:`, error);
+        this.isPlayerLoading = false;
+      }
+    });
   }
 
-  onStationChange(station: string) {
-    if (station && station !== this.currentStation) {
-      this.apiService.switchStation(station).subscribe({
+  onStationChange(stationKey: string) {
+    if (stationKey && stationKey !== this.currentStation) {
+      // Get the value (API parameter) for the selected station key
+      const stationValue = this.availableStations[stationKey];
+      
+      if (!stationValue) {
+        console.error('Station value not found for key:', stationKey);
+        return;
+      }
+
+      // Use appropriate switch method based on current player
+      const switchObservable = this.currentPlayer === 'player_radio' 
+        ? this.apiService.switchRadioStation(stationValue)
+        : this.apiService.switchYandexStation(stationValue);
+
+      switchObservable.subscribe({
         next: () => {
-          this.currentStation = station;
-          this.selectedStation = station;
+          this.currentStation = stationKey;
+          this.selectedStation = stationKey;
+          console.log(`Switched to station: ${stationKey} (value: ${stationValue}) on ${this.currentPlayer}`);
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('Failed to switch station:', error);
         }
       });
@@ -403,6 +327,6 @@ export class PlayerComponent implements OnInit, OnDestroy {
   }
 
   getStationDisplayName(stationKey: string): string {
-    return this.availableStations[stationKey] || stationKey;
+    return stationKey; // Show the key (station name) directly
   }
 }
