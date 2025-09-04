@@ -45,6 +45,7 @@ $border-color: #475569;
 
 // Header
 .player-header {
+  padding: 10px;
   @include glass-effect;
   @include card-shadow;
   padding: 1rem 2rem; // Уменьшил с 1.5rem до 1rem
@@ -202,6 +203,9 @@ $border-color: #475569;
         width: 100%;
         padding: 0.75rem 1rem;
         border: 2px solid $border-color;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
         border-radius: 12px;
         background: rgba(255, 255, 255, 0.05);
         color: $text-primary;
@@ -357,6 +361,9 @@ $border-color: #475569;
         width: 100%;
         padding: 0.75rem 1rem;
         border: 2px solid $border-color;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
         border-radius: 12px;
         background: rgba(255, 255, 255, 0.05);
         color: $text-primary;
@@ -393,7 +400,6 @@ $border-color: #475569;
 
 // Audio Player Section
 .audio-player-section {
-  padding: 0; // Убрал padding
   margin-bottom: 0; // Убрал margin-bottom, используем gap в main-content
   flex: 1; // Занимает оставшееся пространство
   display: flex;
@@ -410,7 +416,8 @@ $border-color: #475569;
     display: flex;
     flex-direction: column;
 
-    .player-header {
+    .player-header {  
+      padding: 10px;
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
@@ -713,6 +720,7 @@ $border-color: #475569;
 // Responsive Design
 @media (max-width: 768px) {
   .player-header {
+    padding: 10px;
     flex-direction: column;
     gap: 1rem; // Уменьшил с 1.5rem до 1rem
     text-align: center;
@@ -741,6 +749,7 @@ $border-color: #475569;
 
   .player-card {
     .player-header {
+      padding: 10px;
       flex-direction: column;
       gap: 1rem; // Уменьшил с 1.5rem до 1rem
       align-items: stretch;
