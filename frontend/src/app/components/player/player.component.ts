@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { interval, Subscription, forkJoin, of } from 'rxjs';
 import { catchError, switchMap, tap } from 'rxjs/operators';
+import { environment } from '../../../environments/environment';
 import { 
   AvailablePlayersResponse, 
   RadioStationsResponse, 
@@ -160,6 +161,12 @@ export class PlayerComponent implements OnInit, OnDestroy {
   }
 
   private autoStartMusic() {
+    // Check if autoplay is enabled via environment variable
+    if (!environment.autoplay) {
+      console.log('Autoplay is disabled via AUTOPLAY environment variable');
+      return;
+    }
+
     if (this.audioPlayer && this.selectedStation) {
       // Small delay to ensure everything is loaded
       setTimeout(() => {

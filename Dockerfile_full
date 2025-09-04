@@ -1,15 +1,32 @@
 FROM python:3.12-alpine
 
 ARG VERSION
+ARG AUTOPLAY=true
 
 RUN mkdir /tmp/lorad
 WORKDIR /tmp/lorad
 
 COPY . .
+
+# Build frontend with AUTOPLAY environment variable
+WORKDIR /tmp/lorad/frontend
+RUN apk add nodejs npm
+RUN npm install -g @angular/cli
+RUN npm install
+RUN echo "export const environment = { production: true, apiUrl: 'https://radio.locchan.dev/lorad/api', autoplay: ${AUTOPLAY} };" > src/environments/environment.prod.ts
+RUN ng build --configuration=production --base-href /ui/
+
+# Build Python backend
+WORKDIR /tmp/lorad
 RUN apk add ffmpeg && pip install poetry
 RUN poetry build
 RUN pip install dist/*.whl
 RUN cp /tmp/lorad/lorad_main.py /usr/bin/lorad && chmod +x /usr/bin/lorad
+
+# Copy frontend build to Python app
+RUN mkdir -p /app/ui
+RUN cp -r /tmp/lorad/frontend/dist/lorad-frontend/browser/* /app/ui/
+
 RUN rm -rf /tmp/lorad
 
 RUN ln -s /usr/share/zoneinfo/Europe/Minsk /etc/localtime
