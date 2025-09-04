@@ -19,7 +19,7 @@ def validate(headers, data):
     stations = get_radio_stations()
     found = False
     for astation in stations:
-        if astation == data["new_station"]:
+        if stations[astation] == data["new_station"]:
             found = True
     if not found:
         return f"There is no such station: {data["new_station"]}"
