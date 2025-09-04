@@ -36,11 +36,33 @@ $border-color: #475569;
 // Player Container
 .player-container {
   height: 100vh; // Фиксированная высота вместо min-height
-  @include gradient-bg($dark-bg, #0f172a);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  position: relative;
   padding: 0;
   overflow: hidden; // Убираем скролл только для player
   display: flex;
   flex-direction: column;
+
+  // Overlay для лучшей читаемости
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%);
+    z-index: 1;
+  }
+
+  // Все содержимое должно быть поверх overlay
+  > * {
+    position: relative;
+    z-index: 2;
+  }
 }
 
 // Header

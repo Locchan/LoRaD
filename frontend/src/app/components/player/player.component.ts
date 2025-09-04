@@ -30,6 +30,9 @@ export class PlayerComponent implements OnInit, OnDestroy {
   // Radio title from environment
   radioTitle = environment.radioTitle;
   
+  // Background image from environment
+  backgroundImage = environment.backgroundImage;
+  
   // Player management
   availablePlayers: { [key: string]: string } = {};
   currentPlayer = '';
