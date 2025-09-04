@@ -1,8 +1,9 @@
 config.json
+stations.json
 __pycache__
 *.log
 dist/
-resources/*
+resources/
 update_resources.sh
 update_repo_author.sh
 .DS_Store

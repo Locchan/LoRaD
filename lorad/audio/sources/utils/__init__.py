@@ -1,0 +1,2 @@
+class FFMPEGFeedError(RuntimeError):
+    pass

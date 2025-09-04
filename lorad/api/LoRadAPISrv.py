@@ -1,3 +1,4 @@
+import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
@@ -29,6 +30,8 @@ def register_endpoints():
                 except AttributeError:
                     continue
 
+                logger.debug(f"Registering: {amethod} - {endpoint_module.ENDP_PATH}")
+
                 if endpoint_module.ENDP_PATH not in endpoints[amethod]:
                     endpoints[amethod][endpoint_module.ENDP_PATH] = getattr(endpoint_module, f"impl_{amethod}")
                     registered_endpoints+=1
@@ -59,14 +62,27 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
 
     def do_GET(self):
         try:
+            ip_from_headers = self.headers.get('X-Real-IP')
+            if ip_from_headers is not None:
+                self.client_address = (ip_from_headers, self.client_address[1])
             if self.path in endpoints["GET"]:
                 endpoint_exec_result = endpoints["GET"][self.path](self.headers)
                 self.send_response(endpoint_exec_result["rc"])
+                content_type = "application/json"
+                if "content-type" in endpoint_exec_result:
+                    content_type = endpoint_exec_result["content-type"]
+                self.send_header('Content-type', content_type)
                 self.end_headers()
-                response = json.dumps(endpoint_exec_result["data"])
+                if isinstance(endpoint_exec_result["data"], dict):
+                    response = json.dumps(endpoint_exec_result["data"])
+                else:
+                    response = endpoint_exec_result["data"]
                 self.wfile.write(response.encode("utf-8"))
                 self.wfile.flush()
-                logger.info(f"RQ: GET {self.path}: {endpoint_exec_result["rc"]}." +
+                real_ip = self.headers.get('X-Real-IP')
+                if real_ip is None:
+                    real_ip = self.client_address[0]
+                logger.info(f"[{real_ip}] - RQ: GET {self.path}: {endpoint_exec_result["rc"]}." +
                             f" Data: TX:{sys.getsizeof(response)}b")
                 logger.debug(f"RQ Headers: {self.headers}")
                 if sys.getsizeof(response) < 8192:
@@ -86,6 +102,9 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
+            ip_from_headers = self.headers.get('X-Real-IP')
+            if ip_from_headers is not None:
+                self.client_address = (ip_from_headers, self.client_address[1])
             if self.path in endpoints["POST"]:
                 data_length = int(self.headers.get('Content-Length'))
                 if data_length > MAX_DATA_LEN:
@@ -98,11 +117,21 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
                     return
                 endpoint_exec_result = endpoints["POST"][self.path](self.headers, data)
                 self.send_response(endpoint_exec_result["rc"])
+                content_type = "application/json"
+                if "content-type" in endpoint_exec_result:
+                    content_type = endpoint_exec_result["content-type"]
+                self.send_header('Content-type', content_type)
                 self.end_headers()
-                response = json.dumps(endpoint_exec_result["data"])
+                if isinstance(endpoint_exec_result["data"], dict):
+                    response = json.dumps(endpoint_exec_result["data"])
+                else:
+                    response = endpoint_exec_result["data"]
                 self.wfile.write(response.encode("utf-8"))
                 self.wfile.flush()
-                logger.info(f"RQ: POST {self.path}: {endpoint_exec_result["rc"]}." +
+                real_ip = self.headers.get('X-Real-IP')
+                if real_ip is None:
+                    real_ip = self.client_address[0]
+                logger.info(f"[{real_ip}] - RQ: POST {self.path}: {endpoint_exec_result["rc"]}." +
                             f" Data: RX:{data_length}b" +
                             f" TX:{sys.getsizeof(endpoint_exec_result["data"])}b")
                 logger.debug(f"RQ Headers: {self.headers}")

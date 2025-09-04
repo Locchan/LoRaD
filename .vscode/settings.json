@@ -1,4 +1,9 @@
 {
     "python.analysis.autoImportCompletions": true,
-    "pylint.args": ["--errors-only"]
+    "pylint.args": [
+        "--errors-only"
+    ],
+    "python-envs.defaultEnvManager": "ms-python.python:poetry",
+    "python-envs.defaultPackageManager": "ms-python.python:poetry",
+    "python-envs.pythonProjects": []
 }
