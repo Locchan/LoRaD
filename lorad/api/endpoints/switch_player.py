@@ -1,6 +1,6 @@
 from lorad.api.endpoints.users.auth import lrd_validate
 from lorad.api.utils.decorators import lrd_api_endp, lrd_auth, lrd_feat_req
-from lorad.api.utils.misc import get_players_names, switch_players
+from lorad.api.utils.misc import get_players_names, switch_players, forbid_switching
 import lorad.common.utils.globs as globs
 
 ENDP_PATH = "/switch_player"
@@ -20,6 +20,8 @@ def validate(headers, data):
     for astation in stations:
         if astation == data["new_player"]:
             found = True
+    if globs.SWITCH_LOCK:
+        return {"rc": 406, "data": {"message": "Cannot switch right now. Try later."}}
     if not found:
         return f"There is no such player: {data["new_player"]}"
     return
@@ -30,4 +32,5 @@ def validate(headers, data):
 @lrd_api_endp
 def impl_POST(headers, data):
     switch_players(data["new_player"])
+    forbid_switching(10)
     return {"success": True}
