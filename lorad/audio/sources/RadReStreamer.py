@@ -71,7 +71,6 @@ class RadReStreamer:
             return False
         else:
             self.currently_playing = stations[station]["name"]
-            self.currently_playing = stations[station]["name"]
             if self.preflight_request(station_url):
                 self.transcoder = Transcoder(self.station_info["format"], self.default_format)
                 logger.info(f"Starting streaming '{station}'. Stream settings:")

@@ -1,12 +1,16 @@
 import hashlib
+import threading
 from collections import deque
+from threading import Thread
 from time import sleep
 
 import lorad.common.utils.globs as globs
 from lorad.audio.server import AudioStream
 from lorad.audio.sources.FileStreamer import FileStreamer
 from lorad.audio.sources.RadReStreamer import RadReStreamer
+from lorad.common.utils.logger import get_logger
 
+logger = get_logger()
 
 def whatsplaying():
     player = get_current_player()
@@ -70,12 +74,41 @@ def get_radio_stations():
         stations_parsed[stations[anitem]["name"]] = anitem
     return stations_parsed
 
-def get_yandex_stations():
+def get_yandex_stations(cached=False):
     if globs.YANDEX_OBJ.radio is not None:
+        if cached and globs.YANDEX_STATION_CACHE is not None:
+            return globs.YANDEX_STATION_CACHE
         stations = globs.YANDEX_OBJ.radio.get_stations()
         stations_parsed = {}
         for astation in stations:
             stations_parsed[astation['station']['name']] = f"{astation['station']['id']['type']}:{astation['station']['id']['tag']}"
+        globs.YANDEX_STATION_CACHE = stations_parsed
         return stations_parsed
     else:
         return None
+
+def thread_alive(thread_name):
+    for thread in threading.enumerate():
+        if thread.name == thread_name:
+            if thread.is_alive():
+                return True
+    return False
+
+def forbid_switching(time_seconds=0):
+    logger.debug("Forbidding switching")
+    if time_seconds > 0:
+        globs.SWITCH_LOCK = True
+        if not thread_alive("SW_Locker"):
+            Thread(target=_switch_lock, args=(time_seconds,), name="SW_Locker").start()
+    else:
+        globs.SWITCH_LOCK = True
+
+def _switch_lock(time_seconds):
+    logger.debug(f"Sleeping for {time_seconds} seconds before allowing switching.")
+    sleep(time_seconds)
+    logger.debug("Allowing switching")
+    globs.SWITCH_LOCK = False
+
+def allow_switching():
+    logger.debug("Allowing switching")
+    globs.SWITCH_LOCK = False
