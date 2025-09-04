@@ -24,7 +24,7 @@ def validate(headers, data):
     if globs.CURRENT_PLAYER_NAME != globs.RESTREAMER.name_tech:
         return {"rc": 406, "data": {"message": "Radio is not the current player."}}
     if globs.SWITCH_LOCK:
-        return {"rc": 406, data: {"message": "Cannot switch right now. Try later."}}
+        return {"rc": 406, "data": {"message": "Cannot switch right now. Try later."}}
     if not found:
         return f"There is no such station: {data["new_station"]}"
     return

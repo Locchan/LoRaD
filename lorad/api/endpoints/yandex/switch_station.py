@@ -22,7 +22,7 @@ def validate(headers, data):
     if globs.CURRENT_PLAYER_NAME != globs.FILESTREAMER.name_tech:
         return {"rc": 406, "data": {"message": "Yandex is not the current player."}}
     if globs.SWITCH_LOCK:
-        return {"rc": 406, data: {"message": "Cannot switch right now. Try later."}}
+        return {"rc": 406, "data": {"message": "Cannot switch right now. Try later."}}
     found = False
     for astation in stations:
         if stations[astation] == data["new_station"]:
