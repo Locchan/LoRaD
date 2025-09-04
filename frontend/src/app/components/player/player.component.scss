@@ -457,47 +457,6 @@ $border-color: #475569;
         }
       }
 
-      .player-controls {
-        display: flex;
-        gap: 1rem;
-
-        .control-btn {
-          width: 56px;
-          height: 56px;
-          border: none;
-          border-radius: 50%;
-          cursor: pointer;
-          @include smooth-transition;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.25rem;
-
-          &.play-pause-btn {
-            @include gradient-bg($success-color, $accent-color);
-            color: white;
-
-            &:hover {
-              transform: scale(1.1);
-              box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
-            }
-
-            &.playing {
-              @include gradient-bg($warning-color, $error-color);
-            }
-          }
-
-          &.refresh-btn {
-            @include glass-effect;
-            color: $text-primary;
-
-            &:hover {
-              background: rgba(255, 255, 255, 0.2);
-              transform: rotate(180deg);
-            }
-          }
-        }
-      }
     }
 
     .track-info {
@@ -541,6 +500,51 @@ $border-color: #475569;
           font-size: 1rem;
           color: $text-secondary;
           opacity: 0.8;
+        }
+      }
+    }
+
+    .player-controls {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      flex-shrink: 0;
+
+      .control-btn {
+        width: 56px;
+        height: 56px;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        @include smooth-transition;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+
+        &.play-pause-btn {
+          @include gradient-bg($success-color, $accent-color);
+          color: white;
+
+          &:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+          }
+
+          &.playing {
+            @include gradient-bg($warning-color, $error-color);
+          }
+        }
+
+        &.refresh-btn {
+          @include glass-effect;
+          color: $text-primary;
+
+          &:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: rotate(180deg);
+          }
         }
       }
     }
