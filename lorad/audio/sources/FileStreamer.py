@@ -5,7 +5,6 @@ from pathlib import Path
 from time import sleep
 from typing import Tuple
 
-from lorad.api.utils.misc import forbid_switching
 from lorad.audio.file_sources.FileRide import FileRide
 from lorad.audio.server.AudioStream import AudioStream
 from lorad.audio.sources.utils.Transcoder import Transcoder
@@ -149,6 +148,7 @@ class FileStreamer:
 
             source_bitrate, seconds_per_chunk, length = self.get_track_info()
             if unswitcheable:
+                from lorad.api.utils.misc import forbid_switching
                 forbid_switching(length)
 
             self.transcoder = Transcoder(input_format="mp3", respect_chunk_size=True)
