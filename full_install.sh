@@ -9,7 +9,7 @@ poetry build
 pip install --no-cache-dir dist/*.whl
 cp /tmp/lorad/lorad_main.py /usr/bin/lorad
 chmod +x /usr/bin/lorad
-rm -rf /tmp/lorad
 ln -s /usr/share/zoneinfo/Europe/Minsk /etc/localtime
 echo "${VERSION}" > /version
 pip freeze > /packages
+rm -rf /tmp/lorad
