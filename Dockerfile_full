@@ -7,7 +7,7 @@ WORKDIR /tmp/lorad
 
 COPY . .
 
-RUN /bin/bash full_install.sh
+RUN full_install.sh
 
 WORKDIR /
 EXPOSE 5475
