@@ -13,4 +13,5 @@ chmod +x /usr/bin/lorad
 ln -sf /usr/share/zoneinfo/Europe/Minsk /etc/localtime
 echo "${VERSION}" > /version
 pip freeze > /packages
+sed -i '/lorad/d' /packages
 rm -rf /tmp/lorad
