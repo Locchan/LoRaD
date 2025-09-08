@@ -1,26 +1,13 @@
-FROM locchan/lorad:latest
+FROM docker.locchan.dev/lorad:latest
 
 ARG VERSION
 
-RUN rm /usr/bin/lorad
-RUN rm -rf /tmp/lorad
-
-RUN mkdir -p /tmp/lorad
+RUN rm /usr/bin/lorad && rm -rf /tmp/lorad
 WORKDIR /tmp/lorad
 
 COPY . .
-RUN apk add ffmpeg && pip install poetry
-RUN poetry build
 
-RUN pip install --upgrade --no-deps --force-reinstall dist/*.whl
-RUN pip install --upgrade dist/*.whl
-
-RUN cp /tmp/lorad/lorad_main.py /usr/bin/lorad && chmod +x /usr/bin/lorad
-RUN rm -rf /tmp/lorad
-
-RUN ln -sf /usr/share/zoneinfo/Europe/Minsk /etc/localtime
-
-RUN echo "${VERSION}" > /version
+RUN chmod +x ./upgrade_install.sh && ./upgrade_install.sh
 
 WORKDIR /
 EXPOSE 5475
