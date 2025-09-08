@@ -1,0 +1,15 @@
+FROM docker.locchan.dev/lorad-arm:latest
+
+ARG VERSION
+
+RUN rm /usr/bin/lorad && rm -rf /tmp/lorad
+WORKDIR /tmp/lorad
+
+COPY . .
+
+RUN chmod +x ./upgrade_install.sh && ./upgrade_install.sh
+
+WORKDIR /
+EXPOSE 5475
+EXPOSE 5476
+ENTRYPOINT [ "lorad" ]
