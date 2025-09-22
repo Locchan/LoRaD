@@ -13,8 +13,13 @@ ENABLED_PROGRAMS: list[GenericPrg] = []
 logger = get_logger()
 
 
-def register_programs():
-    logger.info("Registering programs...")
+def register_programs(reload=False):
+    if reload:
+        logger.info("Reloading programs...")
+        global ENABLED_PROGRAMS
+        ENABLED_PROGRAMS = []
+    else:
+        logger.info("Registering programs...")
     config = read_config()
     for aprogram in AVAILABLE_PROGRAMS:
         if aprogram.name in config["ENABLED_PROGRAMS"]:

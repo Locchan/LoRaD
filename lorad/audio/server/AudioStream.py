@@ -34,7 +34,7 @@ class AudioStream(BaseHTTPRequestHandler):
     #  in current_data before it gets completely rewritten by the new track
     track_ended = False
 
-    # This flag should be used to switch station. This makes all threads to stop sending current data and get new data
+    # This flag should be used to switch stations. This makes all threads stop sending current data and get new data
     player_switch = False
 
     clients = []

@@ -1,5 +1,7 @@
+import datetime
 import json
 import os
+import shutil
 import signal
 
 CONFIG = {}
@@ -28,6 +30,12 @@ def read_config(filepath="config.json", reload=False):
                 exit(1)
     else:
         return CONFIG
+
+def write_config(data, filepath="config.json"):
+    shutil.copyfile(filepath, filepath + f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}" + ".bak")
+    with open(filepath, "w", encoding="utf-8") as config_file:
+        json.dump(data, config_file, indent=2)
+    read_config(filepath, reload=True)
 
 def feature_enabled(feature_name):
     config = read_config()
