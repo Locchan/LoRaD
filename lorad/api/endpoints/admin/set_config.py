@@ -5,13 +5,13 @@ from lorad.api.endpoints.users.auth import lrd_validate
 from lorad.api.utils.decorators import lrd_api_endp, lrd_auth
 from lorad.audio.programs.program_mgr import register_programs
 from lorad.common.utils import globs
+from lorad.common.utils.globs import EDITABLE_CONFIG_KEYS
 from lorad.common.utils.misc import read_config, write_config
 
 ENDP_PATH = "/admin/set_config"
 LOGIN_REQUIRED = False
 REQUIRED_FIELDS = {"POST": ["key", "value"]}
 OPTIONAL_FIELDS = {}
-EDITABLE_CONFIG_KEYS = ["ENABLED_PROGRAMS/NewsSmall/start_times"]
 DOCSTRING = {"POST": "Sets a config entry to a value."}
 _RE_HHMM = re.compile(r'^(?:[01]?\d|2[0-3]):[0-5]\d$')
 
