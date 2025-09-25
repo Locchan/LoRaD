@@ -11,7 +11,7 @@ logger = get_logger()
 
 class NewsPrgS(GenericPrg):
     name = "NewsSmall"
-    name_pretty = "News (small)"
+    name_pretty = "Panorama"
 
     def __init__(self, start_times: datetime.time, preparation_needed_mins: int):
         super().__init__(start_times, NewsPrgS.name, NewsPrgS.name_pretty, preparation_needed_mins)
