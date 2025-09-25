@@ -24,7 +24,7 @@ export class BackgroundService {
     const baseUrl = environment.production 
       ? 'https://radio.locchan.dev/ui' 
       : '';
-    const imagePath = `${baseUrl}/randomBackground/${imageName}`;
+    const imagePath = `https://radio.locchan.dev/ui/randomBackground/${imageName}`;
     console.log('Selected background image:', imagePath);
     return imagePath;
   });
