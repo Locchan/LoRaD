@@ -145,6 +145,18 @@
       </div>
     </div>
 
+    <!-- Panorama Popup -->
+    <div class="panorama-popup-overlay" *ngIf="showPanoramaPopup">
+      <div class="panorama-popup">
+        <div class="panorama-content">
+          <div class="panorama-placeholder">
+            <p>НОВОСТИ</p>
+            <video src="news.mp4" alt="Panorama Content"></video>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Fallback Track Display -->
     <div class="track-display" *ngIf="!currentTrack && selectedStation">
       <div class="track-info-simple">

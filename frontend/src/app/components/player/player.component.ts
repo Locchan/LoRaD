@@ -50,6 +50,9 @@ export class PlayerComponent implements OnInit, OnDestroy {
   isLoading = true;
   isPlayerLoading = false;
   
+  // Panorama popup state
+  showPanoramaPopup = false;
+  
   private trackUpdateSubscription?: Subscription;
 
   constructor(
@@ -214,6 +217,9 @@ export class PlayerComponent implements OnInit, OnDestroy {
             // Update track info
             this.currentTrack = response.playing || 'Нет информации о треке';
             
+            // Check for Panorama popup
+            this.showPanoramaPopup = response.playing && response.playing.startsWith('Panorama');
+            
             // Update current player if it differs from what we have
             if (response.player_tech && response.player_tech !== this.currentPlayer) {
               this.currentPlayer = response.player_tech;
@@ -227,6 +233,7 @@ export class PlayerComponent implements OnInit, OnDestroy {
             }
           } else {
             this.currentTrack = 'Нет информации о треке';
+            this.showPanoramaPopup = false;
           }
         },
         error: (error: any) => {
