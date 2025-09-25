@@ -1,8 +1,9 @@
-import { Component, OnInit, signal, computed, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, signal, computed, ChangeDetectionStrategy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
+import { BackgroundService } from '../../services/background.service';
 import { ScheduleTime, NewsSchedule } from '../../interfaces/api.interfaces';
 
 @Component({
@@ -10,7 +11,7 @@ import { ScheduleTime, NewsSchedule } from '../../interfaces/api.interfaces';
   imports: [CommonModule, FormsModule, RouterModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="schedule-container" [style.background-image]="'url(' + backgroundImage + ')'">
+    <div class="schedule-container" [style.background-image]="'url(' + backgroundImage() + ')'">
       <header class="schedule-header">
         <div class="logo-section">
           <h1 class="app-title">
@@ -134,6 +135,8 @@ import { ScheduleTime, NewsSchedule } from '../../interfaces/api.interfaces';
   styleUrls: ['./schedule.component.scss']
 })
 export class ScheduleComponent implements OnInit {
+  private backgroundService = inject(BackgroundService);
+  
   // Signals for reactive state management
   scheduleTimes = signal<ScheduleTime[]>([]);
   isLoading = signal(false);
@@ -141,7 +144,7 @@ export class ScheduleComponent implements OnInit {
   successMessage = signal('');
   newTime = '';
   currentUser = signal('');
-  backgroundImage = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80';
+  backgroundImage = this.backgroundService.currentBackgroundImage;
 
   // Computed properties
   hasChanges = computed(() => {

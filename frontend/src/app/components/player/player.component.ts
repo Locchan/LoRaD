@@ -1,9 +1,10 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { StorageService } from '../../services/storage.service';
+import { BackgroundService } from '../../services/background.service';
 import { interval, Subscription, forkJoin, of } from 'rxjs';
 import { catchError, switchMap, tap } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
@@ -23,6 +24,8 @@ import {
   imports: [FormsModule, CommonModule, RouterModule]
 })
 export class PlayerComponent implements OnInit, OnDestroy {
+  private backgroundService = inject(BackgroundService);
+  
   currentUser: string | null = null;
   currentTrack = '';
   currentStation = '';
@@ -30,8 +33,8 @@ export class PlayerComponent implements OnInit, OnDestroy {
   // Radio title from environment
   radioTitle = environment.radioTitle;
   
-  // Background image from environment
-  backgroundImage = environment.backgroundImage;
+  // Background image from service
+  backgroundImage = this.backgroundService.currentBackgroundImage;
   
   // Player management
   availablePlayers: { [key: string]: string } = {};

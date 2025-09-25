@@ -36,12 +36,14 @@ $border-color: #475569;
 // Player Container
 .player-container {
   height: 100vh; // Фиксированная высота вместо min-height
+  width: 100vw;
   background-size: cover;
-  background-position: center;
+  background-position: center center;
   background-repeat: no-repeat;
   background-attachment: fixed;
   position: relative;
   padding: 0;
+  margin: 0;
   overflow: hidden; // Убираем скролл только для player
   display: flex;
   flex-direction: column;

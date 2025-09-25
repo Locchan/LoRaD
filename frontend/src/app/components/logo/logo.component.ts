@@ -35,7 +35,7 @@ import { CommonModule } from '@angular/common';
       color: #666;
       text-align: center;
       font-weight: 500;
-      opacity: 0.8;
+      // opacity: 0.8;
     }
 
     @media (max-width: 768px) {
