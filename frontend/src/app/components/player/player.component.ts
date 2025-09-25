@@ -68,7 +68,7 @@ export class PlayerComponent implements OnInit, OnDestroy {
     // Load volume from localStorage
     this.volume = this.storageService.loadVolume();
     
-    this.audioPlayer = new Audio('https://radio.locchan.dev/lorad/live');
+    this.audioPlayer = new Audio('http://lorad:5475');
     this.audioPlayer.volume = this.volume / 100;
     this.initializePlayer();
   }
