@@ -1,11 +1,15 @@
 import datetime
+import random
 from typing import Tuple
 from sqlalchemy import Result, String, Text, UniqueConstraint, select, desc
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, mapped_column
 
+from lorad.audio.programs.NewsPrgS import generate_fake_news
 from lorad.common.database.Base import Base
 from lorad.common.database.MySQL import MySQL
+from lorad.common.utils.globs import FEAT_FAKE_NEWS
+from lorad.common.utils.misc import feature_enabled, read_config
 
 
 
@@ -19,6 +23,7 @@ class News(Base):
     body_prepared: Mapped[str] = mapped_column(Text, nullable=True)
     date_published: Mapped[datetime.datetime] = mapped_column(nullable=False)
     preparation_needed: Mapped[bool] = mapped_column(default=False)
+    fake: Mapped[bool] = mapped_column(default=False)
     used: Mapped[bool] = mapped_column(default=False)
 
     __table_args__ = (UniqueConstraint("source", "title", "date_published", name="src_ttl_date_unx"),)
@@ -74,7 +79,16 @@ def get_prepared_news_by_src(source) -> Result[Tuple[News]]:
 
 def get_news(news_to_get: int = 10) -> Result[Tuple[News]]:
     with MySQL.get_session() as session:
-        return session.scalars(select(News).order_by(desc(News.date_published)).limit(news_to_get)).all()
+        if feature_enabled(FEAT_FAKE_NEWS):
+            generate_fake_news(session.scalars(select(News).order_by(desc(News.date_published)).limit(news_to_get)).all())
+            fake_news = session.scalars(select(News).where(News.fake==1).order_by(desc(News.id)).limit(2)).all()
+            news = session.scalars(select(News).order_by(desc(News.date_published)).limit(news_to_get - 2)).all()
+            for anews in fake_news:
+                print(anews.body_prepared)
+            news.extend(fake_news)
+            return news
+        else:
+            return session.scalars(select(News).order_by(desc(News.date_published)).limit(news_to_get)).all()
 
 def mark_as_read(ids) -> None:
     with MySQL.get_session() as session:

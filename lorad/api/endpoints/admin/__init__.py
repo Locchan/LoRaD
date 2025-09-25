@@ -1,0 +1,1 @@
+from lorad.api.endpoints.admin import get_config, set_config

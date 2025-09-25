@@ -3,24 +3,11 @@ FROM python:3.12-alpine
 ARG VERSION
 ARG AUTOPLAY=true
 
-RUN mkdir /tmp/lorad
 WORKDIR /tmp/lorad
 
 COPY . .
 
-WORKDIR /tmp/lorad
-RUN apk add ffmpeg && pip install poetry
-RUN poetry build
-RUN pip install dist/*.whl
-RUN cp /tmp/lorad/lorad_main.py /usr/bin/lorad && chmod +x /usr/bin/lorad
-
-RUN cp -r /tmp/lorad/frontend/dist/lorad-frontend/browser/* /app/ui/
-
-RUN rm -rf /tmp/lorad
-
-RUN ln -s /usr/share/zoneinfo/Europe/Minsk /etc/localtime
-
-RUN echo "${VERSION}" > /version
+RUN chmod +x ./full_install.sh && ./full_install.sh
 
 WORKDIR /
 EXPOSE 5475

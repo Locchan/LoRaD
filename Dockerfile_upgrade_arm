@@ -1,4 +1,4 @@
-FROM docker.locchan.dev/lorad:latest
+FROM local/lorad-arm:latest
 
 ARG VERSION
 

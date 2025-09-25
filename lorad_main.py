@@ -23,7 +23,7 @@ signal.signal(signal.SIGINT, signal_stop)
 splash()
 
 logger.info("Loading config...")
-config = read_config("config.json")
+config = read_config()
 
 init_localization()
 
