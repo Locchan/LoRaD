@@ -20,7 +20,7 @@ export class BackgroundService {
   // Computed signal that returns the current background image URL
   currentBackgroundImage = computed(() => {
     const imageName = this.backgroundImages[this.currentImageIndex()];
-    const imagePath = `/randomBackground/${imageName}`;
+    const imagePath = `randomBackground/${imageName}`;
     console.log('Selected background image:', imagePath);
     return imagePath;
   });
