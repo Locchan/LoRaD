@@ -1,9 +1,10 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { StorageService } from '../../services/storage.service';
+import { BackgroundService } from '../../services/background.service';
 import { interval, Subscription, forkJoin, of } from 'rxjs';
 import { catchError, switchMap, tap } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
@@ -20,9 +21,11 @@ import {
   templateUrl: './player.component.html',
   styleUrls: ['./player.component.scss'],
   standalone: true,
-  imports: [FormsModule, CommonModule]
+  imports: [FormsModule, CommonModule, RouterModule]
 })
 export class PlayerComponent implements OnInit, OnDestroy {
+  private backgroundService = inject(BackgroundService);
+  
   currentUser: string | null = null;
   currentTrack = '';
   currentStation = '';
@@ -30,8 +33,8 @@ export class PlayerComponent implements OnInit, OnDestroy {
   // Radio title from environment
   radioTitle = environment.radioTitle;
   
-  // Background image from environment
-  backgroundImage = environment.backgroundImage;
+  // Background image from service
+  backgroundImage = this.backgroundService.currentBackgroundImage;
   
   // Player management
   availablePlayers: { [key: string]: string } = {};
@@ -50,12 +53,15 @@ export class PlayerComponent implements OnInit, OnDestroy {
   isLoading = true;
   isPlayerLoading = false;
   
+  // Panorama popup state
+  showPanoramaPopup = false;
+  
   private trackUpdateSubscription?: Subscription;
 
   constructor(
     private apiService: ApiService,
     private storageService: StorageService,
-    private router: Router
+    public router: Router
   ) {}
 
   ngOnInit() {
@@ -210,11 +216,30 @@ export class PlayerComponent implements OnInit, OnDestroy {
     this.trackUpdateSubscription = interval(2000).subscribe(() => {
       this.apiService.getWhatsPlaying().subscribe({
         next: (response: any) => {
-          // Use 'playing' field as specified in requirements
-          if (response && response.playing) {
-            this.currentTrack = response.playing;
+          if (response) {
+            // Update track info
+            this.currentTrack = response.playing || 'Нет информации о треке';
+            
+            // Check for Panorama popup
+            this.showPanoramaPopup = response.playing && response.playing.startsWith('Panorama');
+            
+            // Update current player if it differs from what we have
+            if (response.player_tech && response.player_tech !== this.currentPlayer) {
+              this.currentPlayer = response.player_tech;
+              this.selectedPlayer = response.player_tech;
+            }
+            
+            // Update current station if it differs from what we have
+            if (response.station_tech && response.station_tech !== this.currentStation) {
+              this.currentStation = response.station_tech;
+              this.selectedStation = response.station_tech;
+            }
+
+            // Compare and update dropdowns with readable values
+            this.updateDropdownsFromReadableValues(response);
           } else {
             this.currentTrack = 'Нет информации о треке';
+            this.showPanoramaPopup = false;
           }
         },
         error: (error: any) => {
@@ -348,5 +373,41 @@ export class PlayerComponent implements OnInit, OnDestroy {
 
   getStationDisplayName(stationKey: string): string {
     return stationKey; // Show the key (station name) directly
+  }
+
+  private updateDropdownsFromReadableValues(response: any) {
+    // Check if player_readable differs from current selection
+    if (response.player_readable) {
+      const currentPlayerDisplayName = this.getPlayerDisplayName(this.selectedPlayer);
+      if (response.player_readable !== currentPlayerDisplayName) {
+        // Find the player key that matches the readable name
+        const matchingPlayerKey = Object.keys(this.availablePlayers).find(
+          key => this.availablePlayers[key] === response.player_readable
+        );
+        
+        if (matchingPlayerKey && matchingPlayerKey !== this.selectedPlayer) {
+          console.log(`Updating player dropdown: ${this.selectedPlayer} -> ${matchingPlayerKey} (${response.player_readable})`);
+          this.selectedPlayer = matchingPlayerKey;
+          this.currentPlayer = matchingPlayerKey;
+        }
+      }
+    }
+
+    // Check if station_readable differs from current selection
+    if (response.station_readable) {
+      const currentStationDisplayName = this.getStationDisplayName(this.selectedStation);
+      if (response.station_readable !== currentStationDisplayName) {
+        // Find the station key that matches the readable name
+        const matchingStationKey = Object.keys(this.availableStations).find(
+          key => this.getStationDisplayName(key) === response.station_readable
+        );
+        
+        if (matchingStationKey && matchingStationKey !== this.selectedStation) {
+          console.log(`Updating station dropdown: ${this.selectedStation} -> ${matchingStationKey} (${response.station_readable})`);
+          this.selectedStation = matchingStationKey;
+          this.currentStation = matchingStationKey;
+        }
+      }
+    }
   }
 }

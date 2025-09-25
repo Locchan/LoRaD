@@ -1,4 +1,4 @@
-<div class="player-container" [style.background-image]="'url(' + backgroundImage + ')'">
+<div class="player-container" [style.background-image]="'url(' + backgroundImage() + ')'">
   <header class="player-header">
     <div class="logo-section">
       <h1 class="app-title">
@@ -7,6 +7,17 @@
       </h1>
       <p class="app-subtitle">Your Personal Radio Station</p>
     </div>
+    
+    <nav class="navigation">
+      <a routerLink="/" class="nav-link" [class.active]="router.url === '/'">
+        <i class="fas fa-play-circle"></i>
+        Плеер
+      </a>
+      <a routerLink="/schedule" class="nav-link" [class.active]="router.url === '/schedule'">
+        <i class="fas fa-calendar-alt"></i>
+        Реклама
+      </a>
+    </nav>
     
     <div class="user-info">
       <span class="username">{{ currentUser }}</span>
@@ -129,6 +140,18 @@
           <div class="status-indicator">
             <span class="status-dot" [class.active]="!audioPlayer?.paused"></span>
             <span class="status-text">{{ !audioPlayer?.paused ? 'Воспроизводится' : 'Остановлено' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panorama Popup -->
+    <div class="panorama-popup-overlay" *ngIf="showPanoramaPopup">
+      <div class="panorama-popup">
+        <div class="panorama-content">
+          <div class="panorama-placeholder">
+            <p>НОВОСТИ</p>
+            <video src="news.mp4" alt="Panorama Content"></video>
           </div>
         </div>
       </div>
