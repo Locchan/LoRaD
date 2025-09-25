@@ -1,6 +1,6 @@
 from lorad.api.endpoints.users.auth import lrd_validate
 from lorad.api.utils.decorators import lrd_api_endp, lrd_auth, lrd_feat_req
-from lorad.api.utils.misc import get_yandex_stations
+from lorad.api.utils.misc import get_yandex_stations, forbid_switching
 import lorad.common.utils.globs as globs
 from lorad.common.utils.globs import FEAT_FILESTREAMER_YANDEX
 
@@ -21,6 +21,8 @@ def validate(headers, data):
         return {"rc": 406, "data": {"message": "Yandex is not initialized."}}
     if globs.CURRENT_PLAYER_NAME != globs.FILESTREAMER.name_tech:
         return {"rc": 406, "data": {"message": "Yandex is not the current player."}}
+    if globs.SWITCH_LOCK:
+        return {"rc": 406, "data": {"message": "Cannot switch right now. Try later."}}
     found = False
     for astation in stations:
         if stations[astation] == data["new_station"]:
@@ -37,4 +39,5 @@ def impl_POST(headers, data):
     globs.FILESTREAMER.stop_carousel()
     globs.YANDEX_OBJ.radio.start_radio(data["new_station"])
     globs.FILESTREAMER.start_carousel()
+    forbid_switching(10)
     return {"success": True}
