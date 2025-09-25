@@ -1,13 +1,60 @@
 import datetime
 import os
+import random
+from sqlalchemy.exc import IntegrityError
 from lorad.audio.programs.GenericPrg import GenericPrg
 from lorad.audio.programs.news.orm import News
 from lorad.audio.programs.news.neuro.neurovoice import check_voiced, get_filelist, voice_news
 from lorad.audio.utils.ffmpeg_utils import ffmpeg_concatenate, ffmpeg_reencode
+from lorad.common.database.MySQL import MySQL
+from lorad.common.utils.globs import FEAT_FAKE_NEWS
 from lorad.common.utils.logger import get_logger
 from lorad.common.utils.misc import read_config
 
 logger = get_logger()
+
+def generate_fake_news(news):
+    from lorad.audio.programs.news.neuro.neuronews import fakeify_news
+    fake_news = 0
+    for anitem in news:
+        if anitem.fake:
+            fake_news+=1
+    if fake_news == 2:
+        logger.info("No need to generate fake news.")
+        return news
+    logger.info("Generating fake news...")
+    news_to_fake = random.sample(news, 2)
+    config = read_config()
+    openai_api_key = config["OPENAI_API_KEY"]
+    for anitem in news_to_fake:
+        news.remove(anitem)
+    fake_text = fakeify_news(openai_api_key, [x.body_prepared for x in news_to_fake])
+    news_to_fake_filtered = []
+    for iter, anewstofake in enumerate(news_to_fake):
+        news_to_fake_filtered.append(
+            News.News(
+                source = anewstofake.source,
+                title = anewstofake.title,
+                body_raw = anewstofake.body_raw,
+                body_prepared = fake_text[iter],
+                date_published = datetime.datetime.fromtimestamp(1),
+                preparation_needed = anewstofake.preparation_needed,
+                fake = True,
+                used = anewstofake.used
+            )
+        )
+    logger.info(f"Generated {len(news_to_fake_filtered)} fake news.")
+    with MySQL.get_session() as session:
+        for anitem in news_to_fake_filtered:
+            try:
+                session.add(anitem)
+                session.commit()
+                session.refresh(anitem)
+                news.append(anitem)
+            except IntegrityError:
+                session.rollback()
+                news_to_fake_filtered.remove(anitem)
+    return news
 
 class NewsPrgS(GenericPrg):
     name = "NewsSmall"
@@ -23,6 +70,7 @@ class NewsPrgS(GenericPrg):
         if len(news) == 0:
             logger.warning("No news!")
             return
+        random.shuffle(news)
         for anews in news:
             if not check_voiced(anews.id):
                 voice_news(anews.id)

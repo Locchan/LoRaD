@@ -4,11 +4,13 @@ from lorad.audio.programs.news.orm import News
 from lorad.common.utils.logger import get_logger
 from lorad.common.utils.misc import read_config
 from openai import OpenAI
+import random
 
 logger = get_logger()
 
 def get_summary(openai_api_key, body_full):
     client = OpenAI(
+        base_url="https://openai-proxy.locchan.dev",
         api_key=openai_api_key,
     )
 
@@ -78,3 +80,24 @@ def get_most_important_news_by_source(source: str, titles_to_give: int, importan
 #  NN is stoopid, sometimes answers with words even when clearly instructed not to do so.
 def filter_text(text):
     return re.sub(r'[^\d\W]', '', text)
+
+def fakeify_news(openai_api_key, news):
+    client = OpenAI(
+        base_url="https://openai-proxy.locchan.dev",
+        api_key=openai_api_key,
+    )
+
+    chat_completion = client.chat.completions.create(
+        messages=[
+            {
+                "role": "system",
+                "content": "Делай вывод максимально приближённым стилистически к исходному тексту."
+            },
+            {
+                "role": "user",
+                "content": f"Измени новости так, чтобы они содержали ложную информацию (абсолютно рандомную, но по теме новости). Раздели новости тремя хэштегами (###), новости должны быть в исходном порядке: \n{'\n'.join(news)}",
+            }
+        ],
+        model="gpt-4o-mini"
+    )
+    return chat_completion.choices[0].message.content.split('###')
