@@ -32,6 +32,8 @@ def read_config(filepath="config.json", reload=False):
         return CONFIG
 
 def write_config(data, filepath="config.json"):
+    if "CFGFILE_PATH" in os.environ:
+        filepath = os.environ["CFGFILE_PATH"]
     shutil.copyfile(filepath, filepath + f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}" + ".bak")
     with open(filepath, "w", encoding="utf-8") as config_file:
         json.dump(data, config_file, indent=2)
