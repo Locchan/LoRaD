@@ -38,6 +38,8 @@ export interface CurrentStationResponse {
 export interface WhatsPlayingResponse {
   player_readable: string;
   player_tech: string;
+  station_readable: string;
+  station_tech: string;
   playing: string;
 }
 

@@ -231,6 +231,9 @@ export class PlayerComponent implements OnInit, OnDestroy {
               this.currentStation = response.station_tech;
               this.selectedStation = response.station_tech;
             }
+
+            // Compare and update dropdowns with readable values
+            this.updateDropdownsFromReadableValues(response);
           } else {
             this.currentTrack = 'Нет информации о треке';
             this.showPanoramaPopup = false;
@@ -367,5 +370,41 @@ export class PlayerComponent implements OnInit, OnDestroy {
 
   getStationDisplayName(stationKey: string): string {
     return stationKey; // Show the key (station name) directly
+  }
+
+  private updateDropdownsFromReadableValues(response: any) {
+    // Check if player_readable differs from current selection
+    if (response.player_readable) {
+      const currentPlayerDisplayName = this.getPlayerDisplayName(this.selectedPlayer);
+      if (response.player_readable !== currentPlayerDisplayName) {
+        // Find the player key that matches the readable name
+        const matchingPlayerKey = Object.keys(this.availablePlayers).find(
+          key => this.availablePlayers[key] === response.player_readable
+        );
+        
+        if (matchingPlayerKey && matchingPlayerKey !== this.selectedPlayer) {
+          console.log(`Updating player dropdown: ${this.selectedPlayer} -> ${matchingPlayerKey} (${response.player_readable})`);
+          this.selectedPlayer = matchingPlayerKey;
+          this.currentPlayer = matchingPlayerKey;
+        }
+      }
+    }
+
+    // Check if station_readable differs from current selection
+    if (response.station_readable) {
+      const currentStationDisplayName = this.getStationDisplayName(this.selectedStation);
+      if (response.station_readable !== currentStationDisplayName) {
+        // Find the station key that matches the readable name
+        const matchingStationKey = Object.keys(this.availableStations).find(
+          key => this.getStationDisplayName(key) === response.station_readable
+        );
+        
+        if (matchingStationKey && matchingStationKey !== this.selectedStation) {
+          console.log(`Updating station dropdown: ${this.selectedStation} -> ${matchingStationKey} (${response.station_readable})`);
+          this.selectedStation = matchingStationKey;
+          this.currentStation = matchingStationKey;
+        }
+      }
+    }
   }
 }
