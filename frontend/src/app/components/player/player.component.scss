@@ -101,6 +101,43 @@ $border-color: #475569;
     }
   }
 
+  .navigation {
+    display: flex;
+    gap: 0.5rem;
+
+    .nav-link {
+      @include glass-effect;
+      padding: 0.75rem 1.5rem;
+      border-radius: 12px;
+      color: $text-primary;
+      text-decoration: none;
+      @include smooth-transition;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 500;
+      font-size: 0.875rem;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: translateY(-2px);
+      }
+
+      &.active {
+        @include gradient-bg($primary-color, $secondary-color);
+        color: white;
+
+        &:hover {
+          transform: translateY(-2px);
+        }
+      }
+
+      i {
+        font-size: 0.875rem;
+      }
+    }
+  }
+
   .user-info {
     display: flex;
     align-items: center;
@@ -840,4 +877,22 @@ $border-color: #475569;
 .station-section:hover {
   transform: translateY(-2px);
   @include smooth-transition;
+}
+
+// Logo Section Footer
+.logo-section-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  margin-top: auto;
+  background: rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(5px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 768px) {
+  .logo-section-footer {
+    padding: 16px;
+  }
 }

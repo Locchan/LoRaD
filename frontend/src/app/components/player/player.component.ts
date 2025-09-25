@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { StorageService } from '../../services/storage.service';
 import { interval, Subscription, forkJoin, of } from 'rxjs';
@@ -20,7 +20,7 @@ import {
   templateUrl: './player.component.html',
   styleUrls: ['./player.component.scss'],
   standalone: true,
-  imports: [FormsModule, CommonModule]
+  imports: [FormsModule, CommonModule, RouterModule]
 })
 export class PlayerComponent implements OnInit, OnDestroy {
   currentUser: string | null = null;
@@ -55,7 +55,7 @@ export class PlayerComponent implements OnInit, OnDestroy {
   constructor(
     private apiService: ApiService,
     private storageService: StorageService,
-    private router: Router
+    public router: Router
   ) {}
 
   ngOnInit() {
@@ -210,9 +210,21 @@ export class PlayerComponent implements OnInit, OnDestroy {
     this.trackUpdateSubscription = interval(2000).subscribe(() => {
       this.apiService.getWhatsPlaying().subscribe({
         next: (response: any) => {
-          // Use 'playing' field as specified in requirements
-          if (response && response.playing) {
-            this.currentTrack = response.playing;
+          if (response) {
+            // Update track info
+            this.currentTrack = response.playing || 'Нет информации о треке';
+            
+            // Update current player if it differs from what we have
+            if (response.player_tech && response.player_tech !== this.currentPlayer) {
+              this.currentPlayer = response.player_tech;
+              this.selectedPlayer = response.player_tech;
+            }
+            
+            // Update current station if it differs from what we have
+            if (response.station_tech && response.station_tech !== this.currentStation) {
+              this.currentStation = response.station_tech;
+              this.selectedStation = response.station_tech;
+            }
           } else {
             this.currentTrack = 'Нет информации о треке';
           }

@@ -1,0 +1,651 @@
+// Import Font Awesome for icons
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
+
+// Variables
+$primary-color: #6366f1;
+$secondary-color: #8b5cf6;
+$accent-color: #06b6d4;
+$success-color: #10b981;
+$warning-color: #f59e0b;
+$error-color: #ef4444;
+$dark-bg: #1e293b;
+$card-bg: #334155;
+$text-primary: #f8fafc;
+$text-secondary: #cbd5e1;
+$border-color: #475569;
+
+// Mixins
+@mixin glass-effect {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+@mixin gradient-bg($start, $end) {
+  background: linear-gradient(135deg, $start 0%, $end 100%);
+}
+
+@mixin card-shadow {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+@mixin smooth-transition($property: all) {
+  transition: $property 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+// Schedule Container
+.schedule-container {
+  min-height: 100vh;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  position: relative;
+  padding: 0;
+  overflow-x: hidden;
+
+  // Overlay для лучшей читаемости
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%);
+    z-index: 1;
+  }
+
+  // Все содержимое должно быть поверх overlay
+  > * {
+    position: relative;
+    z-index: 2;
+  }
+}
+
+// Header
+.schedule-header {
+  padding: 1rem 2rem;
+  @include glass-effect;
+  @include card-shadow;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  border-radius: 0 0 20px 20px;
+
+  .logo-section {
+    .app-title {
+      font-size: 2rem;
+      font-weight: 700;
+      @include gradient-bg($primary-color, $secondary-color);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.25rem;
+
+      i {
+        margin-right: 0.75rem;
+        color: $accent-color;
+      }
+    }
+
+    .app-subtitle {
+      color: $text-secondary;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+  }
+
+  .navigation {
+    display: flex;
+    gap: 0.5rem;
+
+    .nav-link {
+      @include glass-effect;
+      padding: 0.75rem 1.5rem;
+      border-radius: 12px;
+      color: $text-primary;
+      text-decoration: none;
+      @include smooth-transition;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 500;
+      font-size: 0.875rem;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: translateY(-2px);
+      }
+
+      &.active {
+        @include gradient-bg($primary-color, $secondary-color);
+        color: white;
+
+        &:hover {
+          transform: translateY(-2px);
+        }
+      }
+
+      i {
+        font-size: 0.875rem;
+      }
+    }
+  }
+
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+
+    .username {
+      font-weight: 600;
+      color: $text-primary;
+    }
+
+    .logout-button {
+      @include glass-effect;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 12px;
+      color: $text-primary;
+      cursor: pointer;
+      @include smooth-transition;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 500;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: translateY(-2px);
+      }
+
+      i {
+        font-size: 0.875rem;
+      }
+    }
+  }
+}
+
+// Main Content
+.main-content {
+  padding: 0 2rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+// Section Headers
+.section-header {
+  margin-bottom: 1.5rem;
+
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: $text-primary;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+
+    i {
+      color: $accent-color;
+    }
+  }
+
+  .section-description {
+    color: $text-secondary;
+    font-size: 1rem;
+    margin: 0;
+  }
+}
+
+// Schedule Section
+.schedule-section {
+  @include glass-effect;
+  @include card-shadow;
+  border-radius: 20px;
+  padding: 2rem;
+  position: relative;
+
+  .schedule-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+}
+
+// Add Time Control
+.add-time-control {
+  .time-input-group {
+    display: flex;
+    align-items: end;
+    gap: 1rem;
+    flex-wrap: wrap;
+
+    .time-label {
+      font-weight: 500;
+      color: $text-primary;
+      font-size: 1rem;
+      min-width: 120px;
+    }
+
+    .time-input {
+      padding: 0.75rem 1rem;
+      border: 2px solid $border-color;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      color: $text-primary;
+      font-size: 1rem;
+      @include smooth-transition(border-color);
+      min-width: 150px;
+
+      &:focus {
+        outline: none;
+        border-color: $primary-color;
+      }
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+    }
+
+    .add-btn {
+      @include gradient-bg($success-color, $accent-color);
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 12px;
+      color: white;
+      cursor: pointer;
+      @include smooth-transition;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 600;
+      font-size: 1rem;
+
+      &:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+      }
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      i {
+        font-size: 0.875rem;
+      }
+    }
+  }
+}
+
+// Times List
+.times-list {
+  .times-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+
+    h3 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: $text-primary;
+      margin: 0;
+    }
+
+    .save-btn {
+      @include gradient-bg($primary-color, $secondary-color);
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 12px;
+      color: white;
+      cursor: pointer;
+      @include smooth-transition;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 600;
+      font-size: 1rem;
+
+      &:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+      }
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      i {
+        font-size: 0.875rem;
+      }
+    }
+  }
+
+  .times-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+  }
+}
+
+// Time Item
+.time-item {
+  @include glass-effect;
+  border-radius: 16px;
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  @include smooth-transition;
+  border: 2px solid transparent;
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+
+  .time-display {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+
+    i {
+      color: $accent-color;
+      font-size: 1.125rem;
+    }
+
+    .time-text {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: $text-primary;
+    }
+  }
+
+  .time-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+
+    .remove-btn {
+      width: 40px;
+      height: 40px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(239, 68, 68, 0.2);
+      color: $error-color;
+      cursor: pointer;
+      @include smooth-transition;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+
+      &:hover:not(:disabled) {
+        background: rgba(239, 68, 68, 0.3);
+        transform: scale(1.1);
+      }
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+    }
+  }
+}
+
+// Empty State
+.empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: $text-secondary;
+
+  .empty-icon {
+    font-size: 4rem;
+    color: $text-secondary;
+    margin-bottom: 1.5rem;
+    opacity: 0.6;
+  }
+
+  h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: $text-primary;
+    margin-bottom: 0.75rem;
+  }
+
+  p {
+    font-size: 1rem;
+    margin: 0;
+  }
+}
+
+// Loading Section
+.loading-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+
+  .loading-card {
+    @include glass-effect;
+    @include card-shadow;
+    border-radius: 20px;
+    padding: 3rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+
+    i {
+      font-size: 2rem;
+      color: $accent-color;
+      animation: spin 1s linear infinite;
+    }
+
+    p {
+      color: $text-secondary;
+      font-size: 1.125rem;
+      font-weight: 500;
+      margin: 0;
+    }
+  }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+// Success Message
+.success-message {
+  position: fixed;
+  top: 2rem;
+  right: 2rem;
+  z-index: 1000;
+  animation: slideInRight 0.3s ease-out;
+
+  .success-card {
+    @include glass-effect;
+    @include card-shadow;
+    border-radius: 16px;
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-width: 300px;
+    border-left: 4px solid $success-color;
+
+    i {
+      color: $success-color;
+      font-size: 1.25rem;
+    }
+
+    p {
+      color: $text-primary;
+      font-weight: 500;
+      margin: 0;
+      flex: 1;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: $text-secondary;
+      cursor: pointer;
+      padding: 0.25rem;
+      border-radius: 4px;
+      @include smooth-transition;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: $text-primary;
+      }
+
+      i {
+        font-size: 0.875rem;
+      }
+    }
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+// Responsive Design
+@media (max-width: 768px) {
+  .schedule-header {
+    padding: 1rem;
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+
+    .logo-section {
+      .app-title {
+        font-size: 1.5rem;
+      }
+    }
+  }
+
+  .main-content {
+    padding: 0 1rem 2rem;
+    gap: 1.5rem;
+  }
+
+  .schedule-section {
+    padding: 1.5rem;
+  }
+
+  .add-time-control {
+    .time-input-group {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.75rem;
+
+      .time-label {
+        min-width: auto;
+      }
+
+      .time-input {
+        min-width: auto;
+      }
+    }
+  }
+
+  .times-list {
+    .times-header {
+      flex-direction: column;
+      align-items: stretch;
+      text-align: center;
+    }
+
+    .times-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .time-item {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+
+    .time-actions {
+      justify-content: center;
+    }
+  }
+
+  .success-message {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    right: 1rem;
+
+    .success-card {
+      min-width: auto;
+    }
+  }
+}
+
+// Animations
+.schedule-section,
+.time-item {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Hover effects
+.schedule-section:hover {
+  transform: translateY(-2px);
+  @include smooth-transition;
+}
+
+// Logo Section Footer
+.logo-section-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  margin-top: 40px;
+  background: rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(5px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 768px) {
+  .logo-section-footer {
+    padding: 16px;
+    margin-top: 20px;
+  }
+}

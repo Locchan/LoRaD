@@ -12,3 +12,22 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+// Global Logo Footer
+.global-logo-footer {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 6px 20px;
+  background: transparent;
+}
+
+@media (max-width: 768px) {
+  .global-logo-footer {
+    padding: 4px 16px;
+  }
+}

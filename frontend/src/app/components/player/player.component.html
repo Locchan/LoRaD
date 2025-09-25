@@ -8,6 +8,17 @@
       <p class="app-subtitle">Your Personal Radio Station</p>
     </div>
     
+    <nav class="navigation">
+      <a routerLink="/" class="nav-link" [class.active]="router.url === '/'">
+        <i class="fas fa-play-circle"></i>
+        Плеер
+      </a>
+      <a routerLink="/schedule" class="nav-link" [class.active]="router.url === '/schedule'">
+        <i class="fas fa-calendar-alt"></i>
+        Реклама
+      </a>
+    </nav>
+    
     <div class="user-info">
       <span class="username">{{ currentUser }}</span>
       <button class="logout-button" (click)="onLogout()">

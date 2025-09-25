@@ -51,7 +51,33 @@ export interface AvailablePlayersResponse {
 
 export interface RadioStationsResponse {
   [key: string]: string;
-}export interface SwitchPlayerRequest {
+}
+
+export interface SwitchPlayerRequest {
   new_player: string;
+}
+
+// Configuration interfaces
+export interface ConfigGetRequest {
+  key: string;
+}
+
+export interface ConfigSetRequest {
+  key: string;
+  value: string[] | string;
+}
+
+export interface ConfigResponse {
+  [key: string]: string[] | string;
+}
+
+// Schedule interfaces
+export interface ScheduleTime {
+  time: string;
+  enabled: boolean;
+}
+
+export interface NewsSchedule {
+  times: ScheduleTime[];
 }
 

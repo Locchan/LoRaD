@@ -13,6 +13,9 @@ import {
   RadioStationsResponse,
   CurrentPlayerResponse,
   WhatsPlayingResponse,
+  ConfigGetRequest,
+  ConfigSetRequest,
+  ConfigResponse,
 } from '../interfaces/api.interfaces';
 
 @Injectable({
@@ -163,5 +166,22 @@ export class ApiService {
 
   isAuthenticated(): boolean {
     return this.authToken !== null && this.username !== null;
+  }
+
+  // Configuration management endpoints
+  getConfig(key: string): Observable<ConfigResponse> {
+    return this.http.post<ConfigResponse>(
+      `${this.apiUrl}/admin/get_config`,
+      { key },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  setConfig(key: string, value: string[] | string): Observable<UserResponse> {
+    return this.http.post<UserResponse>(
+      `${this.apiUrl}/admin/set_config`,
+      { key, value },
+      { headers: this.getAuthHeaders() }
+    );
   }
 }
