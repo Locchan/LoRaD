@@ -45,7 +45,7 @@ class GenericPrg():
                 logger.info(f"Program: {self.name}; Track {anum+1}/{len(self.prepared_program)}")
                 if player_before_program != globs.FILESTREAMER.name_tech:
                     switch_players(globs.FILESTREAMER.name_tech)
-                globs.FILESTREAMER.serve_file(track_filepath=aprogram[1], unswitcheable=True)
+                globs.FILESTREAMER.serve_file(track_filepath=aprogram[1], track_name=aname unswitcheable=True)
             logger.info(f"Program [{self.name}] finished. Restarting carousel.")
         except Exception as e:
             logger.error(f"Failed to run the program: {e.__class__.__name__}")
