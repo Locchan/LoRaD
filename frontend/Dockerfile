@@ -6,14 +6,6 @@ COPY package*.json ./
 RUN npm install
 COPY . .
 
-ARG API_URL=127.0.0.1:5476
-ARG TITLE=LoRaD
-ARG AUTOPLAY=true
-ARG BG_IMG=https://upload.wikimedia.org/wikipedia/commons/d/dd/I_G%C4%B1yaseddin_Keyh%C3%BCsrev_Meret_%C3%96wezov_Antalya.jpg
-
-# Create environment file with AUTOPLAY value
-RUN echo "export const environment = {production: false, apiUrl: '${API_URL}', autoplay: ${AUTOPLAY}, radioTitle: '${TITLE}', backgroundImage: '${BG_IMG}'};" > src/environments/environment.ts
-
 RUN ng build --configuration=development --optimization=false --base-href /ui/
 
 FROM docker.io/library/nginx:stable-alpine AS runner
