@@ -112,7 +112,7 @@ class NewsPrgS(GenericPrg):
     def add_ads(self, files_list, count=1):
         logger.info(f"Adding {count} ads to the news")
         adsdir = os.path.join(self.config["DATADIR"], "resources", "ads")
-        ad_files = [f for f in os.listdir(adsdir) if os.path.isfile(os.path.join(adsdir, f))]
+        ad_files = [os.path.join(adsdir, f) for f in os.listdir(adsdir) if os.path.isfile(os.path.join(adsdir, f))]
         if not ad_files:
             logger.warning("Could not get an ad to add to the news.")
             return files_list
