@@ -14,7 +14,7 @@ ARG BG_IMG=https://upload.wikimedia.org/wikipedia/commons/d/dd/I_G%C4%B1yaseddin
 # Create environment file with AUTOPLAY value
 RUN echo "export const environment = {production: true, apiUrl: '${API_URL}', autoplay: ${AUTOPLAY}, radioTitle: '${TITLE}', backgroundImage: '${BG_IMG}'};" > src/environments/environment.prod.ts
 
-RUN ng build --configuration=production --optimization=false --build-optimizer=false --source-map=false --base-href /ui/
+RUN ng build --configuration=production --optimization=false --base-href /ui/
 
 FROM docker.io/library/nginx:stable-alpine AS runner
 RUN rm -rf /usr/share/nginx/html/* && mkdir /usr/share/nginx/html/ui/
