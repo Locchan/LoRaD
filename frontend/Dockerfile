@@ -12,7 +12,7 @@ ARG AUTOPLAY=true
 ARG BG_IMG=https://upload.wikimedia.org/wikipedia/commons/d/dd/I_G%C4%B1yaseddin_Keyh%C3%BCsrev_Meret_%C3%96wezov_Antalya.jpg
 
 # Create environment file with AUTOPLAY value
-RUN echo "export const environment = {production: true, apiUrl: '${API_URL}', autoplay: ${AUTOPLAY}, radioTitle: '${TITLE}', backgroundImage: '${BG_IMG}'};" > src/environments/environment.prod.ts
+RUN echo "export const environment = {production: false, apiUrl: '${API_URL}', autoplay: ${AUTOPLAY}, radioTitle: '${TITLE}', backgroundImage: '${BG_IMG}'};" > src/environments/environment.ts
 
 RUN ng build --configuration=production --base-href /ui/
 
