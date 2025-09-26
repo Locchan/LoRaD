@@ -31,7 +31,7 @@ globs.FEATURE_FLAGS = config["FEATURE_FLAGS"] if "FEATURE_FLAGS" in config else 
 
 if len(globs.FEATURE_FLAGS) > 0:
     logger.info(f"Enabled flags: {globs.FEATURE_FLAGS}")
-    if "DEBUG" in globs.FEATURE_FLAGS:
+    if "DEBUG" in globs.FEATURE_FLAGS or "DEBUG" in config and config["DEBUG"]:
         setdebug()
 
 carousel_providers = []

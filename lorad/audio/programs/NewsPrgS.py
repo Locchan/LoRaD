@@ -1,15 +1,16 @@
 import datetime
 import os
 import random
+import time
 from sqlalchemy.exc import IntegrityError
 from lorad.audio.programs.GenericPrg import GenericPrg
 from lorad.audio.programs.news.orm import News
 from lorad.audio.programs.news.neuro.neurovoice import check_voiced, get_filelist, voice_news
 from lorad.audio.utils.ffmpeg_utils import ffmpeg_concatenate, ffmpeg_reencode
 from lorad.common.database.MySQL import MySQL
-from lorad.common.utils.globs import FEAT_FAKE_NEWS
+from lorad.common.utils.globs import FEAT_FAKE_NEWS, FEAT_NEWS_ADS, FEAT_NEWS_RANDOM_FILE
 from lorad.common.utils.logger import get_logger
-from lorad.common.utils.misc import read_config
+from lorad.common.utils.misc import read_config, feature_enabled
 
 logger = get_logger()
 
@@ -100,5 +101,70 @@ class NewsPrgS(GenericPrg):
             if not os.path.exists(tmpfilename):
                 ffmpeg_reencode(afile, ["-b:a", f"{self.config["BITRATE_KBPS"]}k", "-c:a", "libmp3lame", "-ar", "44100", "-ac", "2", "-af", "apad=pad_dur=2"], tmpfilename)
         logger.info("Concatenating news files into a digest")
+        if feature_enabled(FEAT_NEWS_ADS):
+            temp_files = self.add_ads(tempfiles)
+        if feature_enabled(FEAT_NEWS_RANDOM_FILE):
+            temp_files = self.add_random_files(tempfiles)
+        logger.debug("Will use the following files:")
+        logger.debug(temp_files)
         ffmpeg_concatenate(tempfiles, news_file, artist="NeuroNews", title=f"Новости за {datetime.datetime.now().strftime("%Y-%m-%d %H")}")
+        self._cleanup()
         return news_file
+
+    def add_random_files(self, files_list, count=1):
+        logger.info(f"Adding {count} random files to the news")
+        random_filesdir = os.path.join(self.config["DATADIR"], "resources", "random_voices")
+        ad_files = [os.path.join(random_filesdir, f) for f in os.listdir(random_filesdir) if os.path.isfile(os.path.join(random_filesdir, f))]
+        if not ad_files:
+            logger.warning("Could not get a random file to add to the news.")
+            return files_list
+        random_files_to_add = random.sample(ad_files, count)
+        if not isinstance(random_files_to_add, list):
+            random_files_to_add = [random_files_to_add]
+        files_list.extend(random_files_to_add)
+        return files_list
+
+    def add_ads(self, files_list, count=1):
+        logger.info(f"Adding {count} ads to the news")
+        adsdir = os.path.join(self.config["DATADIR"], "resources", "ads")
+        ad_files = [os.path.join(adsdir, f) for f in os.listdir(adsdir) if os.path.isfile(os.path.join(adsdir, f))]
+        if not ad_files:
+            logger.warning("Could not get an ad to add to the news.")
+            return files_list
+        ads_to_add = random.sample(ad_files, count)
+        if not isinstance(ads_to_add, list):
+            ads_to_add = [ads_to_add]
+        files_list.extend(ads_to_add)
+        return files_list
+
+    def _cleanup(self):
+        logger.info("Starting voice file cleanup...")
+        newsdir = os.path.join(self.config["DATADIR"], "neurovoice")
+        digestdir = os.path.join(newsdir, "digests")
+
+        cutoff = time.time() - 24 * 60 * 60
+        counter = 0
+        for filename in os.listdir(digestdir):
+            file_path = os.path.join(digestdir, filename)
+
+            if os.path.isfile(file_path):
+                try:
+                    if os.path.getmtime(file_path) < cutoff:
+                        os.remove(file_path)
+                        counter+=1
+                        logger.debug(f"Deleted old file: {file_path}")
+                except Exception as e:
+                    logger.warning(f"Could not delete {file_path}: {e}")
+        
+        for filename in os.listdir(newsdir):
+            file_path = os.path.join(newsdir, filename)
+
+            if os.path.isfile(file_path):
+                try:
+                    if os.path.getmtime(file_path) < cutoff:
+                        os.remove(file_path)
+                        counter+=1
+                        logger.debug(f"Deleted old file: {file_path}")
+                except Exception as e:
+                    logger.warning(f"Could not delete {file_path}: {e}")
+        logger.info(f"Cleaned {counter} files.")
