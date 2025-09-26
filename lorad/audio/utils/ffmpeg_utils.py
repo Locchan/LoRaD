@@ -15,7 +15,9 @@ def ffmpeg_reencode(filename: str, params: list[str], output_filename: str):
         ffmpeg_command.extend(["-loglevel", "quiet"])
     ffmpeg_command.append(output_filename)
     logger.debug(f"Re-encoder command: {' '.join(ffmpeg_command)}")
-    subprocess.call(ffmpeg_command)
+    rc = subprocess.call(ffmpeg_command)
+    if rc != 0:
+        logger.error("Reencoding finished with errors.")
     
 
 def ffmpeg_concatenate(filenames: list[str], output_filename: str, artist=None, title=None):
@@ -34,6 +36,8 @@ def ffmpeg_concatenate(filenames: list[str], output_filename: str, artist=None, 
     if title is not None:
         ffmpeg_command.extend(["-metadata", f"title='{title}'"])
     ffmpeg_command.append(output_filename)
-    logger.debug(f"Re-encoder command: {' '.join(ffmpeg_command)}")
-    subprocess.call(ffmpeg_command)
+    logger.debug(f"Concatenator command: {' '.join(ffmpeg_command)}")
+    rc = subprocess.call(ffmpeg_command)
+    if rc != 0:
+        logger.error("Concatenation finished with errors.")
     os.remove(list_filename)
