@@ -25,7 +25,7 @@ import {
 })
 export class PlayerComponent implements OnInit, OnDestroy {
   private backgroundService = inject(BackgroundService);
-  
+  private radioUrl = environment.radioUrl;
   currentUser: string | null = null;
   currentTrack = '';
   currentStation = '';
@@ -68,7 +68,7 @@ export class PlayerComponent implements OnInit, OnDestroy {
     // Load volume from localStorage
     this.volume = this.storageService.loadVolume();
     
-    this.audioPlayer = new Audio('http://lorad:5475');
+    this.audioPlayer = new Audio(this.radioUrl);
     this.audioPlayer.volume = this.volume / 100;
     this.initializePlayer();
   }
