@@ -85,7 +85,7 @@ class FileStreamer:
             self.fallback_index += 1
             self.start_carousel()
 
-    def start(self, one_track_only):
+    def start(self):
         self.start_carousel()
 
     def stop(self):
