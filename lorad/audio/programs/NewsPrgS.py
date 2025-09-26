@@ -8,9 +8,9 @@ from lorad.audio.programs.news.orm import News
 from lorad.audio.programs.news.neuro.neurovoice import check_voiced, get_filelist, voice_news
 from lorad.audio.utils.ffmpeg_utils import ffmpeg_concatenate, ffmpeg_reencode
 from lorad.common.database.MySQL import MySQL
-from lorad.common.utils.globs import FEAT_FAKE_NEWS
+from lorad.common.utils.globs import FEAT_FAKE_NEWS, FEAT_ADS
 from lorad.common.utils.logger import get_logger
-from lorad.common.utils.misc import read_config
+from lorad.common.utils.misc import read_config, feature_enabled
 
 logger = get_logger()
 
@@ -101,9 +101,21 @@ class NewsPrgS(GenericPrg):
             if not os.path.exists(tmpfilename):
                 ffmpeg_reencode(afile, ["-b:a", f"{self.config["BITRATE_KBPS"]}k", "-c:a", "libmp3lame", "-ar", "44100", "-ac", "2", "-af", "apad=pad_dur=2"], tmpfilename)
         logger.info("Concatenating news files into a digest")
+        if feature_enabled(FEAT_ADS):
+            temp_files = self.add_ads(tempfiles)
         ffmpeg_concatenate(tempfiles, news_file, artist="NeuroNews", title=f"Новости за {datetime.datetime.now().strftime("%Y-%m-%d %H")}")
         self._cleanup()
         return news_file
+    
+    def add_ads(self, files_list, count=1):
+        adsdir = os.path.join(self.config["DATADIR"], "resources", "ads")
+        ad_files = [f for f in os.listdir(adsdir) if os.path.isfile(os.path.join(adsdir, f))]
+        if not ad_files:
+            logger.warning("Could not get an ad to add to the news.")
+            return files_list
+        ads_to_add = random.sample(ad_files, count)
+        files_list.extend(ads_to_add)
+        return files_list
     
     def _cleanup(self):
         logger.info("Starting voice file cleanup...")
