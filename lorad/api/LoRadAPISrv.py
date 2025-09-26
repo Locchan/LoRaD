@@ -136,9 +136,12 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
                 real_ip = self.headers.get('X-Real-IP')
                 if real_ip is None:
                     real_ip = self.client_address[0]
-                logger.info(f"[{real_ip}] - RQ: POST {self.path}: {endpoint_exec_result["rc"]}." +
-                            f" Data: RX:{data_length}b" +
-                            f" TX:{sys.getsizeof(endpoint_exec_result["data"])}b")
+                if self.path in DEBUG_ONLY_PRINT_ENDPOINTS and int(endpoint_exec_result["rc"]) == 200:
+                    logger.debug(f"[{real_ip}] - RQ: POST {self.path}: {endpoint_exec_result["rc"]}." +
+                                f" Data: TX:{sys.getsizeof(response)}b")
+                else:
+                    logger.info(f"[{real_ip}] - RQ: POST {self.path}: {endpoint_exec_result["rc"]}." +
+                                f" Data: TX:{sys.getsizeof(response)}b")
                 logger.debug(f"RQ Headers: {self.headers}")
                 logger.debug(f"Data: {response}")
             else:
