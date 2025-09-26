@@ -1,6 +1,7 @@
 import datetime
 import os
 import random
+import time
 from sqlalchemy.exc import IntegrityError
 from lorad.audio.programs.GenericPrg import GenericPrg
 from lorad.audio.programs.news.orm import News
@@ -101,4 +102,37 @@ class NewsPrgS(GenericPrg):
                 ffmpeg_reencode(afile, ["-b:a", f"{self.config["BITRATE_KBPS"]}k", "-c:a", "libmp3lame", "-ar", "44100", "-ac", "2", "-af", "apad=pad_dur=2"], tmpfilename)
         logger.info("Concatenating news files into a digest")
         ffmpeg_concatenate(tempfiles, news_file, artist="NeuroNews", title=f"Новости за {datetime.datetime.now().strftime("%Y-%m-%d %H")}")
+        self._cleanup()
         return news_file
+    
+    def _cleanup(self):
+        logger.info("Starting voice file cleanup...")
+        newsdir = os.path.join(self.config["DATADIR"], "neurovoice")
+        digestdir = os.path.join(newsdir, "digests")
+
+        cutoff = time.time() - 24 * 60 * 60
+        counter = 0
+        for filename in os.listdir(digestdir):
+            file_path = os.path.join(digestdir, filename)
+
+            if os.path.isfile(file_path):
+                try:
+                    if os.path.getmtime(file_path) < cutoff:
+                        os.remove(file_path)
+                        counter+=1
+                        logger.debug(f"Deleted old file: {file_path}")
+                except Exception as e:
+                    logger.warning(f"Could not delete {file_path}: {e}")
+        
+        for filename in os.listdir(newsdir):
+            file_path = os.path.join(newsdir, filename)
+
+            if os.path.isfile(file_path):
+                try:
+                    if os.path.getmtime(file_path) < cutoff:
+                        os.remove(file_path)
+                        counter+=1
+                        logger.debug(f"Deleted old file: {file_path}")
+                except Exception as e:
+                    logger.warning(f"Could not delete {file_path}: {e}")
+        logger.info(f"Cleaned {counter} files.")
