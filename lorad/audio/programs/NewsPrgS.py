@@ -103,17 +103,22 @@ class NewsPrgS(GenericPrg):
         logger.info("Concatenating news files into a digest")
         if feature_enabled(FEAT_ADS):
             temp_files = self.add_ads(tempfiles)
+        logger.debug("Will use the following files:")
+        logger.debug(temp_files)
         ffmpeg_concatenate(tempfiles, news_file, artist="NeuroNews", title=f"Новости за {datetime.datetime.now().strftime("%Y-%m-%d %H")}")
         self._cleanup()
         return news_file
     
     def add_ads(self, files_list, count=1):
+        logger.info(f"Adding {count} ads to the news")
         adsdir = os.path.join(self.config["DATADIR"], "resources", "ads")
         ad_files = [f for f in os.listdir(adsdir) if os.path.isfile(os.path.join(adsdir, f))]
         if not ad_files:
             logger.warning("Could not get an ad to add to the news.")
             return files_list
         ads_to_add = random.sample(ad_files, count)
+        if not isinstance(ads_to_add, list):
+            ads_to_add = [ads_to_add]
         files_list.extend(ads_to_add)
         return files_list
     
