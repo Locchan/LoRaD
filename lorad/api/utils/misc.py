@@ -33,7 +33,7 @@ def get_players_names():
         res[aplayer.name_tech] = aplayer.name_readable
     return res
 
-def switch_players(new_player_name):
+def switch_players(new_player_name, one_track_only=False):
     from lorad.common.utils.logger import get_logger
     logger = get_logger()
     if new_player_name == globs.CURRENT_PLAYER_NAME:
@@ -47,8 +47,14 @@ def switch_players(new_player_name):
         AudioStream.player_switch = True
         AudioStream.current_data = deque()
         prev_player.stop()
+        prev_player.running = False
+        new_player.running = True
+        if new_player.name_tech == globs.FILESTREAMER.name_tech:
+            if not one_track_only:
+                new_player.start()
+        else:
+            new_player.start()
         sleep(1)
-        new_player.start()
         AudioStream.player_switch = False
 
 def start_player(player_name):

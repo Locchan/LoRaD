@@ -26,6 +26,7 @@ class RadReStreamer:
         self.default_format = config["DEFAULT_AUDIO_FORMAT"]
         self.transcoder = None
         self.current_station = "default"
+        self.currently_playing = self.current_station
         self.get_stations()
 
     def get_stations(self) -> dict:
@@ -37,6 +38,7 @@ class RadReStreamer:
             if self.running:
                 # Non-None return from this means that we detected an unrecoverable error, thus we break.
                 result = self.__prepare_and_start(self.current_station)
+                self.currently_playing = self.current_station
                 if result is not None:
                     if not result:
                         logger.error("Could not start stream. Check logs.")

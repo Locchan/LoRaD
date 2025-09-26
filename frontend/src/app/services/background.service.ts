@@ -1,4 +1,5 @@
 import { Injectable, signal, computed } from '@angular/core';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
@@ -20,7 +21,10 @@ export class BackgroundService {
   // Computed signal that returns the current background image URL
   currentBackgroundImage = computed(() => {
     const imageName = this.backgroundImages[this.currentImageIndex()];
-    const imagePath = `/randomBackground/${imageName}`;
+    const baseUrl = environment.production 
+      ? 'https://radio.locchan.dev/ui' 
+      : '';
+    const imagePath = `https://radio.locchan.dev/ui/randomBackground/${imageName}`;
     console.log('Selected background image:', imagePath);
     return imagePath;
   });
