@@ -15,7 +15,7 @@
       </a>
       <a routerLink="/schedule" class="nav-link" [class.active]="router.url === '/schedule'">
         <i class="fas fa-calendar-alt"></i>
-        Реклама
+        Новости
       </a>
     </nav>
     
@@ -151,7 +151,16 @@
         <div class="panorama-content">
           <div class="panorama-placeholder">
             <p>НОВОСТИ</p>
-            <video src="news.mp4" alt="Panorama Content"></video>
+            <video 
+              #newsVideo
+              src="news.mp4" 
+              autoplay
+              muted 
+              loop 
+              playsinline
+              (loadeddata)="onVideoLoaded($event)"
+              (error)="onVideoError($event)">
+            </video>
           </div>
         </div>
       </div>

@@ -16,9 +16,9 @@ import { ScheduleTime, NewsSchedule } from '../../interfaces/api.interfaces';
         <div class="logo-section">
           <h1 class="app-title">
             <i class="fas fa-calendar-alt"></i>
-            Расписание рекламы
+            Расписание новостей
           </h1>
-          <p class="app-subtitle">Управление временем выпусков рекламы</p>
+          <p class="app-subtitle">Управление временем выпусков новостей</p>
         </div>
         
         <nav class="navigation">
@@ -28,7 +28,7 @@ import { ScheduleTime, NewsSchedule } from '../../interfaces/api.interfaces';
           </a>
           <a routerLink="/schedule" class="nav-link active">
             <i class="fas fa-calendar-alt"></i>
-            Реклама
+            Новости
           </a>
         </nav>
         
@@ -45,8 +45,8 @@ import { ScheduleTime, NewsSchedule } from '../../interfaces/api.interfaces';
         <!-- Schedule Management Section -->
         <div class="schedule-section">
           <div class="section-header">
-            <h2><i class="fas fa-clock"></i> Время выпусков рекламы</h2>
-            <p class="section-description">Настройте время, когда должна выходить реклама</p>
+            <h2><i class="fas fa-clock"></i> Время выпусков новостей</h2>
+            <p class="section-description">Настройте время, когда должны выходить новости</p>
           </div>
           
           <div class="schedule-controls">
