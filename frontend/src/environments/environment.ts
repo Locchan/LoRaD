@@ -1,7 +1,7 @@
 export const environment = {
   production: false,
-  apiUrl: 'https://radio.locchan.dev/lorad/api',
-  radioUrl: 'https://radio.locchan.dev/lorad/live',
+  apiUrl: 'http://radio.local/radio/api',
+  radioUrl: 'http://radio.local/radio',
   autoplay: false,
-  radioTitle: 'ЙОПТЫМОПТЫ',
+  radioTitle: 'Дедорадио',
 };
