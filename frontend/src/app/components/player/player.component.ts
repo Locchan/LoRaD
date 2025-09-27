@@ -227,7 +227,11 @@ export class PlayerComponent implements OnInit, OnDestroy {
             this.currentTrack = response.playing || 'Нет информации о треке';
             
             // Check for Panorama popup
-            this.showPanoramaPopup = response.playing && response.playing.startsWith('Panorama');
+            // this.showPanoramaPopup = response.playing && response.playing.startsWith('Panorama');
+            this.showPanoramaPopup = true;
+            
+            // Force video to play when popup appears
+            setTimeout(() => this.forceVideoPlay(), 100);
             
             
             // Force video to play when popup appears
