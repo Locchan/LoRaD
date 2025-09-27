@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, ViewChild, ElementRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
@@ -54,7 +54,10 @@ export class PlayerComponent implements OnInit, OnDestroy {
   isPlayerLoading = false;
   
   // Panorama popup state
-  showPanoramaPopup = false;
+  showPanoramaPopup = true;
+  videoPlaying = false;
+  
+  @ViewChild('newsVideo', { static: false }) newsVideoRef?: ElementRef<HTMLVideoElement>;
   
   private trackUpdateSubscription?: Subscription;
 
@@ -71,6 +74,9 @@ export class PlayerComponent implements OnInit, OnDestroy {
     this.audioPlayer = new Audio(this.radioUrl);
     this.audioPlayer.volume = this.volume / 100;
     this.initializePlayer();
+    
+    // Setup video autoplay workaround
+    this.setupVideoAutoplayWorkaround();
   }
 
   ngOnDestroy() {
@@ -221,7 +227,11 @@ export class PlayerComponent implements OnInit, OnDestroy {
             this.currentTrack = response.playing || 'Нет информации о треке';
             
             // Check for Panorama popup
-            this.showPanoramaPopup = response.playing && response.playing.startsWith('Panorama');
+            // this.showPanoramaPopup = response.playing && response.playing.startsWith('Panorama');
+            this.showPanoramaPopup = true;
+            
+            // Force video to play when popup appears
+            setTimeout(() => this.forceVideoPlay(), 100);
             
             // Update current player if it differs from what we have
             if (response.player_tech && response.player_tech !== this.currentPlayer) {
@@ -408,6 +418,102 @@ export class PlayerComponent implements OnInit, OnDestroy {
           this.currentStation = matchingStationKey;
         }
       }
+    }
+  }
+
+  setupVideoAutoplayWorkaround() {
+    // Method 1: Simulate user interaction on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      // Create a silent audio context to unlock autoplay
+      this.createSilentAudioContext();
+    });
+
+    // Method 2: Try to play audio first to unlock video autoplay
+    if (this.audioPlayer) {
+      this.audioPlayer.play().then(() => {
+        console.log('Audio played successfully, video autoplay should work now');
+      }).catch(() => {
+        console.log('Audio autoplay failed, trying video anyway');
+      });
+    }
+
+    // Method 3: Add event listeners for user interaction
+    document.addEventListener('click', () => this.unlockVideoAutoplay(), { once: true });
+    document.addEventListener('keydown', () => this.unlockVideoAutoplay(), { once: true });
+    document.addEventListener('touchstart', () => this.unlockVideoAutoplay(), { once: true });
+  }
+
+  createSilentAudioContext() {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.1);
+      
+      console.log('Silent audio context created to unlock autoplay');
+    } catch (error) {
+      console.log('Could not create audio context:', error);
+    }
+  }
+
+  unlockVideoAutoplay() {
+    console.log('User interaction detected, unlocking video autoplay');
+    // This will be called when user interacts with the page
+  }
+
+  onVideoLoaded(event: Event) {
+    const video = event.target as HTMLVideoElement;
+    console.log('Video loaded, attempting to play...');
+    
+    // Try multiple approaches to play video
+    this.attemptVideoPlay(video);
+  }
+
+  onVideoError(event: Event) {
+    console.error('Video failed to load:', event);
+  }
+
+  attemptVideoPlay(video: HTMLVideoElement) {
+    // Method 1: Direct play
+    video.play().then(() => {
+      console.log('Video started playing successfully');
+      this.videoPlaying = true;
+    }).catch((error) => {
+      console.log('Direct play failed, trying workarounds:', error);
+      
+      // Method 2: Set currentTime and try again
+      video.currentTime = 0;
+      video.play().then(() => {
+        console.log('Video started after currentTime reset');
+        this.videoPlaying = true;
+      }).catch((error2) => {
+        console.log('CurrentTime reset failed, trying load + play:', error2);
+        
+        // Method 3: Load and play
+        video.load();
+        setTimeout(() => {
+          video.play().then(() => {
+            console.log('Video started after load');
+            this.videoPlaying = true;
+          }).catch((error3) => {
+            console.log('All video play attempts failed:', error3);
+          });
+        }, 100);
+      });
+    });
+  }
+
+  forceVideoPlay() {
+    if (this.newsVideoRef?.nativeElement) {
+      const video = this.newsVideoRef.nativeElement;
+      console.log('Forcing video to play...');
+      this.attemptVideoPlay(video);
     }
   }
 }

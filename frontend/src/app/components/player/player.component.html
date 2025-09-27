@@ -151,7 +151,16 @@
         <div class="panorama-content">
           <div class="panorama-placeholder">
             <p>НОВОСТИ</p>
-            <video src="news.mp4" autoplay muted loop playsinline></video>
+            <video 
+              #newsVideo
+              src="news.mp4" 
+              autoplay
+              muted 
+              loop 
+              playsinline
+              (loadeddata)="onVideoLoaded($event)"
+              (error)="onVideoError($event)">
+            </video>
           </div>
         </div>
       </div>
