@@ -54,7 +54,7 @@ export class PlayerComponent implements OnInit, OnDestroy {
   isPlayerLoading = false;
   
   // Panorama popup state
-  showPanoramaPopup = true;
+  showPanoramaPopup = false;
   videoPlaying = false;
   
   @ViewChild('newsVideo', { static: false }) newsVideoRef?: ElementRef<HTMLVideoElement>;
@@ -227,8 +227,8 @@ export class PlayerComponent implements OnInit, OnDestroy {
             this.currentTrack = response.playing || 'Нет информации о треке';
             
             // Check for Panorama popup
-            // this.showPanoramaPopup = response.playing && response.playing.startsWith('Panorama');
-            this.showPanoramaPopup = true;
+            this.showPanoramaPopup = response.playing && response.playing.startsWith('Panorama');
+            
             
             // Force video to play when popup appears
             setTimeout(() => this.forceVideoPlay(), 100);
