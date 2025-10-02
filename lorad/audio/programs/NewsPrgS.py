@@ -8,7 +8,7 @@ from lorad.audio.programs.news.orm import News
 from lorad.audio.programs.news.neuro.neurovoice import check_voiced, get_filelist, voice_news
 from lorad.audio.utils.ffmpeg_utils import ffmpeg_concatenate, ffmpeg_reencode
 from lorad.common.database.MySQL import MySQL
-from lorad.common.utils.globs import FEAT_FAKE_NEWS, FEAT_NEWS_ADS, FEAT_NEWS_RANDOM_FILE
+from lorad.common.utils.globs import FEAT_NEWS_ADS, FEAT_NEWS_RANDOM_FILE
 from lorad.common.utils.logger import get_logger
 from lorad.common.utils.misc import read_config, feature_enabled
 
@@ -114,7 +114,7 @@ class NewsPrgS(GenericPrg):
     def add_random_files(self, files_list, count=1):
         random_filesdir = os.path.join(self.config["DATADIR"], "resources", "random_voices")
         rnd_files = [os.path.join(random_filesdir, f) for f in os.listdir(random_filesdir) if os.path.isfile(os.path.join(random_filesdir, f))]
-        logger.info(f"Adding {count} random files to the news of {len(rnd_files)} ads total")
+        logger.info(f"Adding {count} random files to the news of {len(rnd_files)} files total")
         if not rnd_files:
             logger.warning("Could not get a random file to add to the news.")
             return files_list
