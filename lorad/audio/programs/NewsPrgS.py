@@ -112,22 +112,22 @@ class NewsPrgS(GenericPrg):
         return news_file
 
     def add_random_files(self, files_list, count=1):
-        logger.info(f"Adding {count} random files to the news")
         random_filesdir = os.path.join(self.config["DATADIR"], "resources", "random_voices")
-        ad_files = [os.path.join(random_filesdir, f) for f in os.listdir(random_filesdir) if os.path.isfile(os.path.join(random_filesdir, f))]
-        if not ad_files:
+        rnd_files = [os.path.join(random_filesdir, f) for f in os.listdir(random_filesdir) if os.path.isfile(os.path.join(random_filesdir, f))]
+        logger.info(f"Adding {count} random files to the news of {len(rnd_files)} ads total")
+        if not rnd_files:
             logger.warning("Could not get a random file to add to the news.")
             return files_list
-        random_files_to_add = random.sample(ad_files, count)
+        random_files_to_add = random.sample(rnd_files, count)
         if not isinstance(random_files_to_add, list):
             random_files_to_add = [random_files_to_add]
         files_list.extend(random_files_to_add)
         return files_list
 
     def add_ads(self, files_list, count=1):
-        logger.info(f"Adding {count} ads to the news")
         adsdir = os.path.join(self.config["DATADIR"], "resources", "ads")
         ad_files = [os.path.join(adsdir, f) for f in os.listdir(adsdir) if os.path.isfile(os.path.join(adsdir, f))]
+        logger.info(f"Adding {count} ads to the news of {len(ad_files)} ads total")
         if not ad_files:
             logger.warning("Could not get an ad to add to the news.")
             return files_list
