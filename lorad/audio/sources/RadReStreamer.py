@@ -14,6 +14,34 @@ from lorad.audio.sources.utils.Transcoder import Transcoder
 logger = get_logger()
 config = read_config()
 
+
+def parse_stream_headers(headers):
+    headers = {key.lower(): value for key, value in headers.items()}
+    station_info = {}
+
+    ice_audio_info = headers.get("ice-audio-info")
+    if ice_audio_info:
+        try:
+            audio_info_dict = dict(item.split("=") for item in ice_audio_info.split(";"))
+            if "ice-bitrate" in audio_info_dict:
+                station_info["bitrate"] = audio_info_dict["ice-bitrate"]
+            elif "bitrate" in audio_info_dict:
+                station_info["bitrate"] = audio_info_dict["bitrate"]
+        except Exception:
+            pass
+    if "bitrate" not in station_info and "icy-br" in headers:
+        station_info["bitrate"] = headers["icy-br"]
+
+    content_type = headers.get("content-type")
+    if content_type:
+        if ";" not in content_type:
+            station_info["format"] = content_type.split("/")[-1]
+        else:
+            station_info["format"] = content_type.split(";", 1)[0].split("/")[-1].strip()
+
+    return station_info
+
+
 class RadReStreamer:
     def __init__(self, server: AudioStream):
         self.name_readable = get_loc("PLAYER_NAME_RADRESTREAMER")
@@ -98,12 +126,7 @@ class RadReStreamer:
                 for header, value in response.headers.items():
                     headers[header] = value
                 response.close()
-        self.station_info = {}
-        if 'ice-audio-info' in headers:
-            audio_info_dict = dict(item.split('=') for item in headers['ice-audio-info'].split(';'))
-            self.station_info["bitrate"] = audio_info_dict["ice-bitrate"]
-        if 'Content-Type' in headers:
-            self.station_info["format"] = headers['Content-Type'].split("/")[-1]
+        self.station_info = parse_stream_headers(headers)
         return True
     
     def __stream(self, station_url):
