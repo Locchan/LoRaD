@@ -33,6 +33,11 @@ cd frontend
 # Check if frontend image already exists
 if ! docker image inspect local/lorad-front-arm:${LORAD_VERSION} >/dev/null 2>&1; then
   docker build \
+    --build-arg LORAD_ENV=production \
+    --build-arg LORAD_DOMAIN="${LORAD_DOMAIN:-radio.local}" \
+    --build-arg LORAD_SCHEME="${LORAD_SCHEME:-http}" \
+    --build-arg LORAD_API_PATH="${LORAD_API_PATH:-/radio/api}" \
+    --build-arg LORAD_RADIO_PATH="${LORAD_RADIO_PATH:-/radio}" \
     -f Dockerfile \
     -t local/lorad-front-arm:${LORAD_VERSION} \
     .
