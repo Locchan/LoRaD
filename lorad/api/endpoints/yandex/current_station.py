@@ -10,7 +10,8 @@ RESULT_EXAMPLE = {"GET": "{'station': 'genre:pop'}"}
 @lrd_feat_req(globs.FEAT_FILESTREAMER_YANDEX)
 @lrd_api_endp
 def impl_GET(headers):
-    if globs.YANDEX_OBJ.radio is not None:
-        return {"station": globs.YANDEX_OBJ.radio.station_id}
-    else:
+    station = globs.FILESTREAMER.current_source()
+    if station is None:
         return {"rc": 406, "data": {"message": "Yandex is not initialized."}}
+    else:
+        return {"station": station}

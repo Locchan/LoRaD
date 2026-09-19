@@ -10,4 +10,4 @@ RESULT_EXAMPLE = {"GET": "{'station': 'love'}"}
 @lrd_feat_req(globs.FEAT_RESTREAMER)
 @lrd_api_endp
 def impl_GET(headers):
-    return {"station": globs.RESTREAMER.current_station}
+    return {"station": globs.RESTREAMER.current_source()}

@@ -1,0 +1,11 @@
+[Unit]
+Description=Gimn
+
+[Service]
+ExecStart=/usr/bin/gimn
+Type=simple
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

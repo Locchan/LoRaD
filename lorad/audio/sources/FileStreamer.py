@@ -7,10 +7,12 @@ from typing import Tuple
 
 from lorad.audio.file_sources.FileRide import FileRide
 from lorad.audio.server.AudioStream import AudioStream
+from lorad.audio.sources.GenericPlayer import GenericPlayer
 from lorad.audio.sources.utils.Transcoder import Transcoder
 from lorad.common.localization.localization import get_loc
 from lorad.common.utils.globs import END_OF_TRANSCODED_DATA
 from lorad.common.utils.logger import get_logger
+import lorad.common.utils.globs as globs
 from mutagen.mp3 import MP3
 from mutagen.easyid3 import EasyID3
 
@@ -19,7 +21,7 @@ from lorad.common.utils.misc import read_config
 logger = get_logger()
 
 # Supports only mp3 as it's hardcoded in the Transcoder class creation and was default since the first attempts at this project.
-class FileStreamer:
+class FileStreamer(GenericPlayer):
     def __init__(self, connectors: list[FileRide], server: AudioStream):
         logger.debug("Initializing carousel...")
         config = read_config()
@@ -30,7 +32,6 @@ class FileStreamer:
         self.connectors = connectors
         self.connector_index = 0
         self.current_ride = self.connectors[self.connector_index]
-        self.carousel_enabled = False
         self.chunk_size = config["CHUNK_SIZE_KB"]
         self.chunk_size_bytes = self.chunk_size * 102
         self.currently_playing = ""
@@ -39,13 +40,14 @@ class FileStreamer:
         self.target_bitrate = int(config["BITRATE_KBPS"])
         self.default_format = config["DEFAULT_AUDIO_FORMAT"]
         self.running = False
+        self._stop_current = False
         self.free = True
         self.initial_burst_chunks = 8
 
     def carousel(self):
         logger.debug("Entering carousel")
         while True:
-            if self.carousel_enabled:
+            if self.running:
                 try:
                     if not self.current_ride.initialized:
                         self.current_ride.initialize()
@@ -60,7 +62,7 @@ class FileStreamer:
                     self.current_ride.next_track()
                 except Exception as e:
                     logger.warn(f"Could not get the next track from {self.current_ride.__class__.__name__}: [{e.__class__.__name__}: {e}]")
-                    self.stop_carousel()
+                    self.stop()
                     self.fallback()
                 # Rotating connectors if possible
                 self.connector_index += 1
@@ -81,29 +83,50 @@ class FileStreamer:
         if self.fallback_index == len(fallback_tracks):
             self.fallback_index = 0
         self.serve_file(os.path.join(config["FALLBACK_TRACK_DIR"], fallback_tracks[self.fallback_index]))
-        if self.carousel_enabled:
+        if self.running:
             self.fallback_index += 1
-            self.start_carousel()
+            self.start()
 
     def start(self):
-        self.start_carousel()
-
-    def stop(self):
-        self.stop_carousel()
-
-    def start_carousel(self):
-        if self.carousel_enabled:
+        if self.running:
             logger.warn("Tried to start carousel when it is already started")
         else:
             logger.info("Starting carousel")
-            self.carousel_enabled = True
+            self._stop_current = False
+            self.running = True
 
-    def stop_carousel(self):
-        if not self.carousel_enabled:
+    def stop(self):
+        if not self.running:
             logger.warn("Tried to stop carousel when it is already stopped")
         logger.info("Stopping carousel")
         self.running = False
-        self.carousel_enabled = False
+        self._stop_current = True
+
+    def list_sources(self, cached=False):
+        radio = getattr(self.current_ride, "radio", None)
+        if radio is None:
+            return None
+        if cached and globs.YANDEX_STATION_CACHE is not None:
+            return globs.YANDEX_STATION_CACHE
+        stations = {}
+        for astation in radio.get_stations():
+            stations[astation["station"]["name"]] = f"{astation['station']['id']['type']}:{astation['station']['id']['tag']}"
+        globs.YANDEX_STATION_CACHE = stations
+        return stations
+
+    def current_source(self):
+        radio = getattr(self.current_ride, "radio", None)
+        if radio is None:
+            return None
+        return radio.station_id
+
+    def switch_source(self, source_id):
+        radio = getattr(self.current_ride, "radio", None)
+        if radio is None:
+            raise RuntimeError("Yandex is not initialized.")
+        self.stop()
+        radio.start_radio(source_id)
+        self.start()
 
     # If we don't have track name from whoever wants us to play it, try getting it from metadata.
     # If even this fails, just cut the file extension use the rest as the track title
@@ -140,7 +163,7 @@ class FileStreamer:
             else:
                 break
 
-        self.running = True
+        self._stop_current = False
         self.free = False
         try:
             if self.currently_playing == "":
@@ -157,7 +180,7 @@ class FileStreamer:
                 self.transcoder.start()
                 data_accepted = True
                 while True:
-                    if self.running:
+                    if not self._stop_current:
                         # AudioStream will refuse data if no one is listening.
                         if data_accepted:
                             source_chunk = mp3file.read(self.chunk_size_bytes)

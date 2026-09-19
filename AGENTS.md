@@ -1,6 +1,6 @@
 # LoRaD (backend)
 
-LoRaD is a self-hosted internet radio: it muxes downloaded tracks and/or live radio into one HTTP MP3 stream, and optionally interrupts that stream with scheduled AI-voiced news. This file is the agent context for the **Python backend only**. Do not use it as guidance for `frontend/` (that tree has its own Angular rules).
+LoRaD is a self-hosted internet radio: it muxes downloaded tracks and/or live radio into one HTTP MP3 stream, and optionally interrupts that stream with scheduled AI-voiced news. This file is the agent context for the **Python backend only**. Do not use it as guidance for `frontend/` (static HTML/CSS/JS).
 
 ## Stack
 
@@ -35,7 +35,7 @@ upgrade_install.sh            # same, force-reinstall wheel
 Dockerfile_full / _upgrade    # ports 5475 (stream) and 5476 (API)
 ```
 
-Ignore `frontend/`, `test.py` (ad-hoc leftover), and generated/runtime dirs (`data/`, `temp/`, `dist/`).
+Ignore `frontend/` and generated/runtime dirs (`data/`, `temp/`, `dist/`).
 
 ## Boot
 
@@ -111,7 +111,7 @@ Yandex requires both `FILESTREAMER` and `FILESTREAMER:YANDEX`. FileStreamer with
 
 ## Process-wide state
 
-`lorad/common/utils/globs.py` is the shared mutable process state: current streamer, players, Yandex object, locale, `SWITCH_LOCK`, station cache, capability strings. Players are objects with `name_tech`, `name_readable`, `start()` / `stop()`, `currently_playing`, `running`.
+`lorad/common/utils/globs.py` is the shared mutable process state: current streamer, players, Yandex object, locale, `SWITCH_LOCK`, station cache, capability strings. Players subclass `GenericPlayer` (`lorad/audio/sources/GenericPlayer.py`): `name_tech`, `name_readable`, `currently_playing`, `start()` / `stop()`, `list_sources()`, `current_source()`, `switch_source(id)`. `switch_players(name, start=True)` is only stop-old / flush-buffer / start-new. Station changes go through the current player's `switch_source`.
 
 Known `name_tech` values: `player_streaming` (`FileStreamer`), `player_radio` (`RadReStreamer`). First registered player becomes the default.
 
@@ -143,7 +143,7 @@ Over `MAX_CLIENTS`, any IP with more than two connections is added to `kick_list
 - `get_current_track()` → `(display_name, filepath)` or invalid (carousel falls back)
 - `next_track()` — advance, download, set current
 
-`YaMu` is the only provider. It wraps `yandex_music.Client` + `Radio` (Rotor). Tracks download into `TEMPDIR` as `yandex_<md5>.mp3`. Default station is `user:onyourwave`. Station switches go through `YANDEX_OBJ.radio.start_radio(station_id)` after stopping the carousel.
+`YaMu` is the only provider. It wraps `yandex_music.Client` + `Radio` (Rotor). Tracks download into `TEMPDIR` as `yandex_<md5>.mp3`. Default station is `user:onyourwave`. Station switches are `FileStreamer.switch_source(station_id)` (stop, `radio.start_radio`, start).
 
 To add a provider: subclass `FileRide`, construct it in `lorad_main.py` when its feature is on, append to `carousel_providers`.
 

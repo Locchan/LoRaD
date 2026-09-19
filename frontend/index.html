@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>LoradFrontend</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    (function () {
+      var path = location.pathname;
+      var base = (path === "/ui" || path.indexOf("/ui/") === 0) ? "/ui/" : "/";
+      document.write('<base href="' + base + '">');
+    })();
+  </script>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="view-login" class="view login-container" hidden>
+    <header class="login-header">
+      <div class="logo-section">
+        <h1 class="app-title">
+          <i class="fas fa-radio"></i>
+          <span data-bind="radio-title"></span>
+        </h1>
+        <p class="app-subtitle">Your Personal Radio Station</p>
+      </div>
+    </header>
+
+    <div class="login-content">
+      <div class="login-card">
+        <div class="login-header-section">
+          <h2 class="login-title">
+            <i class="fas fa-sign-in-alt"></i>
+            Вход в систему
+          </h2>
+          <p class="login-subtitle">Введите ваши учетные данные для доступа к радио</p>
+        </div>
+
+        <form id="login-form" class="login-form" novalidate>
+          <div class="form-group">
+            <label for="username" class="form-label">
+              <i class="fas fa-user"></i>
+              Имя пользователя
+            </label>
+            <div class="input-wrapper">
+              <input
+                type="text"
+                id="username"
+                name="username"
+                required
+                minlength="3"
+                class="form-input"
+                placeholder="Введите имя пользователя"
+                autocomplete="username">
+              <i class="fas fa-user input-icon"></i>
+            </div>
+            <div id="username-error" class="input-error" hidden>
+              <i class="fas fa-exclamation-circle"></i>
+              Минимум 3 символа
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="password" class="form-label">
+              <i class="fas fa-lock"></i>
+              Пароль
+            </label>
+            <div class="input-wrapper">
+              <input
+                type="password"
+                id="password"
+                name="password"
+                required
+                minlength="8"
+                class="form-input"
+                placeholder="Введите пароль"
+                autocomplete="current-password">
+              <i class="fas fa-lock input-icon"></i>
+            </div>
+            <div id="password-error" class="input-error" hidden>
+              <i class="fas fa-exclamation-circle"></i>
+              Минимум 8 символов
+            </div>
+          </div>
+
+          <button type="submit" id="login-button" class="login-button" disabled>
+            <i id="login-button-icon" class="fas fa-sign-in-alt"></i>
+            <span id="login-button-text">Войти</span>
+          </button>
+
+          <div id="login-error" class="error-message" hidden>
+            <i class="fas fa-exclamation-triangle"></i>
+            <span id="login-error-text"></span>
+          </div>
+        </form>
+
+        <div class="login-footer">
+          <div class="security-info">
+            <i class="fas fa-shield-alt"></i>
+            <span>Безопасное соединение</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="view-player" class="view player-container" hidden>
+    <header class="player-header">
+      <div class="logo-section">
+        <h1 class="app-title">
+          <i class="fas fa-radio"></i>
+          <span data-bind="radio-title"></span>
+        </h1>
+        <p class="app-subtitle">Your Personal Radio Station</p>
+      </div>
+
+      <nav class="navigation">
+        <a href="#/" class="nav-link active">
+          <i class="fas fa-play-circle"></i>
+          Плеер
+        </a>
+        <a href="#/schedule" class="nav-link">
+          <i class="fas fa-calendar-alt"></i>
+          Новости
+        </a>
+      </nav>
+
+      <div class="user-info">
+        <span class="username" data-bind="username"></span>
+        <button type="button" class="logout-button" data-action="logout">
+          <i class="fas fa-sign-out-alt"></i>
+          Выйти
+        </button>
+      </div>
+    </header>
+
+    <div class="main-content">
+      <div class="player-section">
+        <div class="section-header">
+          <h2><i class="fas fa-play-circle"></i> Выбор плеера</h2>
+        </div>
+        <div class="player-selector">
+          <label for="player" class="player-label">Плеер:</label>
+          <div class="select-wrapper">
+            <select id="player" class="player-select">
+              <option value="">Выберите плеер</option>
+            </select>
+            <i class="fas fa-chevron-down select-arrow"></i>
+          </div>
+          <div id="player-loading" class="loading-indicator" hidden>
+            <i class="fas fa-spinner fa-spin"></i> Переключение плеера...
+          </div>
+        </div>
+      </div>
+
+      <div class="station-section">
+        <div class="section-header">
+          <h2><i class="fas fa-broadcast-tower"></i> Выбор станции</h2>
+        </div>
+        <div class="station-selector">
+          <label for="station" class="station-label">Станция:</label>
+          <div class="select-wrapper">
+            <select id="station" class="station-select">
+              <option value="">Выберите станцию</option>
+            </select>
+            <i class="fas fa-chevron-down select-arrow"></i>
+          </div>
+        </div>
+      </div>
+
+      <div id="player-init-loading" class="loading-section">
+        <div class="loading-card">
+          <i class="fas fa-spinner fa-spin"></i>
+          <p>Загрузка плеера и станций...</p>
+          <div class="loading-steps">
+            <p>Инициализация плеера...</p>
+            <p>Загрузка доступных станций...</p>
+            <p>Получение текущей станции...</p>
+            <p>Автоматический запуск музыки...</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="audio-player-section" class="audio-player-section" hidden>
+        <div class="player-card">
+          <div class="track-info">
+            <div class="track-artwork">
+              <i class="fas fa-music"></i>
+            </div>
+            <div class="track-details">
+              <div id="track-title" class="track-title">Нет информации о треке</div>
+            </div>
+          </div>
+
+          <div class="player-controls">
+            <button type="button" id="play-pause-btn" class="control-btn play-pause-btn" disabled>
+              <i id="play-pause-icon" class="fas fa-play"></i>
+            </button>
+            <button type="button" id="refresh-btn" class="control-btn refresh-btn" title="Обновить поток">
+              <i class="fas fa-sync-alt"></i>
+            </button>
+          </div>
+
+          <div class="player-footer">
+            <div class="volume-control">
+              <i class="fas fa-volume-up"></i>
+              <input
+                type="range"
+                id="volume-slider"
+                min="0"
+                max="100"
+                value="100"
+                class="volume-slider"
+                title="Громкость">
+              <span id="volume-value" class="volume-value">100%</span>
+            </div>
+            <div class="status-indicator">
+              <span id="status-dot" class="status-dot"></span>
+              <span id="status-text" class="status-text">Остановлено</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="panorama-popup" class="panorama-popup-overlay" hidden>
+        <div class="panorama-popup">
+          <div class="panorama-content">
+            <div class="panorama-placeholder">
+              <p>НОВОСТИ</p>
+              <video id="news-video" src="news.mp4" muted loop playsinline></video>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="track-fallback" class="track-display" hidden>
+        <div class="track-info-simple">
+          <div class="simple-track-card">
+            <i class="fas fa-radio"></i>
+            <div class="simple-track-text">
+              <span id="fallback-station" class="station-name-simple">Станция:</span>
+              <span id="fallback-status" class="track-status">Остановлено</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="view-schedule" class="view schedule-container" hidden>
+    <header class="schedule-header">
+      <div class="logo-section">
+        <h1 class="app-title">
+          <i class="fas fa-calendar-alt"></i>
+          Расписание новостей
+        </h1>
+        <p class="app-subtitle">Управление временем выпусков новостей</p>
+      </div>
+
+      <nav class="navigation">
+        <a href="#/" class="nav-link">
+          <i class="fas fa-play-circle"></i>
+          Плеер
+        </a>
+        <a href="#/schedule" class="nav-link active">
+          <i class="fas fa-calendar-alt"></i>
+          Новости
+        </a>
+      </nav>
+
+      <div class="user-info">
+        <span class="username" data-bind="username"></span>
+        <button type="button" class="logout-button" data-action="logout">
+          <i class="fas fa-sign-out-alt"></i>
+          Выйти
+        </button>
+      </div>
+    </header>
+
+    <div class="main-content">
+      <div class="schedule-section">
+        <div class="section-header">
+          <h2><i class="fas fa-clock"></i> Время выпусков новостей</h2>
+          <p class="section-description">Настройте время, когда должны выходить новости</p>
+        </div>
+
+        <div class="schedule-controls">
+          <div class="add-time-control">
+            <div class="time-input-group">
+              <label for="newTime" class="time-label">Добавить время:</label>
+              <input type="time" id="newTime" class="time-input">
+              <button type="button" id="add-time-btn" class="add-btn" disabled>
+                <i class="fas fa-plus"></i>
+                Добавить
+              </button>
+            </div>
+          </div>
+
+          <div id="times-list" class="times-list" hidden>
+            <div class="times-header">
+              <h3>Настроенные времена</h3>
+              <button type="button" id="save-schedule-btn" class="save-btn" disabled>
+                <i class="fas fa-save"></i>
+                Сохранить изменения
+              </button>
+            </div>
+            <div id="times-grid" class="times-grid"></div>
+          </div>
+
+          <div id="schedule-empty" class="empty-state" hidden>
+            <div class="empty-icon">
+              <i class="fas fa-calendar-times"></i>
+            </div>
+            <h3>Нет настроенных времен</h3>
+            <p>Добавьте время для выпусков новостей, используя форму выше</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="schedule-loading" class="loading-section" hidden>
+        <div class="loading-card">
+          <i class="fas fa-spinner fa-spin"></i>
+          <p id="schedule-loading-message">Загрузка расписания...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="success-message" class="success-message" hidden>
+    <div class="success-card">
+      <i class="fas fa-check-circle"></i>
+      <p id="success-message-text"></p>
+      <button type="button" id="success-close-btn" class="close-btn">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  </div>
+
+  <div class="global-logo-footer">
+    <div class="logo-container">
+      <img src="logo.png" alt="ФУТИК-НУТИК" class="logo-image">
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

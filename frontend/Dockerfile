@@ -1,17 +1,13 @@
-FROM docker.io/library/node:22-alpine AS builder
+FROM docker.io/library/nginx:stable-alpine
 
-WORKDIR /app
-RUN npm install -g @angular/cli
-COPY package*.json ./
-RUN npm install
-COPY . .
+RUN rm -rf /usr/share/nginx/html/* && mkdir -p /usr/share/nginx/html/ui
 
-RUN ng build --configuration=development --optimization=false --base-href /ui/
-
-FROM docker.io/library/nginx:stable-alpine AS runner
-RUN rm -rf /usr/share/nginx/html/* && mkdir /usr/share/nginx/html/ui/
-COPY --from=builder /app/dist/lorad-frontend/browser/* /usr/share/nginx/html/ui/
+COPY css /usr/share/nginx/html/ui/css
+COPY js /usr/share/nginx/html/ui/js
+COPY randomBackground /usr/share/nginx/html/ui/randomBackground
+COPY index.html favicon.ico logo.png news.mp4 /usr/share/nginx/html/ui/
 COPY nginx.conf /etc/nginx/conf.d/lorad.conf
+
 EXPOSE 5477
 
 CMD ["nginx", "-g", "daemon off;"]

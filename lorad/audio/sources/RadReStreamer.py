@@ -8,6 +8,7 @@ from lorad.common.utils.misc import read_stations
 from lorad.audio.server import AudioStream
 from lorad.audio.sources.FileStreamer import sleep
 from lorad.audio.server.AudioStream import AudioStream
+from lorad.audio.sources.GenericPlayer import GenericPlayer
 from lorad.audio.sources.utils import FFMPEGFeedError
 from lorad.audio.sources.utils.Transcoder import Transcoder
 
@@ -42,7 +43,7 @@ def parse_stream_headers(headers):
     return station_info
 
 
-class RadReStreamer:
+class RadReStreamer(GenericPlayer):
     def __init__(self, server: AudioStream):
         self.name_readable = get_loc("PLAYER_NAME_RADRESTREAMER")
         self.name_tech = "player_radio"
@@ -80,8 +81,7 @@ class RadReStreamer:
     
     def start(self):
         self.running = True
-    
-    # Stop everything, wait for the transmission to finish
+
     def stop(self):
         if self.transcoder is not None:
             self.transcoder.stop()
@@ -90,6 +90,18 @@ class RadReStreamer:
             if not self.transmitting:
                 return
             sleep(0.2)
+
+    def list_sources(self, cached=False):
+        stations = self.get_stations()
+        return {stations[anitem]["name"]: anitem for anitem in stations}
+
+    def current_source(self):
+        return self.current_station
+
+    def switch_source(self, source_id):
+        self.stop()
+        self.current_station = source_id
+        self.start()
     
     def __prepare_and_start(self, station):
         stations = self.get_stations()
