@@ -41,4 +41,5 @@ Example:\
 Example:\
 "NewsSmall": {"start_times": [],"jingle_path": "","preparation_needed_mins": ""}
 - **OPENAI_API_KEY**: nuff said
+- **OPENAI_MODEL**: OpenAI chat model for news summarizer / fake-news / ranking. Default: `gpt-4o-mini`
 - **GOOGLE_CLOUD_API_USERDATA**: Whole google API auth json

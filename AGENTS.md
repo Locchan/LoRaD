@@ -79,6 +79,7 @@ Stations for the restreamer are a second JSON (`STATIONS_FILE_PATH`, default `./
 | `RESTREAMER.STATION` | default station id |
 | `YAMU_TOKEN` | Yandex Music |
 | `OPENAI_API_KEY` | news summarizer / fake-news |
+| `OPENAI_MODEL` | OpenAI chat model (default `gpt-4o-mini`) |
 | `GOOGLE_CLOUD_API_USERDATA` | full GCP service-account JSON for TTS |
 | `NEWS_PARSER_PERIOD_MIN` / `NEWS_NEURIFIER_PERIOD_MIN` | news loops |
 | `ENABLED_PROGRAMS` | `{ "NewsSmall": { start_times, jingle_path, preparation_needed_mins } }` |
@@ -160,7 +161,7 @@ Enabled only with `NEURONEWS`. `AVAILABLE_PROGRAMS` in `program_mgr.py` is the c
 News pipeline:
 
 1. `parse_news` — sources → `News.add_news` (unique on source+title+date)
-2. `neurify_news` — OpenAI (`gpt-4o-mini`, radio-announcer prompt) fills `body_prepared`. Summarizer uses `https://openai-proxy.locchan.dev`
+2. `neurify_news` — OpenAI (`OPENAI_MODEL`, default `gpt-4o-mini`, radio-announcer prompt) fills `body_prepared`. Summarizer uses `https://openai-proxy.locchan.dev`
 3. `voice_news` — Google Cloud TTS `ru-RU-Standard-B` → MP3
 
 `MdzSrc` is the only source. `GenericSource.parse_news()` → `list[News]`. To add a source: subclass, implement `parse_news`, append an instance in `parse_news()`'s `sources` list. To add a program: subclass `GenericPrg`, set class `name`, append the class to `AVAILABLE_PROGRAMS`, add an `ENABLED_PROGRAMS` block.
