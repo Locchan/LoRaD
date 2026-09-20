@@ -13,7 +13,7 @@ from lorad.audio.programs.program_mgr import prg_sched_loop
 from lorad.common.localization.localization import init_localization
 from lorad.common.utils.logger import get_logger, setdebug
 from lorad.common.utils.misc import feature_enabled, read_config, signal_stop, splash
-from lorad.common.utils.shm import prepare_shm, start_shm_janitor
+from lorad.common.utils.shm import prepare_shm, seed_pinned_assets, start_shm_janitor
 from lorad.audio.sources.RadReStreamer import RadReStreamer
 
 logger = get_logger()
@@ -28,6 +28,7 @@ config = read_config()
 runtime_media_dir = prepare_shm()
 config["TEMPDIR"] = runtime_media_dir
 config["RUNTIME_MEDIA_DIR"] = runtime_media_dir
+seed_pinned_assets(config)
 start_shm_janitor()
 
 init_localization()

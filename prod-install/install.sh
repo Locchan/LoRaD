@@ -54,7 +54,7 @@ if [ "$INSTALL_PACKAGES" -eq 1 ]; then
     alsa-utils \
     nginx \
     python3 \
-    python3-gpiozero \
+    python3-libgpiod \
     docker.io \
     docker-compose-plugin
 fi
