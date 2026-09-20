@@ -4,7 +4,8 @@ services:
     container_name: lorad
     privileged: true
     restart: unless-stopped
-    shm_size: 512m
+    # The host tmpfs instead of a private one, so shm is the machine's (~50% of RAM)
+    # and what LoRaD pins is visible from the host. shm_size would not apply here.
     # The stream generator renices itself and runs its pacing threads realtime.
     cap_add: ["SYS_NICE"]
     cpu_shares: 4096
@@ -17,6 +18,9 @@ services:
       - type: bind
         source: /opt/radio/lorad/data
         target: /data/
+      - type: bind
+        source: /dev/shm
+        target: /dev/shm
   lorad-front:
     image: local/lorad-front-arm:${LORAD_VERSION}
     container_name: lorad-front
