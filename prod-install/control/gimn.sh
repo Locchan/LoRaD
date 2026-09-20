@@ -16,9 +16,18 @@ if [ ! -f "$DEST" ] || [ "$(stat -c%s "$DEST" 2>/dev/null || echo 0)" != "$src_s
     cp -f "$SRC" "$DEST" || exit 1
 fi
 
+# Docker starting up saturates the Pi, so ask for realtime like the stream player does.
+# systemd's policy does not reach the child, hence chrt here. A buffer covers the rest.
+RT_PLAYER="chrt -f 20 ionice -c1"
+PLAYER_BUFFER_KB=1024
+if ! command -v chrt >/dev/null || ! chrt -f 20 true 2>/dev/null; then
+    echo "gimn: no realtime scheduling available, running normally" >&2
+    RT_PLAYER=""
+fi
+
 while true; do
     # mpg123 has no inter-play gap of its own, so the pause lives here.
-    if mpg123 -q "$DEST"; then
+    if $RT_PLAYER mpg123 -q -b "$PLAYER_BUFFER_KB" "$DEST"; then
         sleep 3
     else
         echo "gimn: mpg123 exited $?, backing off" >&2

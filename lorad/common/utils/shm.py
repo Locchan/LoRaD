@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import threading
@@ -71,6 +72,39 @@ def shm_usage() -> float:
 PINNED_RES = os.path.join(SHM_PINNED, "res")
 PINNED_DATA = os.path.join(SHM_PINNED, "data")
 PINNED_FALLBACK = os.path.join(SHM_PINNED, "fallback")
+PINNED_YANDEX_STATIONS = os.path.join(SHM_PINNED, "yandex_available_stations.json")
+
+
+def write_pinned_json(path: str, payload) -> None:
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, mode=0o700, exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False)
+    os.replace(tmp, path)
+
+
+def read_pinned_json(path: str):
+    try:
+        with open(path, encoding="utf-8") as handle:
+            return json.load(handle)
+    except FileNotFoundError:
+        return None
+    except (OSError, json.JSONDecodeError) as e:
+        logger.warning(f"Could not read pinned json {path}: {e}")
+        return None
+
+
+def write_yandex_stations(stations: dict) -> None:
+    write_pinned_json(PINNED_YANDEX_STATIONS, stations)
+
+
+def read_yandex_stations() -> dict | None:
+    payload = read_pinned_json(PINNED_YANDEX_STATIONS)
+    if isinstance(payload, dict):
+        return payload
+    return None
 
 
 def pinned_path(root: str, *parts: str) -> str:
@@ -170,7 +204,7 @@ def _pin_file(src: str, dest: str) -> bool:
     if parent:
         os.makedirs(parent, mode=0o700, exist_ok=True)
     shutil.copy2(src, dest)
-    logger.info(f"Pinned media in shm: {src} -> {dest}")
+    logger.debug(f"Pinned media in shm: {src} -> {dest}")
     return True
 
 
@@ -183,9 +217,13 @@ def _pin_tree(src: str, dest: str) -> str | None:
         return None
     os.makedirs(SHM_PINNED, mode=0o700, exist_ok=True)
     if os.path.isfile(src):
-        _pin_file(src, dest)
+        if _pin_file(src, dest):
+            logger.info(f"Pinned 1 file into shm: {src} -> {dest}")
+        else:
+            logger.info(f"Pinned media already in shm: {src} -> {dest}")
         return dest
     copied = 0
+    seen = 0
     for root, dirs, files in os.walk(src):
         dirs[:] = [name for name in dirs if name not in PINNED_IGNORE]
         rel = os.path.relpath(root, src)
@@ -194,10 +232,15 @@ def _pin_tree(src: str, dest: str) -> str | None:
                 continue
             src_file = os.path.join(root, name)
             dest_file = os.path.join(dest, name) if rel == "." else os.path.join(dest, rel, name)
+            seen += 1
             if _pin_file(src_file, dest_file):
                 copied += 1
-    if copied == 0:
-        logger.info(f"Pinned media already in shm: {src} -> {dest}")
+    already = seen - copied
+    if copied:
+        extra = f", {already} already present" if already else ""
+        logger.info(f"Pinned {copied} files into shm{extra}: {src} -> {dest}")
+    else:
+        logger.info(f"Pinned media already in shm ({seen} files): {src} -> {dest}")
     return dest
 
 

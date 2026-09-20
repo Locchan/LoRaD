@@ -1,6 +1,6 @@
 import os
 import time
-from threading import RLock
+from threading import RLock, Thread
 from yandex_music import Client as YaMuClient, Track
 import yandex_music
 import hashlib
@@ -9,7 +9,7 @@ import lorad.common.utils.globs as globs
 from lorad.audio.file_sources.FileRide import FileRide
 from lorad.audio.file_sources.yandex.Radio import Radio
 from lorad.common.utils.logger import get_logger
-from lorad.common.utils.shm import unlink_shm
+from lorad.common.utils.shm import read_yandex_stations, unlink_shm, write_yandex_stations
 
 logger = get_logger()
 
@@ -29,6 +29,40 @@ class YaMu(FileRide):
         self.next_track_name: str = None
         self._likes_lock = RLock()
         self._liked_track_ids: set[str] | None = None
+
+    def cache_stations_async(self) -> None:
+        """Warm the station cache off the boot path; the pinned copy serves until it lands."""
+        pinned = read_yandex_stations()
+        if pinned:
+            globs.YANDEX_STATION_CACHE = pinned
+            logger.info(f"Serving {len(pinned)} Yandex stations from shm while refreshing")
+        Thread(name="YaStations", target=self.cache_stations, daemon=True).start()
+
+    def cache_stations(self) -> dict | None:
+        """Fetch Yandex rotor stations once and pin the map in shm for the API."""
+        try:
+            stations = self._station_map(self.client.rotor_stations_list())
+            write_yandex_stations(stations)
+            globs.YANDEX_STATION_CACHE = stations
+            logger.info(f"Pinned {len(stations)} Yandex stations in shm")
+            return stations
+        except Exception as e:
+            logger.exception(e)
+            existing = read_yandex_stations()
+            if existing:
+                globs.YANDEX_STATION_CACHE = existing
+                logger.warning(f"Using previously pinned Yandex stations ({len(existing)})")
+                return existing
+            return None
+
+    @staticmethod
+    def _station_map(raw) -> dict:
+        stations = {}
+        for astation in raw:
+            stations[astation["station"]["name"]] = (
+                f"{astation['station']['id']['type']}:{astation['station']['id']['tag']}"
+            )
+        return stations
 
     def initialize(self) -> Track:
         logger.info("Initializing Yandex Music...")
@@ -52,6 +86,23 @@ class YaMu(FileRide):
         track = self.__advance()
         self.__set_current_track(track)
         return track
+
+    def switch_station(self, station_id):
+        if self.radio is None:
+            raise RuntimeError("Yandex is not initialized.")
+        # Whatever was prefetched belongs to the old station.
+        self.drop_prefetched()
+        track = self.radio.start_radio(station_id)
+        self.radio_started = True
+        self.__set_current_track(track)
+        return track
+
+    def drop_prefetched(self):
+        if self.next_track_path:
+            unlink_shm(self.next_track_path)
+        self.next_track_obj = None
+        self.next_track_path = None
+        self.next_track_name = None
 
     def supports_next_track(self) -> bool:
         return True
