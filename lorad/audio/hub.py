@@ -46,6 +46,7 @@ class AudioHub:
         self._source_lock = threading.RLock()
         self._owner = None
         self._decoder = None
+        self._decoder_owner = None
 
         self._cond = threading.Condition()
         self.latest = b""
@@ -92,7 +93,15 @@ class AudioHub:
 
     # --- source handling -------------------------------------------------
 
-    def begin_source(self, owner, input_format="mp3", drain_previous=True, bitrate_kbps=None):
+    def begin_source(
+        self,
+        owner,
+        input_format="mp3",
+        drain_previous=True,
+        bitrate_kbps=None,
+        sample_rate=None,
+        channels=None,
+    ):
         """Start a new elementary stream (next track, next station, next program file).
 
         Draining waits until everything already decoded has been played, so a track is
@@ -101,13 +110,53 @@ class AudioHub:
         with self._source_lock:
             if self._owner is not owner:
                 return False
+            signature = Decoder.signature_for(input_format, sample_rate, channels)
+            if drain_previous and signature is not None and self._decoder_owner is owner:
+                with self._state_lock:
+                    decoder = self._decoder
+                if decoder is not None and decoder.alive() and decoder.signature == signature:
+                    # Same owner, codec and PCM layout: keep feeding the running ffmpeg.
+                    # Restarting it would cost a process and a drain wait per track.
+                    decoder.relabel(input_format, bitrate_kbps)
+                    logger.debug(f"AudioHub: continuing on the current decoder ({decoder.label})")
+                    return True
+            reason = self._decoder_restart_reason(owner, drain_previous, signature)
             self._close_decoder(drain=drain_previous)
             if self._owner is not owner:
                 return False
             with self._state_lock:
-                self._decoder = Decoder(input_format, self._push_pcm, bitrate_kbps=bitrate_kbps)
+                self._decoder = Decoder(
+                    input_format,
+                    self._push_pcm,
+                    bitrate_kbps=bitrate_kbps,
+                    sample_rate=sample_rate,
+                    channels=channels,
+                    reason=reason,
+                )
+                self._decoder_owner = owner
             logger.debug(f"AudioHub: new source ({input_format})")
             return True
+
+    def _decoder_restart_reason(self, owner, drain_previous, signature) -> str:
+        with self._state_lock:
+            decoder = self._decoder
+            decoder_owner = self._decoder_owner
+        if decoder is None:
+            return "first decoder"
+        if not decoder.alive():
+            return "previous decoder exited"
+        if not drain_previous:
+            return "skip, flush pending input"
+        if decoder_owner is not owner:
+            return f"owner {_owner_name(decoder_owner)} -> {_owner_name(owner)}"
+        if signature is None:
+            return "unknown sample rate, cannot reuse"
+        if decoder.signature != signature:
+            return (
+                f"{Decoder.format_signature(decoder.signature)} -> "
+                f"{Decoder.format_signature(signature)}"
+            )
+        return "new source"
 
     def feed(self, owner, data: bytes) -> bool:
         with self._state_lock:
@@ -130,6 +179,7 @@ class AudioHub:
         with self._state_lock:
             decoder = self._decoder
             self._decoder = None
+            self._decoder_owner = None
         if decoder is None:
             return
         if drain:

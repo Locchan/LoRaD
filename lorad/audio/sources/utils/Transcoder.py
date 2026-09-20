@@ -50,9 +50,28 @@ def decoder_label(fmt, bitrate_kbps=None) -> str:
 class Decoder:
     """One source (file/track/station) decoded to raw PCM. Short-lived: one per elementary stream."""
 
-    def __init__(self, fmt, on_pcm, bitrate_kbps=None):
+    @staticmethod
+    def signature_for(fmt, sample_rate=None, channels=None):
+        """What has to match for one decoder to keep going across sources.
+
+        Unknown sample rate means "do not reuse": live streams and probed input can
+        change layout without warning, and ffmpeg is configured once per process.
+        """
+        if not sample_rate:
+            return None
+        return (demuxer_for(fmt) or str(fmt or "").strip().lower(), int(sample_rate), int(channels or 0))
+
+    @staticmethod
+    def format_signature(signature) -> str:
+        if not signature:
+            return "unknown layout"
+        fmt, rate, channels = signature
+        return f"{fmt} {rate}Hz {channels}ch"
+
+    def __init__(self, fmt, on_pcm, bitrate_kbps=None, sample_rate=None, channels=None, reason=None):
         self.fmt = fmt
         self.on_pcm = on_pcm
+        self.signature = self.signature_for(fmt, sample_rate, channels)
         self._stop = False
         command = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
         demuxer = demuxer_for(fmt)
@@ -78,12 +97,16 @@ class Decoder:
             bufsize=0,
         )
         self.label = decoder_label(fmt, bitrate_kbps)
-        logger.info(f"Starting ffmpeg [{self.process.pid}]: {self.label}")
+        why = f" ({reason})" if reason else ""
+        logger.info(f"Starting ffmpeg [{self.process.pid}]: {self.label}{why}")
         self.reader = Thread(name="Decoder", target=self._read_loop, daemon=True)
         self.reader.start()
 
     def alive(self):
         return self.process is not None and self.process.poll() is None
+
+    def relabel(self, fmt, bitrate_kbps=None):
+        self.label = decoder_label(fmt, bitrate_kbps)
 
     def write(self, data: bytes) -> bool:
         if not data or self.process is None:

@@ -76,7 +76,13 @@ class GenericPrg:
                 if prev is not None:
                     prev.currently_playing = aname
                 buffers.load_current_track(afile, aname)
-                hub.begin_source(self, "mp3", bitrate_kbps=buffers.current.bitrate_kbps)
+                hub.begin_source(
+                    self,
+                    "mp3",
+                    bitrate_kbps=buffers.current.bitrate_kbps,
+                    sample_rate=buffers.current.sample_rate,
+                    channels=buffers.current.channels,
+                )
                 while buffers.current.ready and self.program_running:
                     pos = 0
                     data = buffers.current.data

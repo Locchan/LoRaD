@@ -27,18 +27,21 @@ def format_slot_size(slot: "RamSlot") -> str:
     return _mb(slot.file_size)
 
 
-def file_bitrate_kbps(path: str) -> int:
+def _mp3_info(path: str):
     try:
-        return max(int(round(MP3(path).info.bitrate / 1000)), 0)
+        return MP3(path).info
     except Exception:
-        return 0
+        return None
+
+
+def file_bitrate_kbps(path: str) -> int:
+    info = _mp3_info(path)
+    return max(int(round(info.bitrate / 1000)), 0) if info else 0
 
 
 def file_duration_s(path: str) -> float:
-    try:
-        return float(MP3(path).info.length)
-    except Exception:
-        return 0.0
+    info = _mp3_info(path)
+    return float(info.length) if info else 0.0
 
 
 def read_window(path: str, offset: int, max_bytes: int = BUFFER_BYTES) -> tuple[bytes, int]:
@@ -65,6 +68,8 @@ class RamSlot:
         self.kind = None  # "window" | "track"
         self.duration_s = 0.0
         self.bitrate_kbps = 0
+        self.sample_rate = 0
+        self.channels = 0
 
     def fill(self, path: str, name: str, offset: int = 0, kind: str = "track"):
         data, size = read_window(path, offset)
@@ -74,8 +79,12 @@ class RamSlot:
         self.file_offset = offset
         self.file_size = size
         self.kind = kind
-        self.duration_s = file_duration_s(path) if kind == "track" and offset == 0 else 0.0
-        self.bitrate_kbps = file_bitrate_kbps(path)
+        info = _mp3_info(path)
+        self.duration_s = float(info.length) if info and kind == "track" and offset == 0 else 0.0
+        self.bitrate_kbps = max(int(round(info.bitrate / 1000)), 0) if info else 0
+        # The decoder is kept across tracks only while these stay the same.
+        self.sample_rate = int(getattr(info, "sample_rate", 0) or 0) if info else 0
+        self.channels = int(getattr(info, "channels", 0) or 0) if info else 0
         self.ready = bool(data)
         if self.ready and is_shm_path(path):
             # Keep the file until the player is done with this track. Unlinking on load

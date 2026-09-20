@@ -345,7 +345,13 @@ class FileStreamer(GenericPlayer):
         )
         self._open_listen(listen_report)
         hub = get_hub()
-        hub.begin_source(self, "mp3", bitrate_kbps=self.buffers.current.bitrate_kbps)
+        hub.begin_source(
+            self,
+            "mp3",
+            bitrate_kbps=self.buffers.current.bitrate_kbps,
+            sample_rate=self.buffers.current.sample_rate,
+            channels=self.buffers.current.channels,
+        )
         try:
             while self.running and not self._stop_current:
                 if self._request_skip:
@@ -417,7 +423,14 @@ class FileStreamer(GenericPlayer):
         if user_skip:
             hub.drop_buffered_audio()
         self.buffers.swap()
-        hub.begin_source(self, "mp3", drain_previous=not user_skip, bitrate_kbps=self.buffers.current.bitrate_kbps)
+        hub.begin_source(
+            self,
+            "mp3",
+            drain_previous=not user_skip,
+            bitrate_kbps=self.buffers.current.bitrate_kbps,
+            sample_rate=self.buffers.current.sample_rate,
+            channels=self.buffers.current.channels,
+        )
         self.current_ride.promote_next()
         self.currently_playing = name
         self.current_filepath = path
