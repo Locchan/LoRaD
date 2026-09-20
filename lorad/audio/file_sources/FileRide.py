@@ -11,6 +11,9 @@ class FileRide:
     def next_track(self):
         pass
 
+    def switch_station(self, station_id):
+        raise RuntimeError("This source has no stations.")
+
     def supports_next_track(self) -> bool:
         return False
 

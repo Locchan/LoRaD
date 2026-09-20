@@ -13,7 +13,7 @@ from lorad.common.localization.localization import get_loc
 from lorad.common.utils.logger import get_logger
 import lorad.common.utils.globs as globs
 from lorad.common.utils.misc import read_config
-from lorad.common.utils.shm import PINNED_FALLBACK, unlink_shm
+from lorad.common.utils.shm import PINNED_FALLBACK, read_yandex_stations, unlink_shm
 
 logger = get_logger()
 
@@ -41,6 +41,7 @@ class FileStreamer(GenericPlayer):
         self._skip_busy = False
         self._request_skip = False
         self._prefetching = False
+        self._prefetch_epoch = 0
         self._track_started = 0.0
         self._track_duration = 0.0
         self._listen_open = False
@@ -138,17 +139,11 @@ class FileStreamer(GenericPlayer):
         get_hub().release(self)
 
     def list_sources(self, cached=False):
-        radio = getattr(self.current_ride, "radio", None)
-        if radio is None:
-            return None
-        if cached and globs.YANDEX_STATION_CACHE is not None:
+        if globs.YANDEX_STATION_CACHE is not None:
             return globs.YANDEX_STATION_CACHE
-        stations = {}
-        for astation in radio.get_stations():
-            stations[astation["station"]["name"]] = (
-                f"{astation['station']['id']['type']}:{astation['station']['id']['tag']}"
-            )
-        globs.YANDEX_STATION_CACHE = stations
+        stations = read_yandex_stations()
+        if stations is not None:
+            globs.YANDEX_STATION_CACHE = stations
         return stations
 
     def current_source(self):
@@ -158,12 +153,23 @@ class FileStreamer(GenericPlayer):
         return radio.station_id
 
     def switch_source(self, source_id):
-        radio = getattr(self.current_ride, "radio", None)
-        if radio is None:
+        ride = self.current_ride
+        if getattr(ride, "radio", None) is None:
             raise RuntimeError("Yandex is not initialized.")
         self.stop()
-        radio.start_radio(source_id)
+        # Everything buffered came from the old station, so throw it away before switching.
+        self._discard_buffers()
+        ride.switch_station(source_id)
         self.start()
+
+    def _discard_buffers(self):
+        self._request_skip = False
+        with self.buffers.lock:
+            # An in-flight prefetch must not fill the buffer with a track from the old station.
+            self._prefetch_epoch += 1
+            self.buffers.reserve_preload_for_track = False
+            self.buffers.preload.clear()
+            self.buffers.current.clear()
 
     def set_track_name_from_metadata(self, path):
         try:
@@ -259,6 +265,7 @@ class FileStreamer(GenericPlayer):
             return
         self._prefetching = True
         with self.buffers.lock:
+            epoch = self._prefetch_epoch
             self.buffers.reserve_preload_for_track = True
             if self.buffers.preload.ready and self.buffers.preload.kind == "window":
                 self.buffers.preload.clear()
@@ -272,6 +279,9 @@ class FileStreamer(GenericPlayer):
                 name, path = got
                 if not path or not os.path.exists(path):
                     logger.warn("Prefetched track has no file")
+                    return
+                if epoch != self._prefetch_epoch:
+                    logger.info(f"Dropping prefetched track from the previous station: {name}")
                     return
                 self.buffers.load_preload_track(path, name)
                 logger.info(

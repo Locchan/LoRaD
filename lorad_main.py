@@ -65,6 +65,7 @@ enabled_threads = [
 if feature_enabled(globs.FEAT_FILESTREAMER):
     if feature_enabled(globs.FEAT_FILESTREAMER_YANDEX):
         globs.YANDEX_OBJ = YaMu(config["YAMU_TOKEN"], config["BITRATE_KBPS"])
+        globs.YANDEX_OBJ.cache_stations_async()
         carousel_providers.append(globs.YANDEX_OBJ)
     if len(carousel_providers) > 0:
         globs.FILESTREAMER = FileStreamer(carousel_providers, globs.CURRENT_DATA_STREAMER)
