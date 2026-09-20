@@ -12,6 +12,7 @@ from lorad.audio.programs.program_mgr import prg_sched_loop
 from lorad.common.localization.localization import init_localization
 from lorad.common.utils.logger import get_logger, setdebug
 from lorad.common.utils.misc import feature_enabled, read_config, signal_stop, splash
+from lorad.common.utils.priority import boost_process
 from lorad.common.utils.shm import prepare_shm, seed_pinned_assets, start_shm_janitor
 from lorad.audio.sources.RadReStreamer import RadReStreamer
 
@@ -23,6 +24,8 @@ signal.signal(signal.SIGINT, signal_stop)
 splash()
 
 logger.info("Loading config...")
+# ffmpeg is spawned later and inherits this, so the encoders outrank news and downloads.
+boost_process()
 config = read_config()
 runtime_media_dir = prepare_shm()
 config["TEMPDIR"] = runtime_media_dir
