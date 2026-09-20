@@ -1,7 +1,7 @@
 import hashlib
 import threading
 from threading import Thread
-from time import sleep
+from time import monotonic, sleep
 
 import lorad.common.utils.globs as globs
 from lorad.common.utils.logger import get_logger
@@ -70,21 +70,42 @@ def thread_alive(thread_name):
                 return True
     return False
 
-def forbid_switching(time_seconds=0):
-    logger.debug("Forbidding switching")
-    if time_seconds > 0:
-        globs.SWITCH_LOCK = True
-        if not thread_alive("SW_Locker"):
-            Thread(target=_switch_lock, args=(time_seconds,), name="SW_Locker").start()
-    else:
-        globs.SWITCH_LOCK = True
+# Timed locks overlap (a switch cooldown during a program), so they share one deadline
+# instead of one thread per call: the first SW_Locker to finish must not unlock the rest.
+_switch_lock_guard = threading.Lock()
+_switch_lock_until = 0.0
 
-def _switch_lock(time_seconds):
-    logger.debug(f"Sleeping for {time_seconds} seconds before allowing switching.")
-    sleep(time_seconds)
-    logger.debug("Allowing switching")
-    globs.SWITCH_LOCK = False
+def forbid_switching(time_seconds=0):
+    """Block player/station switches. time_seconds <= 0 holds until allow_switching()."""
+    global _switch_lock_until
+    logger.debug("Forbidding switching")
+    with _switch_lock_guard:
+        globs.SWITCH_LOCK = True
+        if time_seconds <= 0:
+            _switch_lock_until = 0.0
+            return
+        _switch_lock_until = max(_switch_lock_until, monotonic() + time_seconds)
+        if not thread_alive("SW_Locker"):
+            Thread(target=_switch_lock, name="SW_Locker", daemon=True).start()
+
+def _switch_lock():
+    while True:
+        with _switch_lock_guard:
+            if not globs.SWITCH_LOCK:
+                return
+            left = _switch_lock_until - monotonic()
+            if _switch_lock_until <= 0:
+                # Turned into an open-ended hold; whoever took it will release it.
+                return
+            if left <= 0:
+                logger.debug("Allowing switching")
+                globs.SWITCH_LOCK = False
+                return
+        sleep(min(left, 1))
 
 def allow_switching():
+    global _switch_lock_until
     logger.debug("Allowing switching")
-    globs.SWITCH_LOCK = False
+    with _switch_lock_guard:
+        _switch_lock_until = 0.0
+        globs.SWITCH_LOCK = False

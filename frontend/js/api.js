@@ -115,7 +115,6 @@
     saveVolume,
     loadVolume,
     login,
-    whoami: () => request("/user/whoami"),
     getYandexStations: () => request("/yandex/available_stations"),
     getCurrentStation: () => request("/yandex/current_station"),
     openWhatsPlaying,

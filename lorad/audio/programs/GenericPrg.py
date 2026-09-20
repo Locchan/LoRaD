@@ -2,8 +2,8 @@ import datetime
 import os
 
 from lorad.audio.hub import get_hub
-from lorad.audio.ramfile import DoubleBuffer, file_duration_s
-from lorad.api.utils.misc import forbid_switching
+from lorad.audio.ramfile import DoubleBuffer
+from lorad.api.utils.misc import allow_switching, forbid_switching
 import lorad.common.utils.globs as globs
 from lorad.common.utils.logger import get_logger
 from lorad.common.utils.misc import read_config
@@ -59,16 +59,16 @@ class GenericPrg:
                     break
         acquired = False
         completed = False
+        locked = False
         try:
             self.program_running = True
-            total = 0.0
             for aname, afile in self.prepared_program.items():
                 if not os.path.exists(afile):
                     logger.error(f"Can't run program [{self.name}]: file [{afile}] does not exist!")
                     return
-                total += file_duration_s(afile)
-            if total > 0:
-                forbid_switching(int(total) + 1)
+            # Held for as long as the program actually runs, not for an estimated length.
+            forbid_switching()
+            locked = True
             logger.info(f"Running a scheduled program: [{self.name}]...")
             hub.acquire(self)
             acquired = True
@@ -111,6 +111,8 @@ class GenericPrg:
                 if prev is not None:
                     prev.start()
                     hub.acquire(prev)
+            if locked:
+                allow_switching()
             if self.prepared_program:
                 for afile in self.prepared_program.values():
                     unlink_shm(afile)
