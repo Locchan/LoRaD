@@ -6,6 +6,12 @@ ExecStart=/usr/bin/gimn
 Type=simple
 Restart=on-failure
 RestartSec=5
+CPUSchedulingPolicy=fifo
+CPUSchedulingPriority=20
+IOSchedulingClass=realtime
+IOSchedulingPriority=0
+LimitRTPRIO=infinity
+OOMScoreAdjust=-800
 
 [Install]
 WantedBy=multi-user.target
