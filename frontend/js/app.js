@@ -1,5 +1,6 @@
 (function (global) {
   const CONFIG_KEY = "ENABLED_PROGRAMS/NewsSmall/start_times";
+  const PREP_KEY = "ENABLED_PROGRAMS/NewsSmall/preparation_needed_mins";
   const BACKGROUND_IMAGES = [
     "1VuZTnscmraqYUZHZ1EQbecdrVfPm_l244Nl7PF1FkChpTa4adEpJMsKskpKRJXqryRvomDp.jpeg",
     "20160308_preview.jpeg",
@@ -26,12 +27,29 @@
     volume: 100,
     isLoading: true,
     isPlayerLoading: false,
-    trackTimer: null,
+    whatsPlayingSocket: null,
+    whatsPlayingReconnectTimer: null,
+    bufferTimer: null,
+    skipInFlight: false,
+    canSkip: false,
+    liked: null,
+    likeInFlight: false,
+    stationTech: "",
+    stationReadable: "",
+    trackPosition: null,
+    trackLength: null,
+    positionTrack: "",
+    positionTimer: null,
   };
+
+  // whatsplaying only corrects the playhead every few seconds, so the UI counts on its own
+  // and snaps to the server when the two disagree by more than this.
+  const POSITION_RESYNC_S = 2;
 
   const scheduleState = {
     times: [],
     originalTimes: [],
+    preparationNeededMins: null,
     isLoading: false,
     loaded: false,
     successTimer: null,
@@ -129,6 +147,85 @@
     return Boolean(playerState.audio && !playerState.audio.paused);
   }
 
+  // Option values are readable station names, while the API talks in technical ids.
+  function stationKeyFor(techId, readableName) {
+    const stations = playerState.availableStations || {};
+    const byTech = Object.keys(stations).find((key) => stations[key] === techId);
+    if (byTech) return byTech;
+    if (readableName && Object.prototype.hasOwnProperty.call(stations, readableName)) {
+      return readableName;
+    }
+    return "";
+  }
+
+  function syncStationSelect() {
+    if (!playerState.stationTech && !playerState.stationReadable) return;
+    const select = $("station");
+    let key = stationKeyFor(playerState.stationTech, playerState.stationReadable);
+    if (!key && playerState.stationReadable) {
+      // the backend plays something that is not in the list (e.g. "Моя волна"): show it anyway
+      key = playerState.stationReadable;
+      playerState.availableStations[key] = playerState.stationTech;
+      const option = document.createElement("option");
+      option.value = key;
+      option.textContent = key;
+      select.appendChild(option);
+    }
+    if (!key) return;
+    playerState.currentStation = key;
+    playerState.selectedStation = key;
+    select.value = key;
+  }
+
+  function formatClock(seconds) {
+    const total = Math.max(0, Math.floor(seconds));
+    return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+  }
+
+  function renderTrackProgress() {
+    const known = playerState.trackLength != null && playerState.trackPosition != null;
+    setHidden($("track-progress"), !known);
+    if (!known) return;
+    $("track-position").textContent = formatClock(playerState.trackPosition);
+    $("track-length").textContent = formatClock(playerState.trackLength);
+  }
+
+  function startPositionTicker() {
+    if (playerState.positionTimer) return;
+    playerState.positionTimer = setInterval(() => {
+      if (playerState.trackPosition == null || playerState.trackLength == null) return;
+      if (playerState.trackPosition >= playerState.trackLength) return;
+      playerState.trackPosition = Math.min(playerState.trackPosition + 1, playerState.trackLength);
+      renderTrackProgress();
+    }, 1000);
+  }
+
+  function applyTrackProgress(response) {
+    const length = Number(response.length_s);
+    const position = Number(response.position_s);
+    if (!Number.isFinite(length) || !Number.isFinite(position)) {
+      playerState.trackLength = null;
+      playerState.trackPosition = null;
+      playerState.positionTrack = "";
+      renderTrackProgress();
+      return;
+    }
+
+    const track = `${response.playing || ""}|${length}`;
+    const isNewTrack = track !== playerState.positionTrack;
+    const drifted =
+      playerState.trackPosition == null ||
+      Math.abs(position - playerState.trackPosition) > POSITION_RESYNC_S;
+
+    playerState.trackLength = length;
+    if (isNewTrack || drifted) {
+      playerState.trackPosition = position;
+      playerState.positionTrack = track;
+    }
+    renderTrackProgress();
+    startPositionTicker();
+  }
+
   function updatePlaybackUi() {
     const playing = isPlaying();
     $("play-pause-icon").className = playing ? "fas fa-pause" : "fas fa-play";
@@ -148,14 +245,44 @@
     setHidden($("track-fallback"), !(!playerState.currentTrack && playerState.selectedStation && !playerState.isLoading));
     $("track-title").textContent = playerState.currentTrack || "Нет информации о треке";
     $("fallback-station").textContent = `Станция: ${playerState.selectedStation}`;
+    setHidden($("next-track-btn"), !playerState.canSkip);
+    $("next-track-btn").disabled = playerState.skipInFlight || !playerState.canSkip;
+    $("next-track-icon").className = playerState.skipInFlight ? "fas fa-spinner fa-spin" : "fas fa-forward-step";
+    const canLike = typeof playerState.liked === "boolean";
+    setHidden($("like-track-btn"), !canLike);
+    $("like-track-btn").disabled = playerState.likeInFlight || !canLike;
+    $("like-track-btn").classList.toggle("liked", playerState.liked === true);
+    $("like-track-btn").title = playerState.liked ? "Убрать отметку «Нравится»" : "Нравится";
+    $("like-track-icon").className = playerState.likeInFlight
+      ? "fas fa-spinner fa-spin"
+      : playerState.liked
+        ? "fas fa-heart"
+        : "far fa-heart";
     updatePlaybackUi();
   }
 
   function stopPlayer() {
-    if (playerState.trackTimer) {
-      clearInterval(playerState.trackTimer);
-      playerState.trackTimer = null;
+    if (playerState.whatsPlayingReconnectTimer) {
+      clearTimeout(playerState.whatsPlayingReconnectTimer);
+      playerState.whatsPlayingReconnectTimer = null;
     }
+    if (playerState.whatsPlayingSocket) {
+      const socket = playerState.whatsPlayingSocket;
+      playerState.whatsPlayingSocket = null;
+      socket.close();
+    }
+    if (playerState.bufferTimer) {
+      clearInterval(playerState.bufferTimer);
+      playerState.bufferTimer = null;
+    }
+    if (playerState.positionTimer) {
+      clearInterval(playerState.positionTimer);
+      playerState.positionTimer = null;
+    }
+    playerState.trackPosition = null;
+    playerState.trackLength = null;
+    playerState.positionTrack = "";
+    renderTrackProgress();
     if (playerState.audio) {
       playerState.audio.pause();
       playerState.audio = null;
@@ -168,6 +295,43 @@
     });
   }
 
+  function freshStreamUrl() {
+    const separator = config.radioUrl.includes("?") ? "&" : "?";
+    return `${config.radioUrl}${separator}t=${Date.now()}`;
+  }
+
+  function maxBufferSeconds() {
+    const kb = Number(config.maxBufferKb) || 128;
+    const bitrate = Number(config.streamBitrateKbps) || 128;
+    return (kb * 8) / bitrate;
+  }
+
+  function bufferedAheadSeconds(audio) {
+    if (!audio || !audio.buffered || audio.buffered.length === 0) return 0;
+    return audio.buffered.end(audio.buffered.length - 1) - audio.currentTime;
+  }
+
+  function trimBuffer() {
+    const audio = playerState.audio;
+    if (!audio || audio.paused) return;
+    const limit = maxBufferSeconds();
+    if (bufferedAheadSeconds(audio) <= limit) return;
+    const target = audio.buffered.end(audio.buffered.length - 1) - limit / 2;
+    if (audio.seekable.length && target <= audio.seekable.end(audio.seekable.length - 1)) {
+      audio.currentTime = target;
+      return;
+    }
+    // live stream is not seekable: reconnecting is the only way to drop what the browser holds
+    refreshStream();
+  }
+
+  function startBufferWatchdog() {
+    if (playerState.bufferTimer) {
+      clearInterval(playerState.bufferTimer);
+    }
+    playerState.bufferTimer = setInterval(trimBuffer, 2000);
+  }
+
   async function loadStationsForCurrentPlayer() {
     try {
       playerState.availableStations =
@@ -175,6 +339,7 @@
           ? await api.getRadioStations()
           : await api.getYandexStations();
       fillSelect($("station"), playerState.availableStations, playerState.selectedStation);
+      syncStationSelect();
     } catch (error) {
       console.error(`Failed to load ${playerState.currentPlayer} stations:`, error);
     }
@@ -187,9 +352,13 @@
         playerState.currentPlayer === "player_radio"
           ? await api.getRadioCurrentStation()
           : await api.getCurrentStation();
-      playerState.currentStation = response.station;
-      playerState.selectedStation = response.station;
-      $("station").value = response.station || "";
+      const station = response.station || "";
+      if (station !== playerState.stationTech) {
+        // this endpoint only knows technical ids, so a name from whatsplaying is stale now
+        playerState.stationReadable = "";
+      }
+      playerState.stationTech = station;
+      syncStationSelect();
     } catch (error) {
       console.error(`Failed to get current station for ${playerState.currentPlayer}:`, error);
     }
@@ -200,7 +369,7 @@
     playerState.isLoading = false;
     playerState.isPlayerLoading = false;
     updatePlayerSections();
-    startTrackUpdates();
+    startWhatsPlayingUpdates();
     autoStartMusic();
   }
 
@@ -222,47 +391,48 @@
     }
   }
 
-  function startTrackUpdates() {
-    if (playerState.trackTimer) {
-      clearInterval(playerState.trackTimer);
+  function applyWhatsPlaying(response) {
+    if (!response) return;
+    playerState.currentTrack = response.playing || "Нет информации о треке";
+    playerState.canSkip = Boolean(response.can_skip);
+    playerState.liked = Object.prototype.hasOwnProperty.call(response, "liked")
+      ? response.liked
+      : null;
+    const showPanorama = Boolean(response.playing && String(response.playing).startsWith("Panorama"));
+    setHidden($("panorama-popup"), !showPanorama);
+    if (showPanorama) {
+      setTimeout(forceVideoPlay, 100);
     }
-    playerState.trackTimer = setInterval(async () => {
-      try {
-        const response = await api.getWhatsPlaying();
-        if (!response) {
-          playerState.currentTrack = "Нет информации о треке";
-          setHidden($("panorama-popup"), true);
-          updatePlayerSections();
-          return;
-        }
 
-        playerState.currentTrack = response.playing || "Нет информации о треке";
-        const showPanorama = Boolean(response.playing && String(response.playing).startsWith("Panorama"));
-        setHidden($("panorama-popup"), !showPanorama);
-        if (showPanorama) {
-          setTimeout(forceVideoPlay, 100);
-        }
+    if (response.player_tech && response.player_tech !== playerState.currentPlayer) {
+      playerState.currentPlayer = response.player_tech;
+      playerState.selectedPlayer = response.player_tech;
+      $("player").value = response.player_tech;
+    }
 
-        if (response.player_tech && response.player_tech !== playerState.currentPlayer) {
-          playerState.currentPlayer = response.player_tech;
-          playerState.selectedPlayer = response.player_tech;
-          $("player").value = response.player_tech;
-        }
+    if (response.station_tech) {
+      playerState.stationTech = response.station_tech;
+      playerState.stationReadable = response.station_readable || "";
+      syncStationSelect();
+    }
 
-        if (response.station_tech && response.station_tech !== playerState.currentStation) {
-          playerState.currentStation = response.station_tech;
-          playerState.selectedStation = response.station_tech;
-          $("station").value = response.station_tech;
-        }
+    applyTrackProgress(response);
+    updateDropdownsFromReadableValues(response);
+    updatePlayerSections();
+  }
 
-        updateDropdownsFromReadableValues(response);
-        updatePlayerSections();
-      } catch (error) {
-        console.error("Failed to get current track:", error);
-        playerState.currentTrack = "Ошибка загрузки трека";
-        updatePlayerSections();
-      }
-    }, 2000);
+  function startWhatsPlayingUpdates() {
+    if (playerState.whatsPlayingSocket) return;
+    const socket = api.openWhatsPlaying(applyWhatsPlaying, (closedSocket) => {
+      if (playerState.whatsPlayingSocket !== closedSocket) return;
+      playerState.whatsPlayingSocket = null;
+      if (currentRoute() === "/login" || !api.isAuthenticated()) return;
+      playerState.whatsPlayingReconnectTimer = setTimeout(() => {
+        playerState.whatsPlayingReconnectTimer = null;
+        startWhatsPlayingUpdates();
+      }, 2000);
+    });
+    playerState.whatsPlayingSocket = socket;
   }
 
   function updateDropdownsFromReadableValues(response) {
@@ -280,16 +450,6 @@
       }
     }
 
-    if (response.station_readable && response.station_readable !== playerState.selectedStation) {
-      const matching = Object.keys(playerState.availableStations).find(
-        (key) => key === response.station_readable
-      );
-      if (matching && matching !== playerState.selectedStation) {
-        playerState.selectedStation = matching;
-        playerState.currentStation = matching;
-        $("station").value = matching;
-      }
-    }
   }
 
   async function initializePlayer() {
@@ -299,9 +459,11 @@
     $("volume-value").textContent = `${playerState.volume}%`;
     updatePlayerSections();
 
-    playerState.audio = new Audio(config.radioUrl);
+    playerState.audio = new Audio(freshStreamUrl());
+    playerState.audio.preload = "none";
     playerState.audio.volume = playerState.volume / 100;
     bindAudioEvents(playerState.audio);
+    startBufferWatchdog();
     setupVideoAutoplayWorkaround();
 
     try {
@@ -356,6 +518,8 @@
       await api.switchPlayer(player);
       playerState.currentPlayer = player;
       playerState.selectedPlayer = player;
+      playerState.stationTech = "";
+      playerState.stationReadable = "";
       playerState.availableStations = player === "player_radio"
         ? await api.getRadioStations()
         : await api.getYandexStations();
@@ -401,9 +565,49 @@
 
   function refreshStream() {
     if (!playerState.audio) return;
+    const wasPlaying = !playerState.audio.paused;
+    playerState.audio.src = freshStreamUrl();
     playerState.audio.load();
-    if (!playerState.audio.paused) {
+    if (wasPlaying) {
       playerState.audio.play();
+    }
+  }
+
+  async function skipToNextTrack() {
+    if (!playerState.canSkip || playerState.skipInFlight) {
+      return;
+    }
+    playerState.skipInFlight = true;
+    updatePlayerSections();
+    try {
+      const result = await api.nextYandexTrack();
+      if (result && result.playing) {
+        playerState.currentTrack = result.playing;
+      }
+    } catch (error) {
+      if (error.status !== 409) {
+        console.error("Failed to skip track:", error);
+      }
+    } finally {
+      playerState.skipInFlight = false;
+      updatePlayerSections();
+    }
+  }
+
+  async function setYandexTrackLiked() {
+    if (typeof playerState.liked !== "boolean" || playerState.likeInFlight) {
+      return;
+    }
+    playerState.likeInFlight = true;
+    updatePlayerSections();
+    try {
+      await api.setYandexTrackLiked(!playerState.liked);
+      // The WebSocket state change updates the heart for every connected client.
+    } catch (error) {
+      console.error("Failed to change Yandex like status:", error);
+    } finally {
+      playerState.likeInFlight = false;
+      updatePlayerSections();
     }
   }
 
@@ -452,6 +656,21 @@
     $("news-video").addEventListener("loadeddata", (event) => attemptVideoPlay(event.target));
   }
 
+  function minutesWordRu(count) {
+    const n = Math.abs(Number(count)) % 100;
+    const last = n % 10;
+    if (n > 10 && n < 20) {
+      return "минут";
+    }
+    if (last === 1) {
+      return "минута";
+    }
+    if (last >= 2 && last <= 4) {
+      return "минуты";
+    }
+    return "минут";
+  }
+
   function hasScheduleChanges() {
     const original = scheduleState.originalTimes.slice().sort();
     const current = scheduleState.times.slice().sort();
@@ -485,6 +704,15 @@
     $("newTime").disabled = scheduleState.isLoading;
     $("add-time-btn").disabled = !$("newTime").value || scheduleState.isLoading;
     setHidden($("schedule-loading"), !scheduleState.isLoading);
+
+    const prepMins = Number(scheduleState.preparationNeededMins);
+    const prepNote = $("schedule-prep-note");
+    if (Number.isFinite(prepMins)) {
+      $("schedule-prep-mins").textContent = `${prepMins} ${minutesWordRu(prepMins)}`;
+      setHidden(prepNote, false);
+    } else {
+      setHidden(prepNote, true);
+    }
   }
 
   function showSuccess(message) {
@@ -503,10 +731,14 @@
     $("schedule-loading-message").textContent = "Загрузка расписания...";
     renderScheduleTimes();
     try {
-      const response = await api.getConfig(CONFIG_KEY);
-      const times = response[CONFIG_KEY] || [];
+      const [timesResponse, prepResponse] = await Promise.all([
+        api.getConfig(CONFIG_KEY),
+        api.getConfig(PREP_KEY),
+      ]);
+      const times = timesResponse[CONFIG_KEY] || [];
       scheduleState.times = times.slice();
       scheduleState.originalTimes = times.slice();
+      scheduleState.preparationNeededMins = prepResponse[PREP_KEY];
       scheduleState.loaded = true;
     } catch (error) {
       console.error("Error loading schedule:", error);
@@ -621,7 +853,7 @@
     }
 
     if (route === "/schedule") {
-      stopPlayer();
+      // the player keeps running in the background: the views are only hidden, not torn down
       showView("view-schedule");
       if (!scheduleState.loaded && !scheduleState.isLoading) {
         await loadSchedule();
@@ -655,6 +887,8 @@
     });
     $("station").addEventListener("change", (event) => onStationChange(event.target.value));
     $("play-pause-btn").addEventListener("click", playPause);
+    $("next-track-btn").addEventListener("click", skipToNextTrack);
+    $("like-track-btn").addEventListener("click", setYandexTrackLiked);
     $("refresh-btn").addEventListener("click", refreshStream);
     $("volume-slider").addEventListener("input", (event) => {
       playerState.volume = parseInt(event.target.value, 10);

@@ -18,3 +18,6 @@ class GenericPlayer:
 
     def switch_source(self, source_id):
         pass
+
+    def supports_next_track(self) -> bool:
+        return False

@@ -17,12 +17,18 @@ if [ "$ENV" = "production" ]; then
   SCHEME="${LORAD_SCHEME:-http}"
   API_PATH="${LORAD_API_PATH:-/radio/api}"
   RADIO_PATH="${LORAD_RADIO_PATH:-/radio}"
+  WS_PATH="${LORAD_WS_PATH:-/radio/ws}"
 else
   DOMAIN="${LORAD_DOMAIN:-}"
   SCHEME="${LORAD_SCHEME:-}"
   API_PATH="${LORAD_API_PATH:-}"
   RADIO_PATH="${LORAD_RADIO_PATH:-}"
+  WS_PATH="${LORAD_WS_PATH:-}"
 fi
+
+API_URL="${LORAD_API_URL:-}"
+RADIO_URL="${LORAD_RADIO_URL:-}"
+WS_URL="${LORAD_WS_URL:-}"
 
 set_const() {
   key="$1"
@@ -36,3 +42,7 @@ set_const domain "$DOMAIN"
 set_const scheme "$SCHEME"
 set_const apiPath "$API_PATH"
 set_const radioPath "$RADIO_PATH"
+set_const wsPath "$WS_PATH"
+set_const apiUrlOverride "$API_URL"
+set_const radioUrlOverride "$RADIO_URL"
+set_const wsUrlOverride "$WS_URL"

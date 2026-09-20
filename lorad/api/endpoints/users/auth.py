@@ -19,21 +19,21 @@ logger = get_logger()
 def validate(headers, data):
     for areq in REQUIRED_FIELDS["POST"]:
         if areq not in data or areq == "":
-            return f"This method requires {REQUIRED_FIELDS["POST"]} to be specified."
+            return f"This method requires {REQUIRED_FIELDS['POST']} to be specified."
     return
 
 @lrd_validate(validate_func=validate)
 @lrd_api_endp
 def impl_POST(headers, data):
-    login_result = User.user_login(data["username"], data["password"])
+    login_result = User.user_login(data['username'], data["password"])
     if login_result == globs.LOGIN_NO_SUCH_USER:
-        logger.info(f"Attempt to log in as {data["username"]} failed: No such user.")
+        logger.info(f"Attempt to log in as {data['username']} failed: No such user.")
         return (401, {"error": "Login failed"})
     if login_result == globs.LOGIN_INCORRECT_PASSWORD:
-        logger.info(f"Attempt to log in as {data["username"]} failed: Incorrect password.")
+        logger.info(f"Attempt to log in as {data['username']} failed: Incorrect password.")
         return (401, {"error": "Login failed"})
     if login_result == globs.LOGIN_SUCCESS:
-        logger.info(f"{data["username"]} logged in.")
-        return {"token": Token.gen_token(data["username"])}
-    logger.error(f"Attempt to log in as {data["username"]} failed: Invalid response from login method.")
+        logger.info(f"{data['username']} logged in.")
+        return {"token": Token.gen_token(data['username'])}
+    logger.error(f"Attempt to log in as {data['username']} failed: Invalid response from login method.")
     return (401, {"error": "Login failed"})

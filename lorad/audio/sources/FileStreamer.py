@@ -1,106 +1,142 @@
-import time
-import math
 import os
+import time
 from pathlib import Path
-from time import sleep
-from typing import Tuple
+from threading import Thread
 
-from lorad.audio.file_sources.FileRide import FileRide
-from lorad.audio.server.AudioStream import AudioStream
-from lorad.audio.sources.GenericPlayer import GenericPlayer
-from lorad.audio.sources.utils.Transcoder import Transcoder
-from lorad.common.localization.localization import get_loc
-from lorad.common.utils.globs import END_OF_TRANSCODED_DATA
-from lorad.common.utils.logger import get_logger
-import lorad.common.utils.globs as globs
-from mutagen.mp3 import MP3
 from mutagen.easyid3 import EasyID3
 
-from lorad.common.utils.misc import read_config
+from lorad.audio.file_sources.FileRide import FileRide
+from lorad.audio.hub import get_hub
+from lorad.audio.ramfile import DoubleBuffer, file_duration_s, format_duration, format_slot_size
+from lorad.audio.sources.GenericPlayer import GenericPlayer
+from lorad.common.localization.localization import get_loc
+from lorad.common.utils.logger import get_logger
+import lorad.common.utils.globs as globs
+from lorad.common.utils.misc import local_path, read_config
+from lorad.common.utils.shm import unlink_shm
 
 logger = get_logger()
 
-# Supports only mp3 as it's hardcoded in the Transcoder class creation and was default since the first attempts at this project.
+PREFETCH_BEFORE_S = 30
+
+
 class FileStreamer(GenericPlayer):
-    def __init__(self, connectors: list[FileRide], server: AudioStream):
+    def __init__(self, connectors: list[FileRide], server=None):
         logger.debug("Initializing carousel...")
         config = read_config()
         self.name_readable = get_loc("PLAYER_NAME_FILESTREAMER")
         self.name_tech = "player_streaming"
         self.fallback_index = 0
-        self.server = server
         self.connectors = connectors
         self.connector_index = 0
         self.current_ride = self.connectors[self.connector_index]
-        self.chunk_size = config["CHUNK_SIZE_KB"]
-        self.chunk_size_bytes = self.chunk_size * 102
         self.currently_playing = ""
         self.current_filepath = ""
-        self.transcoder : Transcoder | None = None
         self.target_bitrate = int(config["BITRATE_KBPS"])
-        self.default_format = config["DEFAULT_AUDIO_FORMAT"]
+        self.bytes_per_sec = (self.target_bitrate * 1000) / 8
+        self.feed_chunk = config["CHUNK_SIZE_KB"] * 1024
         self.running = False
         self._stop_current = False
-        self.free = True
-        self.initial_burst_chunks = 8
+        self.buffers = DoubleBuffer()
+        self._skip_busy = False
+        self._request_skip = False
+        self._prefetching = False
+        self._track_started = 0.0
+        self._track_duration = 0.0
+        self._listen_open = False
+
+    def supports_next_track(self) -> bool:
+        return self.current_ride.supports_next_track()
+
+    def track_length(self) -> float:
+        # While a program owns the hub this player is stopped and its playhead is meaningless.
+        if not self.running:
+            return 0.0
+        return self._track_duration or 0.0
+
+    def track_position(self) -> float:
+        """Seconds of the current track a listener has heard. Feeding runs ahead, so subtract the hub lead."""
+        if not self._track_started:
+            return 0.0
+        elapsed = time.monotonic() - self._track_started - get_hub().buffered_seconds()
+        if self._track_duration:
+            elapsed = min(elapsed, self._track_duration)
+        return max(elapsed, 0.0)
+
+    def supports_liking(self) -> bool:
+        return (
+            self.current_ride is globs.YANDEX_OBJ
+            and getattr(self.current_ride, "supports_liking", lambda: False)()
+        )
+
+    def current_track_liked(self) -> bool:
+        if not self.supports_liking():
+            raise RuntimeError("Current source does not support likes.")
+        return self.current_ride.current_track_liked()
+
+    def set_current_track_liked(self, liked: bool) -> bool:
+        if not self.supports_liking():
+            raise RuntimeError("Current source does not support likes.")
+        return self.current_ride.set_current_track_liked(liked)
 
     def carousel(self):
         logger.debug("Entering carousel")
+        hub = get_hub()
         while True:
-            if self.running:
-                try:
-                    if not self.current_ride.initialized:
-                        self.current_ride.initialize()
-                    track = self.current_ride.get_current_track()
-                    if track is not None and track and isinstance(track, Tuple):
-                        (self.currently_playing, self.current_filepath) = track
-                    else:
-                        raise RuntimeError(f"Got an invalid track for the carousel: '{track}' Falling back")
-                    # Serve chunks and exit when the end of the file is reached
-                    self.serve_file()
-                    self.cleanup()
-                    self.current_ride.next_track()
-                except Exception as e:
-                    logger.warn(f"Could not get the next track from {self.current_ride.__class__.__name__}: [{e.__class__.__name__}: {e}]")
-                    self.stop()
-                    self.fallback()
-                # Rotating connectors if possible
-                self.connector_index += 1
-                if len(self.connectors) > self.connector_index:
-                    self.current_ride = self.connectors[self.connector_index]
-                else:
-                    self.current_ride = self.connectors[0]
-            else:
-                sleep(1)
+            if not self.running:
+                time.sleep(0.2)
+                continue
+            try:
+                if not self.current_ride.initialized:
+                    self.current_ride.initialize()
+                track = self.current_ride.get_current_track()
+                if not track or not isinstance(track, tuple):
+                    raise RuntimeError(f"Got an invalid track for the carousel: '{track}'")
+                self.currently_playing, self.current_filepath = track
+                hub.acquire(self)
+                self._play_from_file(self.current_filepath, self.currently_playing)
+            except Exception as e:
+                logger.warn(
+                    f"Could not get the next track from {self.current_ride.__class__.__name__}: [{e.__class__.__name__}: {e}]"
+                )
+                self._play_fallback()
+            self._rotate_connector()
 
-    def fallback(self):
+    def _rotate_connector(self):
+        if len(self.connectors) <= 1:
+            return
+        self.connector_index = (self.connector_index + 1) % len(self.connectors)
+        self.current_ride = self.connectors[self.connector_index]
+
+    def _play_fallback(self):
         logger.info("Loading fallback track.")
         config = read_config()
-        fallback_tracks = os.listdir(config["FALLBACK_TRACK_DIR"])
+        fallback_dir = local_path(config["FALLBACK_TRACK_DIR"])
+        fallback_tracks = os.listdir(fallback_dir)
         if len(fallback_tracks) == 0:
             logger.error("Nothing to fall back to! No fallback tracks! Catastrophe!")
             os._exit(1)
-        if self.fallback_index == len(fallback_tracks):
+        if self.fallback_index >= len(fallback_tracks):
             self.fallback_index = 0
-        self.serve_file(os.path.join(config["FALLBACK_TRACK_DIR"], fallback_tracks[self.fallback_index]))
-        if self.running:
-            self.fallback_index += 1
-            self.start()
+        path = os.path.join(fallback_dir, fallback_tracks[self.fallback_index])
+        self.fallback_index += 1
+        get_hub().acquire(self)
+        self._play_from_file(path, None, allow_prefetch=False, advance_after=False, listen_report=False)
 
     def start(self):
         if self.running:
             logger.warn("Tried to start carousel when it is already started")
-        else:
-            logger.info("Starting carousel")
-            self._stop_current = False
-            self.running = True
+            return
+        logger.info("Starting carousel")
+        self._stop_current = False
+        self.running = True
+        get_hub().acquire(self)
 
     def stop(self):
-        if not self.running:
-            logger.warn("Tried to stop carousel when it is already stopped")
         logger.info("Stopping carousel")
         self.running = False
         self._stop_current = True
+        get_hub().release(self)
 
     def list_sources(self, cached=False):
         radio = getattr(self.current_ride, "radio", None)
@@ -110,7 +146,9 @@ class FileStreamer(GenericPlayer):
             return globs.YANDEX_STATION_CACHE
         stations = {}
         for astation in radio.get_stations():
-            stations[astation["station"]["name"]] = f"{astation['station']['id']['type']}:{astation['station']['id']['tag']}"
+            stations[astation["station"]["name"]] = (
+                f"{astation['station']['id']['type']}:{astation['station']['id']['tag']}"
+            )
         globs.YANDEX_STATION_CACHE = stations
         return stations
 
@@ -128,90 +166,235 @@ class FileStreamer(GenericPlayer):
         radio.start_radio(source_id)
         self.start()
 
-    # If we don't have track name from whoever wants us to play it, try getting it from metadata.
-    # If even this fails, just cut the file extension use the rest as the track title
-    def set_track_name_from_metadata(self):
+    def set_track_name_from_metadata(self, path):
         try:
-            track_id3_obj = EasyID3(self.current_filepath)
+            track_id3_obj = EasyID3(path)
             artist = track_id3_obj.get("artist")
             title = track_id3_obj.get("title")
             if artist is None and title is None:
                 raise RuntimeError("No track name in metadata.")
-            self.currently_playing = f"{artist} — {title}"
+            return f"{artist} — {title}"
         except Exception:
-            self.currently_playing = Path(self.current_filepath).stem
+            return Path(path).stem
 
-    def get_track_info(self) -> tuple:
-        track_info = MP3(self.current_filepath).info
-        source_bitrate = track_info.bitrate / 1000
-        seconds_per_chunk = self.chunk_size_bytes / ( (source_bitrate * 1000) / 8)
-        logger.debug(f"Seconds per chunk: {seconds_per_chunk}")
-        logger.info(f"Starting to serve the next track...")
-        logger.info(f"Track duration: {track_info.length}s")
-        return source_bitrate, seconds_per_chunk, track_info.length
-
-    def serve_file(self, track_filepath=None, track_name=None, unswitcheable=False):
-        if track_filepath is not None:
-            self.current_filepath = track_filepath
-        if track_name is not None:
-            self.currently_playing = track_name
-        # Wait if some other thread is in here
-        while True:
-            if not self.free:
-                sleep(1)
-                logger.warning("Waiting until another thread frees the stream...")
-            else:
-                break
-
+    def play_files(self, files: dict[str, str], unswitcheable=False):
+        """Play named files as hub owner (used by scheduled programs)."""
+        hub = get_hub()
+        hub.acquire(self)
+        total = 0.0
+        for path in files.values():
+            if os.path.exists(path):
+                total += file_duration_s(path)
+        if unswitcheable and total > 0:
+            from lorad.api.utils.misc import forbid_switching
+            forbid_switching(int(total) + 1)
+        was_running = self.running
+        self.running = True
         self._stop_current = False
-        self.free = False
         try:
-            if self.currently_playing == "":
-                self.set_track_name_from_metadata()
-
-            source_bitrate, seconds_per_chunk, length = self.get_track_info()
-            if unswitcheable:
-                from lorad.api.utils.misc import forbid_switching
-                forbid_switching(length)
-
-            self.transcoder = Transcoder(input_format="mp3", respect_chunk_size=True)
-
-            with open(self.current_filepath, 'rb') as mp3file:
-                self.transcoder.start()
-                data_accepted = True
-                while True:
-                    if not self._stop_current:
-                        # AudioStream will refuse data if no one is listening.
-                        if data_accepted:
-                            source_chunk = mp3file.read(self.chunk_size_bytes)
-                            if not source_chunk:
-                                self.transcoder.no_more_data = True
-                            else:
-                                self.transcoder.add_data(source_chunk)
-                            transcoder_chunk = self.transcoder.get_transcoded_chunk()
-                            if transcoder_chunk is None:
-                                logger.error("Transcoder error. See logs!")
-                                self.transcoder.stop()
-                                return
-                            elif not transcoder_chunk:
-                                pass
-                            elif transcoder_chunk == END_OF_TRANSCODED_DATA:
-                                self.transcoder.stop()
-                                return
-                            else:
-                                data_accepted = AudioStream.add_data(transcoder_chunk, only_if_listeners_there=True)
-                        else:
-                            data_accepted = AudioStream.add_data(transcoder_chunk, only_if_listeners_there=True)
-                    else:
-                        self.transcoder.stop()
-                        break
-                    time.sleep(seconds_per_chunk)
+            for name, path in files.items():
+                if not os.path.exists(path):
+                    logger.error(f"Program file missing: {path}")
+                    continue
+                self._play_from_file(path, name, allow_prefetch=False, advance_after=False, listen_report=False)
+                if self._stop_current:
+                    break
         finally:
-            logger.info("Exiting file playback method.")
-            self.free = True
-            AudioStream.track_ended = True
+            self.running = was_running
 
-    def cleanup(self):
-        if os.path.exists(self.current_filepath):
-            pass
-            #os.remove(self.current_filepath)
+    def skip_to_next(self) -> bool:
+        if not self.supports_next_track():
+            return False
+        if self._skip_busy:
+            return False
+        self._skip_busy = True
+        try:
+            self._ensure_next_track_preloaded()
+            deadline = time.time() + 180
+            while time.time() < deadline:
+                with self.buffers.lock:
+                    if self.buffers.preload.ready and self.buffers.preload.kind == "track":
+                        break
+                    if self.buffers.preload.ready and self.buffers.preload.kind == "window":
+                        self.buffers.preload.clear()
+                time.sleep(0.2)
+            else:
+                logger.error("Skip failed: next track did not buffer in time")
+                return False
+            self._request_skip = True
+            waited = 0.0
+            while self._request_skip and self.running and waited < 60:
+                time.sleep(0.1)
+                waited += 0.1
+            if self._request_skip:
+                self._request_skip = False
+                return False
+            return True
+        finally:
+            self._skip_busy = False
+
+    def _ensure_next_track_preloaded(self):
+        with self.buffers.lock:
+            if self.buffers.preload.ready and self.buffers.preload.kind == "track":
+                return
+            self.buffers.preload.clear()
+        self._prefetch_next_track()
+
+    def _maybe_prefetch(self, seconds_left: float):
+        # only the tail of the last window is worth prefetching: earlier windows still come from the same file
+        if seconds_left > PREFETCH_BEFORE_S:
+            return
+        if self._prefetching or self.buffers.preload.ready:
+            return
+        if not self.buffers.current.is_last_window():
+            return
+        if not self.current_ride.supports_next_track():
+            return
+        logger.info(f"Prefetching the next track ({seconds_left:.0f}s left of the current one)")
+        self._prefetch_next_track()
+
+    def _prefetch_next_track(self):
+        if self._prefetching:
+            return
+        if not self.current_ride.supports_next_track():
+            return
+        self._prefetching = True
+        with self.buffers.lock:
+            self.buffers.reserve_preload_for_track = True
+            if self.buffers.preload.ready and self.buffers.preload.kind == "window":
+                self.buffers.preload.clear()
+
+        def work():
+            try:
+                got = self.current_ride.prefetch_next()
+                if not got:
+                    logger.warn("prefetch_next returned nothing")
+                    return
+                name, path = got
+                if not path or not os.path.exists(path):
+                    logger.warn("Prefetched track has no file")
+                    return
+                self.buffers.load_preload_track(path, name)
+                logger.info(
+                    f"Next track buffered: {name} "
+                    f"({format_slot_size(self.buffers.preload)}, {format_duration(self.buffers.preload.duration_s)})"
+                )
+            except Exception as e:
+                logger.warn(f"Prefetch failed: {e.__class__.__name__}: {e}")
+            finally:
+                self._prefetching = False
+
+        Thread(name="Prefetch", target=work, daemon=True).start()
+
+    def _open_listen(self, listen_report: bool):
+        if not listen_report:
+            return
+        self.current_ride.notify_playing()
+        self._listen_open = True
+
+    def _close_listen(self, skipped: bool = False):
+        if not self._listen_open:
+            return
+        self._listen_open = False
+        self.current_ride.notify_played(self.track_position(), skipped=skipped)
+
+    def _play_from_file(self, path, name, allow_prefetch=True, advance_after=True, listen_report=True):
+        if not name:
+            name = self.set_track_name_from_metadata(path)
+        self.currently_playing = name
+        self.current_filepath = path
+        self.buffers.load_current_track(path, name)
+        if not self.buffers.current.ready:
+            raise RuntimeError(f"Could not load {path} into RAM")
+        self._track_started = time.monotonic()
+        self._track_duration = self.buffers.current.duration_s or file_duration_s(path)
+        logger.info(
+            f"Playing from RAM: {name} "
+            f"({format_slot_size(self.buffers.current)}, {format_duration(self._track_duration)})"
+        )
+        self._open_listen(listen_report)
+        hub = get_hub()
+        hub.begin_source(self, "mp3", bitrate_kbps=self.buffers.current.bitrate_kbps)
+        try:
+            while self.running and not self._stop_current:
+                if self._request_skip:
+                    if self.buffers.preload.ready and self.buffers.preload.kind == "track":
+                        self._commit_next_track(user_skip=True, listen_report=listen_report)
+                        self._request_skip = False
+                        continue
+                pos = 0
+                data = self.buffers.current.data
+                feed_rate = self._feed_rate()
+                failures = 0
+                while pos < len(data) and self.running and not self._stop_current and not self._request_skip:
+                    chunk = data[pos : pos + self.feed_chunk]
+                    # the hub paces us: feed() blocks once the decoded audio buffer is full
+                    if not hub.feed(self, chunk):
+                        failures += 1
+                        if failures > 40:
+                            raise RuntimeError("The hub is not accepting audio")
+                        time.sleep(0.05)
+                        continue
+                    failures = 0
+                    pos += len(chunk)
+                    if allow_prefetch:
+                        self._maybe_prefetch((len(data) - pos) / feed_rate)
+                if self._request_skip:
+                    continue
+                if not self.running or self._stop_current:
+                    break
+                if self.buffers.preload.ready and self.buffers.preload.kind == "window":
+                    # same file continues: keep the decoder, it is one elementary stream
+                    self.buffers.swap()
+                    continue
+                if self.buffers.preload.ready and self.buffers.preload.kind == "track":
+                    self._commit_next_track(listen_report=listen_report)
+                    continue
+                next_off = self.buffers.current.window_end()
+                if next_off < self.buffers.current.file_size:
+                    self.buffers.wait_preload(timeout=30)
+                    if self.buffers.preload.ready and self.buffers.preload.kind == "window":
+                        self.buffers.swap()
+                        continue
+                if self._prefetching:
+                    # the download outlived the track: finish it here instead of restarting it in next_track()
+                    logger.info("Track ended before its prefetch finished, waiting for the next track")
+                    if self.buffers.wait_preload(timeout=60) and self.buffers.preload.kind == "track":
+                        self._commit_next_track(listen_report=listen_report)
+                        continue
+                break
+        finally:
+            self._close_listen(skipped=False)
+            if self.running and not self._stop_current and advance_after:
+                finished = self.current_filepath
+                self.current_ride.next_track()
+                unlink_shm(finished)
+
+    def _feed_rate(self) -> float:
+        """Bytes per second this file is consumed at, for prefetch timing."""
+        slot = self.buffers.current
+        if slot.duration_s and slot.file_size:
+            return slot.file_size / slot.duration_s
+        return self.bytes_per_sec
+
+    def _commit_next_track(self, user_skip=False, listen_report=True):
+        self._close_listen(skipped=user_skip)
+        name = self.buffers.preload.name
+        path = self.buffers.preload.path
+        finished = self.current_filepath
+        hub = get_hub()
+        if user_skip:
+            hub.drop_buffered_audio()
+        self.buffers.swap()
+        hub.begin_source(self, "mp3", drain_previous=not user_skip, bitrate_kbps=self.buffers.current.bitrate_kbps)
+        self.current_ride.promote_next()
+        self.currently_playing = name
+        self.current_filepath = path
+        self._track_started = time.monotonic()
+        self._track_duration = self.buffers.current.duration_s or file_duration_s(path)
+        unlink_shm(finished)
+        logger.info(
+            f"Switched to buffered track: {name} "
+            f"({format_slot_size(self.buffers.current)}, {format_duration(self._track_duration)})"
+        )
+        self._open_listen(listen_report)

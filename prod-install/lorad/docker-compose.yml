@@ -4,7 +4,8 @@ services:
     container_name: lorad
     privileged: true
     restart: unless-stopped
-    ports: ["5475:5475", "5476:5476"]
+    shm_size: 512m
+    ports: ["5475:5475", "5476:5476", "5478:5478"]
     env_file: .env
     tmpfs:
       - /tmp

@@ -17,7 +17,7 @@ def validate(headers, data):
         if areq not in data or areq == "":
             return f"This method requires {REQUIRED_FIELDS['POST']} to be specified."
     if data["format"] not in VALID_FORMATS:
-        return f"Format {data["format"]} is unknown."
+        return f"Format {data['format']} is unknown."
     return
 
 @lrd_api_endp

@@ -4,12 +4,18 @@ from lorad.common.utils.misc import read_config
 
 logger = get_logger()
 
+
+def _inherit_endp_flags(wrapper, wrapped):
+    if getattr(wrapped, "_lrd_websocket", False):
+        wrapper._lrd_websocket = True
+
 ###
 #    Preferred decorator order
 #    - @lrd_auth
 #    - @lrd_feat_req
 #    - @lrd_validate
-#    - @lrd_api_endp
+#    - @lrd_api_endp          # REST
+#    - @lrd_websocket         # instead of lrd_api_endp: impl_GET(headers, ws)
 ###
 
 # All decorators that are above @lrd_api_endp should return responses in the raw format
@@ -34,6 +40,7 @@ def lrd_feat_req(feat_needed):
                     if afeature in config["ENABLED_FEATURES"]:
                         return func(*args, **kwargs)
             return {"rc": 405, "data": {"error": f"{feat_needed} feature is not enabled. Enable it in order to use this endpoint."}}
+        _inherit_endp_flags(lrd_wrp_endp, func)
         return lrd_wrp_endp
     return decorator
 
@@ -74,6 +81,7 @@ def lrd_validate(validate_func):
                 return {"rc": 400, "data": {"error": validate_error}}
             else:
                 return func(*args, **kwargs)
+        _inherit_endp_flags(lrd_wrp_endp, func)
         return lrd_wrp_endp
     return decorator
 
@@ -97,5 +105,33 @@ def lrd_auth(cap_required):
                     return {"rc": 401, "data": {"error": "Unauthorized"}}
             else:
                 return {"rc": 401, "data": {"error": "Unauthorized"}}
+        _inherit_endp_flags(lrd_wrp_endp, func)
         return lrd_wrp_endp
     return decorator
+
+
+def lrd_websocket(func):
+    """Upgrade GET to a WebSocket on REST.WS_LISTEN_PORT. Use instead of @lrd_api_endp.
+
+    impl_GET(headers, ws): ws is a lorad.api.utils.websocket.WebSocket.
+    Auth/feature wrappers still run as HTTP before the 101 handshake, so a failed
+    login is a normal 401 JSON response, not a half-open socket.
+    """
+
+    def lrd_wrp_ws(headers, ws=None, *args, **kwargs):
+        if ws is None:
+            return {"rc": 101, "websocket": True}
+        try:
+            func(headers, ws, *args, **kwargs)
+        except Exception as e:
+            logger.exception(e)
+        finally:
+            try:
+                if ws.open:
+                    ws.close()
+            except Exception:
+                pass
+        return {"rc": 101, "websocket": True, "done": True}
+
+    lrd_wrp_ws._lrd_websocket = True
+    return lrd_wrp_ws

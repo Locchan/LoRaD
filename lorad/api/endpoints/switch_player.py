@@ -23,7 +23,7 @@ def validate(headers, data):
     if globs.SWITCH_LOCK:
         return {"rc": 406, "data": {"message": "Cannot switch right now. Try later."}}
     if not found:
-        return f"There is no such player: {data["new_player"]}"
+        return f"There is no such player: {data['new_player']}"
     return
 
 @lrd_auth(globs.CAP_ADMIN)

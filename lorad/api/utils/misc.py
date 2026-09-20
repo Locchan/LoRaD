@@ -1,11 +1,9 @@
 import hashlib
 import threading
-from collections import deque
 from threading import Thread
 from time import sleep
 
 import lorad.common.utils.globs as globs
-from lorad.audio.server import AudioStream
 from lorad.common.utils.logger import get_logger
 
 logger = get_logger()
@@ -29,6 +27,7 @@ def get_players_names():
     return res
 
 def switch_players(new_player_name, start=True):
+    from lorad.audio.hub import get_hub
     from lorad.common.utils.logger import get_logger
     logger = get_logger()
     if new_player_name == globs.CURRENT_PLAYER_NAME:
@@ -38,16 +37,15 @@ def switch_players(new_player_name, start=True):
     prev_player = get_current_player()
     globs.CURRENT_PLAYER_NAME = new_player_name
     new_player = get_current_player()
-    AudioStream.player_switch = True
-    AudioStream.current_data = deque()
     if prev_player is not None:
         prev_player.stop()
-    if start:
+        get_hub().release(prev_player)
+    if start and new_player is not None:
         new_player.start()
-    sleep(1)
-    AudioStream.player_switch = False
+        get_hub().acquire(new_player)
 
 def start_player(player_name):
+    from lorad.audio.hub import get_hub
     from lorad.common.utils.logger import get_logger
     logger = get_logger()
     logger.info(f"Starting player: '{player_name}'")
@@ -55,7 +53,9 @@ def start_player(player_name):
         switch_players(player_name)
         return
     globs.CURRENT_PLAYER_NAME = player_name
-    get_current_player().start()
+    player = get_current_player()
+    player.start()
+    get_hub().acquire(player)
 
 def get_username_from_headers(headers):
     return headers["Authorization"].split(",")[0]

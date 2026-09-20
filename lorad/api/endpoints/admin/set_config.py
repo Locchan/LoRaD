@@ -35,7 +35,7 @@ def validate(headers, data):
     if any(word in data_key_lower for word in sensitive_words):
         return "Nah."
     if data["key"] not in EDITABLE_CONFIG_KEYS:
-        return f"{data["key"]} is not configured at all or not configured to be editable."
+        return f"{data['key']} is not configured at all or not configured to be editable."
 
     if data["key"] == "ENABLED_PROGRAMS/NewsSmall/start_times":
         try:

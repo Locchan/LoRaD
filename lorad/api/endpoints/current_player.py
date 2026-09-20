@@ -10,4 +10,5 @@ RESULT_EXAMPLE = {"GET": "{'player': 'player_radio'}"}
 @lrd_auth(globs.CAP_BASIC_USER)
 @lrd_api_endp
 def impl_GET(headers):
-    return {"player": get_current_player().name_tech}
+    player = get_current_player()
+    return {"player": player.name_tech if player is not None else None}

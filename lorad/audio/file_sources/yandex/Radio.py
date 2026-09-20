@@ -2,9 +2,12 @@ from random import random
 
 from yandex_music import Track
 
-from lorad.api.LoRadAPISrv import get_logger
+from lorad.common.utils.logger import get_logger
 
 logger = get_logger()
+
+PLAY_FROM = "desktop_win-home-playlist_of_the_day-playlist-default"
+
 
 class Radio:
     def __init__(self, yamu_obj, station_id="user:onyourwave"):
@@ -16,6 +19,8 @@ class Radio:
         self.index = 0
         self.current_track = None
         self.station_tracks = None
+        self._listening_track = None
+        self._listening_batch_id = None
 
     def get_stations(self):
         return self.client.rotor_stations_list()
@@ -26,80 +31,128 @@ class Radio:
         if station_from is not None:
             self.station_from = station_from
         logger.info(f"Starting radio. Station: {self.station_id}")
-        # get first 5 tracks
         self.__update_radio_batch(None)
-
-        # setup current track
-        self.current_track = self.__update_current_track()
+        self.current_track = self.__track_at_index()
         return self.current_track
 
     def play_next(self) -> Track:
-        # send prev track finalize info
-        self.__send_play_end_track(self.current_track, self.play_id)
-        self.__send_play_end_radio(self.current_track, self.station_tracks.batch_id)
-
-        # get next index
+        last_id = self.current_track.track_id if self.current_track is not None else None
         self.index += 1
-        if self.index >= len(self.station_tracks.sequence):
-            # get next 5 tracks. Set index to 0
-            self.__update_radio_batch(self.current_track.track_id)
-
-        # setup next track
-        self.current_track = self.__update_current_track()
+        if self.station_tracks is None or self.index >= len(self.station_tracks.sequence):
+            self.__update_radio_batch(last_id)
+        self.current_track = self.__track_at_index()
         return self.current_track
+
+    def notify_play_start(self, track: Track):
+        if track is None:
+            return
+        if self._listening_track is not None:
+            logger.debug("Yandex play start while a previous listen was still open")
+        self.play_id = self.__generate_play_id()
+        self._listening_track = track
+        self._listening_batch_id = self.station_tracks.batch_id if self.station_tracks else None
+        self.__send_play_audio(track, self.play_id, played_seconds=0, starting=True)
+        self.__send_play_start_radio(track, self._listening_batch_id)
+
+    def notify_play_end(self, track: Track, played_seconds: float, skipped: bool = False):
+        self._close_listen(track, played_seconds, skipped)
+
+    def _close_listen(self, track: Track, played_seconds: float, skipped: bool):
+        if self._listening_track is None or self.play_id is None:
+            return
+        ended = track if track is not None else self._listening_track
+        play_id = self.play_id
+        batch_id = self._listening_batch_id
+        self.play_id = None
+        self._listening_track = None
+        self._listening_batch_id = None
+        self.__send_play_audio(ended, play_id, played_seconds, starting=False)
+        if skipped:
+            self.__send_play_skip_radio(ended, played_seconds, batch_id)
+        else:
+            self.__send_play_end_radio(ended, played_seconds, batch_id)
 
     def __update_radio_batch(self, queue=None):
         self.index = 0
         self.station_tracks = self.client.rotor_station_tracks(self.station_id, queue=queue)
         self.__send_start_radio(self.station_tracks.batch_id)
 
-    def __update_current_track(self):
-        self.play_id = self.__generate_play_id()
-        track = self.client.tracks([self.station_tracks.sequence[self.index].track.track_id])[0]
-        self.__send_play_start_track(track, self.play_id)
-        self.__send_play_start_radio(track, self.station_tracks.batch_id)
-        return track
+    def __track_at_index(self) -> Track:
+        return self.client.tracks([self.station_tracks.sequence[self.index].track.track_id])[0]
 
     def __send_start_radio(self, batch_id):
         self.client.rotor_station_feedback_radio_started(
             station=self.station_id, from_=self.station_from, batch_id=batch_id
         )
 
-    def __send_play_start_track(self, track, play_id):
-        total_seconds = track.duration_ms / 1000
-        self.client.play_audio(
-            from_='desktop_win-home-playlist_of_the_day-playlist-default',
+    def __album_id(self, track):
+        if track.albums:
+            return track.albums[0].id
+        return 0
+
+    def __duration_s(self, track) -> float:
+        if not track or not track.duration_ms:
+            return 0.0
+        return track.duration_ms / 1000
+
+    def __send_play_audio(self, track, play_id, played_seconds, starting: bool):
+        total_seconds = self.__duration_s(track)
+        played = 0.0 if starting else max(0.0, min(float(played_seconds), total_seconds or float(played_seconds)))
+        payload = dict(
+            from_=PLAY_FROM,
             track_id=track.id,
-            album_id=track.albums[0].id,
+            album_id=self.__album_id(track),
             play_id=play_id,
-            track_length_seconds=0,
-            total_played_seconds=0,
+            track_length_seconds=0 if starting else int(total_seconds),
+            total_played_seconds=played,
             end_position_seconds=total_seconds,
         )
+        logger.debug(
+            f"Yandex play_audio {'start' if starting else 'end'}: "
+            f"track={track.id} play_id={play_id} played={played:.1f}/{total_seconds:.1f}s"
+        )
+        try:
+            self.client.play_audio(**payload)
+        except Exception as e:
+            logger.debug(f"Yandex play_audio failed: {e.__class__.__name__}: {e}")
 
     def __send_play_start_radio(self, track, batch_id):
-        self.client.rotor_station_feedback_track_started(station=self.station_id, track_id=track.id, batch_id=batch_id)
+        logger.debug(f"Yandex rotor trackStarted: track={track.id} batch={batch_id}")
+        try:
+            self.client.rotor_station_feedback_track_started(
+                station=self.station_id, track_id=track.id, batch_id=batch_id
+            )
+        except Exception as e:
+            logger.debug(f"Yandex rotor trackStarted failed: {e.__class__.__name__}: {e}")
 
-    def __send_play_end_track(self, track, play_id):
-        # played_seconds = 5.0
-        played_seconds = track.duration_ms / 1000
-        total_seconds = track.duration_ms / 1000
-        self.client.play_audio(
-            from_='desktop_win-home-playlist_of_the_day-playlist-default',
-            track_id=track.id,
-            album_id=track.albums[0].id,
-            play_id=play_id,
-            track_length_seconds=int(total_seconds),
-            total_played_seconds=played_seconds,
-            end_position_seconds=total_seconds,
+    def __send_play_end_radio(self, track, played_seconds, batch_id):
+        played = max(0.0, float(played_seconds))
+        logger.debug(
+            f"Yandex rotor trackFinished: track={track.id} played={played:.1f}s batch={batch_id}"
         )
+        try:
+            self.client.rotor_station_feedback_track_finished(
+                station=self.station_id,
+                track_id=track.id,
+                total_played_seconds=played,
+                batch_id=batch_id,
+            )
+        except Exception as e:
+            logger.debug(f"Yandex rotor trackFinished failed: {e.__class__.__name__}: {e}")
 
-    def __send_play_end_radio(self, track, batch_id):
-        played_seconds = track.duration_ms / 1000
-        self.client.rotor_station_feedback_track_finished(
-            station=self.station_id, track_id=track.id, total_played_seconds=played_seconds, batch_id=batch_id
-        )
+    def __send_play_skip_radio(self, track, played_seconds, batch_id):
+        played = max(0.0, float(played_seconds))
+        logger.debug(f"Yandex rotor skip: track={track.id} played={played:.1f}s batch={batch_id}")
+        try:
+            self.client.rotor_station_feedback_skip(
+                station=self.station_id,
+                track_id=track.id,
+                total_played_seconds=played,
+                batch_id=batch_id,
+            )
+        except Exception as e:
+            logger.debug(f"Yandex rotor skip failed: {e.__class__.__name__}: {e}")
 
     @staticmethod
     def __generate_play_id():
-        return '%s-%s-%s' % (int(random() * 1000), int(random() * 1000), int(random() * 1000))
+        return "%s-%s-%s" % (int(random() * 1000), int(random() * 1000), int(random() * 1000))

@@ -83,6 +83,31 @@
     return data;
   }
 
+  function openWhatsPlaying(onMessage, onClose) {
+    const wsUrl = `${config().wsUrl.replace(/\/$/, "")}/whatsplaying`;
+    const socket = new WebSocket(wsUrl);
+    socket.addEventListener("open", () => {
+      socket.send(JSON.stringify({ username: getUsername(), token: getToken() }));
+    });
+    socket.addEventListener("message", (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.error === "Unauthorized") {
+          logout();
+          global.dispatchEvent(new CustomEvent("lorad:unauthorized"));
+          socket.close();
+          return;
+        }
+        onMessage(data);
+      } catch (error) {
+        console.error("Invalid whatsplaying WebSocket message:", error);
+      }
+    });
+    socket.addEventListener("close", () => onClose(socket));
+    socket.addEventListener("error", () => socket.close());
+    return socket;
+  }
+
   global.LoradApi = {
     isAuthenticated,
     getUsername,
@@ -93,9 +118,12 @@
     whoami: () => request("/user/whoami"),
     getYandexStations: () => request("/yandex/available_stations"),
     getCurrentStation: () => request("/yandex/current_station"),
-    getWhatsPlaying: () => request("/whatsplaying"),
+    openWhatsPlaying,
     switchYandexStation: (newStation) =>
       request("/yandex/switch_station", { method: "POST", body: { new_station: newStation } }),
+    nextYandexTrack: () => request("/yandex/next_track", { method: "POST", body: {} }),
+    setYandexTrackLiked: (liked) =>
+      request("/yandex/like_track", { method: "POST", body: { liked } }),
     switchRadioStation: (newStation) =>
       request("/radio/switch_station", { method: "POST", body: { new_station: newStation } }),
     getAvailablePlayers: () => request("/available_players"),
@@ -104,7 +132,8 @@
     switchPlayer: (newPlayer) =>
       request("/switch_player", { method: "POST", body: { new_player: newPlayer } }),
     getRadioCurrentStation: () => request("/radio/current_station"),
-    getConfig: (key) => request("/admin/get_config", { method: "POST", body: { key } }),
+    getConfig: (key) =>
+      request(`/admin/get_config?key=${encodeURIComponent(key)}`),
     setConfig: (key, value) => request("/admin/set_config", { method: "POST", body: { key, value } }),
   };
 })(window);

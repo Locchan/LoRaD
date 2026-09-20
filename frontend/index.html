@@ -200,9 +200,21 @@
             <button type="button" id="play-pause-btn" class="control-btn play-pause-btn" disabled>
               <i id="play-pause-icon" class="fas fa-play"></i>
             </button>
+            <button type="button" id="next-track-btn" class="control-btn next-track-btn" title="Следующий трек" hidden>
+              <i id="next-track-icon" class="fas fa-forward-step"></i>
+            </button>
+            <button type="button" id="like-track-btn" class="control-btn like-track-btn" title="Нравится" hidden>
+              <i id="like-track-icon" class="far fa-heart"></i>
+            </button>
             <button type="button" id="refresh-btn" class="control-btn refresh-btn" title="Обновить поток">
               <i class="fas fa-sync-alt"></i>
             </button>
+          </div>
+
+          <div id="track-progress" class="track-progress" hidden>
+            <span id="track-position">0:00</span>
+            <span class="track-progress-sep">/</span>
+            <span id="track-length">0:00</span>
           </div>
 
           <div class="player-footer">
@@ -286,13 +298,17 @@
         <div class="section-header">
           <h2><i class="fas fa-clock"></i> Время выпусков новостей</h2>
           <p class="section-description">Настройте время, когда должны выходить новости</p>
+          <p id="schedule-prep-note" class="section-description schedule-prep-note" hidden>
+            Новостям нужно <strong>как минимум <span id="schedule-prep-mins"></span></strong> для подготовки.
+          </p>
         </div>
 
         <div class="schedule-controls">
           <div class="add-time-control">
             <div class="time-input-group">
               <label for="newTime" class="time-label">Добавить время:</label>
-              <input type="time" id="newTime" class="time-input">
+              <!-- lang forces the 24h picker: an en-US browser offers AM/PM and 20:56 gets saved as 08:56 -->
+              <input type="time" id="newTime" class="time-input" lang="ru-RU" step="60">
               <button type="button" id="add-time-btn" class="add-btn" disabled>
                 <i class="fas fa-plus"></i>
                 Добавить
