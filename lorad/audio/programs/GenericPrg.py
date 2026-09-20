@@ -58,6 +58,7 @@ class GenericPrg:
                     prev = aplayer
                     break
         acquired = False
+        completed = False
         try:
             self.program_running = True
             total = 0.0
@@ -96,6 +97,7 @@ class GenericPrg:
                     if not buffers.wait_preload(timeout=30):
                         raise RuntimeError(f"Timed out loading program file: {afile}")
                     buffers.swap()
+            completed = True
             logger.info(f"Program [{self.name}] finished.")
         except Exception as e:
             logger.error(f"Failed to run the program: {e.__class__.__name__}")
@@ -103,7 +105,9 @@ class GenericPrg:
             logger.exception(e)
         finally:
             if acquired:
-                hub.release(self)
+                # The last seconds of the digest are still inside ffmpeg; let them play.
+                # After a failure there is nothing worth waiting for, so cut it there.
+                hub.release(self, drain=completed)
                 if prev is not None:
                     prev.start()
                     hub.acquire(prev)

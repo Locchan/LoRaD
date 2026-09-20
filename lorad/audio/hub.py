@@ -79,14 +79,16 @@ class AudioHub:
         if input_format is not None:
             self.begin_source(owner, input_format)
 
-    def release(self, owner):
+    def release(self, owner, drain=False):
+        """Give up the hub. drain=True plays out what is still inside the decoder,
+        which is a few seconds: feeding always runs ahead of the listener."""
         with self._source_lock:
             with self._state_lock:
                 if self._owner is not owner:
                     return
                 self._owner = None
             logger.info(f"AudioHub: {_owner_name(owner)} released the hub")
-            self._close_decoder(drain=False)
+            self._close_decoder(drain=drain)
 
     def owner(self):
         return self._owner
