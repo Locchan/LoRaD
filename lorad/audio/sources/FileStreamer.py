@@ -42,6 +42,7 @@ class FileStreamer(GenericPlayer):
         self._request_skip = False
         self._prefetching = False
         self._prefetch_epoch = 0
+        self.switching = False
         self._track_started = 0.0
         self._track_duration = 0.0
         self._listen_open = False
@@ -156,20 +157,37 @@ class FileStreamer(GenericPlayer):
         ride = self.current_ride
         if getattr(ride, "radio", None) is None:
             raise RuntimeError("Yandex is not initialized.")
-        self.stop()
-        # Everything buffered came from the old station, so throw it away before switching.
-        self._discard_buffers()
-        ride.switch_station(source_id)
-        self.start()
+        if self.switching:
+            raise RuntimeError("A station switch is already in progress.")
+        self.switching = True
+        # The first track of the new station has to be downloaded; keep playing until it is here.
+        Thread(name="StationSw", target=self._switch_worker, args=(ride, source_id), daemon=True).start()
 
-    def _discard_buffers(self):
-        self._request_skip = False
-        with self.buffers.lock:
-            # An in-flight prefetch must not fill the buffer with a track from the old station.
-            self._prefetch_epoch += 1
-            self.buffers.reserve_preload_for_track = False
-            self.buffers.preload.clear()
-            self.buffers.current.clear()
+    def _switch_worker(self, ride, source_id):
+        try:
+            with self.buffers.lock:
+                # An in-flight prefetch must not land a track from the old station.
+                self._prefetch_epoch += 1
+                self.buffers.reserve_preload_for_track = True
+                self.buffers.preload.clear()
+            got = ride.switch_station(source_id)
+            if not got:
+                logger.error(f"Station switch failed: no playable track on {source_id}")
+                return
+            name, path = got
+            self.buffers.load_preload_track(path, name)
+            if not self.running:
+                # Nothing is playing (a program owns the hub): the carousel will pick it up.
+                ride.promote_next()
+                return
+            if not self._skip_to_preloaded():
+                logger.error(f"Station switch to {source_id}: player did not take the new track")
+        except Exception as e:
+            logger.exception(e)
+        finally:
+            # If the new track never arrived, the current file still needs its windows.
+            self.buffers.release_track_reservation()
+            self.switching = False
 
     def set_track_name_from_metadata(self, path):
         try:
@@ -226,17 +244,21 @@ class FileStreamer(GenericPlayer):
             else:
                 logger.error("Skip failed: next track did not buffer in time")
                 return False
-            self._request_skip = True
-            waited = 0.0
-            while self._request_skip and self.running and waited < 60:
-                time.sleep(0.1)
-                waited += 0.1
-            if self._request_skip:
-                self._request_skip = False
-                return False
-            return True
+            return self._skip_to_preloaded()
         finally:
             self._skip_busy = False
+
+    def _skip_to_preloaded(self) -> bool:
+        """Ask the feeding loop to cut over to whatever sits in the preload buffer."""
+        self._request_skip = True
+        waited = 0.0
+        while self._request_skip and self.running and waited < 60:
+            time.sleep(0.1)
+            waited += 0.1
+        if self._request_skip:
+            self._request_skip = False
+            return False
+        return True
 
     def _ensure_next_track_preloaded(self):
         with self.buffers.lock:

@@ -88,14 +88,18 @@ class YaMu(FileRide):
         return track
 
     def switch_station(self, station_id):
+        """Start the new station and download its first track as the next one, so the
+        player can cut over from what it is already playing."""
         if self.radio is None:
             raise RuntimeError("Yandex is not initialized.")
         # Whatever was prefetched belongs to the old station.
         self.drop_prefetched()
         track = self.radio.start_radio(station_id)
         self.radio_started = True
-        self.__set_current_track(track)
-        return track
+        self.__set_next_track(track)
+        if not self.next_track_path:
+            return None
+        return self.next_track_name, self.next_track_path
 
     def drop_prefetched(self):
         if self.next_track_path:

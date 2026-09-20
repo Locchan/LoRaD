@@ -109,6 +109,14 @@ class DoubleBuffer:
             self.preload.fill(path, name, 0, "track")
             self.reserve_preload_for_track = False
 
+    def release_track_reservation(self):
+        """Give the preload slot back to window loading after a track load fell through."""
+        with self.lock:
+            if not self.reserve_preload_for_track:
+                return
+            self.reserve_preload_for_track = False
+        self._maybe_start_window_preload()
+
     def swap(self):
         with self.lock:
             self.current, self.preload = self.preload, self.current
