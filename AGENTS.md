@@ -290,7 +290,7 @@ Images are Alpine Python 3.12. `full_install.sh` / `upgrade_install.sh` build th
 - API path matching is literal. `/foo` ≠ `/foo/`
 - `lrd_auth` reads `headers._headers` (stdlib private). Pass the real request headers object, not a plain dict, unless you change the decorator
 - `FileStreamer.cleanup` does not delete downloaded tracks (the `os.remove` is commented out)
-- The ffmpeg concat list is written into shm and ffmpeg resolves relative `file` entries against that list, so on-disk assets (`RESDIR`, `DATADIR`, `FALLBACK_TRACK_DIR`) must go through `local_path()`, which also fixes Windows separators in config
+- The ffmpeg concat list is written into shm and ffmpeg resolves relative `file` entries against that list, so on-disk assets (`RESDIR`, `DATADIR`, `FALLBACK_TRACK_DIR`) are copied into `/dev/shm/lorad/pinned` at boot (`seed_pinned_assets`). The janitor and `unlink_shm` never delete that tree. `local_path()` still resolves the on-disk source (Windows separators included) before the copy.
 - `NewsPrgS.add_ads` / `add_random_files` assign a new list that `_reencode_news` does not always pass to `ffmpeg_concatenate` — if you touch digest assembly, make the file list consistent
 - `lorad/audio/file_sources/yandex/Radio.py` and `RadReStreamer` import `get_logger` / `read_config` from odd places; prefer `lorad.common.utils.*` in new code
 - Watchdog uses `athread.is_alive` (method, always truthy) rather than `is_alive()`. Do not rely on it to detect dead threads until that is fixed
