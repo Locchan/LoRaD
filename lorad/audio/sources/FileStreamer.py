@@ -12,8 +12,8 @@ from lorad.audio.sources.GenericPlayer import GenericPlayer
 from lorad.common.localization.localization import get_loc
 from lorad.common.utils.logger import get_logger
 import lorad.common.utils.globs as globs
-from lorad.common.utils.misc import local_path, read_config
-from lorad.common.utils.shm import unlink_shm
+from lorad.common.utils.misc import read_config
+from lorad.common.utils.shm import PINNED_FALLBACK, unlink_shm
 
 logger = get_logger()
 
@@ -110,8 +110,7 @@ class FileStreamer(GenericPlayer):
 
     def _play_fallback(self):
         logger.info("Loading fallback track.")
-        config = read_config()
-        fallback_dir = local_path(config["FALLBACK_TRACK_DIR"])
+        fallback_dir = PINNED_FALLBACK
         fallback_tracks = os.listdir(fallback_dir)
         if len(fallback_tracks) == 0:
             logger.error("Nothing to fall back to! No fallback tracks! Catastrophe!")
