@@ -59,6 +59,8 @@ class RadReStreamer(GenericPlayer):
         self.default_format = config["DEFAULT_AUDIO_FORMAT"]
         self.current_station = "default"
         self.currently_playing = self.current_station
+        # Bumped on every station switch so a stream loop still on the old URL gives up.
+        self._epoch = 0
         self.get_stations()
 
     def get_stations(self) -> dict:
@@ -76,12 +78,13 @@ class RadReStreamer(GenericPlayer):
                 logger.error(f"Station not found: {self.current_station}")
                 time.sleep(5)
                 continue
+            epoch = self._epoch
             station_url = stations[self.current_station]["url"]
             self.currently_playing = stations[self.current_station]["name"]
             fmt = self.preflight_format(station_url) or self.default_format
             hub.acquire(self)
             logger.info(f"Starting streaming '{self.current_station}' ({fmt}) {station_url}")
-            self._stream(hub, station_url, fmt)
+            self._stream(hub, station_url, fmt, epoch)
 
     def start(self):
         self.running = True
@@ -98,6 +101,7 @@ class RadReStreamer(GenericPlayer):
         return self.current_station
 
     def switch_source(self, source_id):
+        self._epoch += 1
         self.stop()
         self.current_station = source_id
         self.start()
@@ -114,9 +118,9 @@ class RadReStreamer(GenericPlayer):
             logger.warn(f"Preflight failed: {e.__class__.__name__}")
             return None
 
-    def _stream(self, hub, station_url, fmt):
+    def _stream(self, hub, station_url, fmt, epoch):
         error_iterations = 0
-        while self.running:
+        while self.running and self._epoch == epoch:
             try:
                 with requests.get(station_url, stream=True, timeout=30) as resp:
                     resp.raise_for_status()
@@ -127,13 +131,17 @@ class RadReStreamer(GenericPlayer):
                     live_fmt = info.get("format") or fmt
                     hub.begin_source(self, live_fmt, bitrate_kbps=_kbps(info.get("bitrate")))
                     for raw_chunk in resp.iter_content(chunk_size=8192):
-                        if not self.running:
+                        if not self.running or self._epoch != epoch:
                             return
                         if raw_chunk and not hub.feed(self, raw_chunk):
+                            if hub.owner() is not self:
+                                # Someone else plays now; standby will reconnect when we are back.
+                                logger.info("Hub is no longer ours, dropping the station stream")
+                                return
                             logger.warning("The hub stopped accepting audio, reconnecting")
                             break
             except Exception as e:
-                if not self.running:
+                if not self.running or self._epoch != epoch:
                     return
                 error_iterations += 1
                 retry_time = min(error_iterations * 2, 15)
