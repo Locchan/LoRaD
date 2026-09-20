@@ -19,6 +19,10 @@ DRAIN_TIMEOUT_S = 120.0
 _HUB = None
 
 
+def _owner_name(owner):
+    return getattr(owner, "name_tech", owner)
+
+
 def get_hub():
     global _HUB
     if _HUB is None:
@@ -63,13 +67,14 @@ class AudioHub:
             prev = self._owner
             self._owner = owner
         if prev is not None and prev is not owner:
-            logger.info(
-                f"AudioHub: {getattr(prev, 'name_tech', prev)} yielding to {getattr(owner, 'name_tech', owner)}"
-            )
+            logger.info(f"AudioHub: {_owner_name(prev)} yielding to {_owner_name(owner)}")
             try:
                 prev.stop()
             except Exception as e:
                 logger.warn(f"Previous owner stop failed: {e.__class__.__name__}")
+        elif prev is None:
+            # A program releases before handing back, so this is the other half of a handover.
+            logger.info(f"AudioHub: {_owner_name(owner)} took the hub")
         if input_format is not None:
             self.begin_source(owner, input_format)
 
@@ -79,6 +84,7 @@ class AudioHub:
                 if self._owner is not owner:
                     return
                 self._owner = None
+            logger.info(f"AudioHub: {_owner_name(owner)} released the hub")
             self._close_decoder(drain=False)
 
     def owner(self):

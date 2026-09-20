@@ -98,6 +98,28 @@ def unlink_shm(path: str) -> bool:
         return False
 
 
+def _file_size(path: str) -> int | None:
+    try:
+        return os.stat(path).st_size
+    except OSError:
+        return None
+
+
+def _pin_file(src: str, dest: str) -> bool:
+    # Same rule as gimn.sh: copy only if the pinned file is missing or a different size.
+    src_size = _file_size(src)
+    if src_size is None:
+        return False
+    if os.path.isfile(dest) and _file_size(dest) == src_size:
+        return False
+    parent = os.path.dirname(dest)
+    if parent:
+        os.makedirs(parent, mode=0o700, exist_ok=True)
+    shutil.copy2(src, dest)
+    logger.info(f"Pinned media in shm: {src} -> {dest}")
+    return True
+
+
 def _pin_tree(src: str, dest: str) -> str | None:
     if src and is_pinned_shm(src):
         logger.error(f"Config points at pinned shm instead of on-disk media: {src}")
@@ -106,19 +128,22 @@ def _pin_tree(src: str, dest: str) -> str | None:
         logger.warning(f"Nothing to pin into shm: {src}")
         return None
     os.makedirs(SHM_PINNED, mode=0o700, exist_ok=True)
-    if os.path.isdir(src):
-        shutil.copytree(
-            src,
-            dest,
-            dirs_exist_ok=True,
-            ignore=shutil.ignore_patterns(*PINNED_IGNORE),
-        )
-    else:
-        parent = os.path.dirname(dest)
-        if parent:
-            os.makedirs(parent, mode=0o700, exist_ok=True)
-        shutil.copy2(src, dest)
-    logger.info(f"Pinned media in shm: {src} -> {dest}")
+    if os.path.isfile(src):
+        _pin_file(src, dest)
+        return dest
+    copied = 0
+    for root, dirs, files in os.walk(src):
+        dirs[:] = [name for name in dirs if name not in PINNED_IGNORE]
+        rel = os.path.relpath(root, src)
+        for name in files:
+            if name in PINNED_IGNORE:
+                continue
+            src_file = os.path.join(root, name)
+            dest_file = os.path.join(dest, name) if rel == "." else os.path.join(dest, rel, name)
+            if _pin_file(src_file, dest_file):
+                copied += 1
+    if copied == 0:
+        logger.info(f"Pinned media already in shm: {src} -> {dest}")
     return dest
 
 
