@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from http.server import ThreadingHTTPServer
 import os
 import signal
 from threading import Thread
@@ -50,7 +49,9 @@ from lorad.audio.sources.FileStreamer import FileStreamer
 from lorad.audio.file_sources.yandex.YaMu import YaMu
 
 logger.info("Starting LoRaD...")
-globs.CURRENT_DATA_STREAMER = ThreadingHTTPServer(("0.0.0.0", config["LISTEN_PORT"]), AudioStream.AudioStream)
+globs.CURRENT_DATA_STREAMER = AudioStream.ThreadingHTTPServer(
+    ("0.0.0.0", config["LISTEN_PORT"]), AudioStream.AudioStream
+)
 
 logger.info(f"Enabled features: {config['ENABLED_FEATURES']}")
 

@@ -117,7 +117,7 @@ class NewsPrgS(GenericPrg):
 
     def add_random_files(self, files_list, count=1):
         random_filesdir = local_path(self.config["DATADIR"], "resources", "random_voices")
-        rnd_files = [os.path.join(random_filesdir, f) for f in os.listdir(random_filesdir) if os.path.isfile(os.path.join(random_filesdir, f))]
+        rnd_files = [os.path.join(random_filesdir, f) for f in os.listdir(random_filesdir) if os.path.isfile(os.path.join(random_filesdir, f)) and f != ".gitkeep"]
         logger.info(f"Adding {count} random files to the news of {len(rnd_files)} files total")
         if not rnd_files:
             logger.warning("Could not get a random file to add to the news.")
@@ -130,7 +130,7 @@ class NewsPrgS(GenericPrg):
 
     def add_ads(self, files_list, count=1):
         adsdir = local_path(self.config["DATADIR"], "resources", "ads")
-        ad_files = [os.path.join(adsdir, f) for f in os.listdir(adsdir) if os.path.isfile(os.path.join(adsdir, f))]
+        ad_files = [os.path.join(adsdir, f) for f in os.listdir(adsdir) if os.path.isfile(os.path.join(adsdir, f)) and f != ".gitkeep"]
         logger.info(f"Adding {count} ads to the news of {len(ad_files)} ads total")
         if not ad_files:
             logger.warning("Could not get an ad to add to the news.")

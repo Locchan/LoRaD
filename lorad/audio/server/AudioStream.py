@@ -13,6 +13,8 @@ config = read_config()
 
 
 class ThreadingHTTPServer(NamedThreadingMixIn, HTTPServer):
+    # Listener threads are long-lived; keep them daemonic like http.server's own class.
+    daemon_threads = True
     thread_prefix = "WRK#"
 
 

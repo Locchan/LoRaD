@@ -3,18 +3,24 @@
 
 Straight on libgpiod instead of gpiozero: every gpiozero backend (lgpio, RPi.GPIO)
 keeps a sampling thread running and burns ~4% CPU on a Pi 3 with the knob untouched.
-A libgpiod bulk wait blocks in the kernel until an edge arrives, so idle costs nothing.
+A libgpiod wait blocks in the kernel until an edge arrives, so idle costs nothing.
+
+Needs the libgpiod v2 bindings (python3-libgpiod on Debian 13).
 """
 
+import glob
 import subprocess
 import time
 
 import gpiod
+from gpiod.line import Bias, Edge
 
-CHIP = "gpiochip0"
 PIN_A = 17
 PIN_B = 27
 VOLUME_CMD = "/usr/bin/volume"
+# The header pins hang off the SoC pin controller; its chip number moves between
+# kernels and Pi models, so find it by label instead of hardcoding gpiochip0.
+CHIP_LABEL_PREFIX = "pinctrl-"
 # Detents seen within this window are applied as a single volume call.
 BURST_S = 0.08
 IDLE_WAIT_S = 1
@@ -54,6 +60,17 @@ class Decoder:
         return 0
 
 
+def find_chip():
+    for path in sorted(glob.glob("/dev/gpiochip*")):
+        if not gpiod.is_gpiochip_device(path):
+            continue
+        with gpiod.Chip(path) as chip:
+            info = chip.get_info()
+            if info.label.startswith(CHIP_LABEL_PREFIX) and info.num_lines > max(PIN_A, PIN_B):
+                return path
+    raise RuntimeError("no pin controller gpiochip found")
+
+
 def apply_steps(steps):
     argument = f"{'+' if steps > 0 else '-'}{abs(steps)}"
     try:
@@ -63,29 +80,29 @@ def apply_steps(steps):
 
 
 def main():
-    chip = gpiod.Chip(CHIP)
-    lines = chip.get_lines([PIN_A, PIN_B])
-    lines.request(
+    settings = gpiod.LineSettings(edge_detection=Edge.BOTH, bias=Bias.PULL_UP)
+    request = gpiod.request_lines(
+        find_chip(),
         consumer="volume_knob",
-        type=gpiod.LINE_REQ_EV_BOTH_EDGES,
-        flags=gpiod.LINE_REQ_FLAG_BIAS_PULL_UP,
+        config={(PIN_A, PIN_B): settings},
     )
     decoder = Decoder()
     pending = 0
     deadline = 0.0
 
-    while True:
-        ready = lines.event_wait(nsec=int(BURST_S * 1e9)) if pending else lines.event_wait(sec=IDLE_WAIT_S)
-        for line in ready or ():
-            event = line.event_read()
-            delta = decoder.feed(line.offset(), event.type == gpiod.LineEvent.RISING_EDGE)
-            if delta and not pending:
-                # Cap the burst so a long uninterrupted turn still moves the volume.
-                deadline = time.monotonic() + BURST_S
-            pending += delta
-        if pending and (not ready or time.monotonic() >= deadline):
-            apply_steps(pending)
-            pending = 0
+    with request:
+        while True:
+            ready = request.wait_edge_events(BURST_S if pending else IDLE_WAIT_S)
+            for event in request.read_edge_events() if ready else ():
+                rising = event.event_type == gpiod.EdgeEvent.Type.RISING_EDGE
+                delta = decoder.feed(event.line_offset, rising)
+                if delta and not pending:
+                    # Cap the burst so a long uninterrupted turn still moves the volume.
+                    deadline = time.monotonic() + BURST_S
+                pending += delta
+            if pending and (not ready or time.monotonic() >= deadline):
+                apply_steps(pending)
+                pending = 0
 
 
 if __name__ == "__main__":
