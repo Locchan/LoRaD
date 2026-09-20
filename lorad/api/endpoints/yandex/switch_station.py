@@ -22,7 +22,7 @@ def validate(headers, data):
     stations = player.list_sources()
     if stations is None:
         return {"rc": 406, "data": {"message": "Yandex is not initialized."}}
-    if globs.SWITCH_LOCK:
+    if globs.SWITCH_LOCK or player.switching:
         return {"rc": 406, "data": {"message": "Cannot switch right now. Try later."}}
     if data["new_station"] not in stations.values():
         return f"There is no such station: {data['new_station']}"
