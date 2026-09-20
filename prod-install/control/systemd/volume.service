@@ -1,0 +1,12 @@
+[Unit]
+Description=LoRaD volume knob
+After=network.target
+
+[Service]
+ExecStart=/opt/radio/control/volume_knob.py
+Type=simple
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

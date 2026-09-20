@@ -1,20 +1,33 @@
-import hashlib
+from urllib.parse import parse_qs, urlsplit
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from threading import Thread
 import json
 import os
 import sys
 
+from lorad.api.utils.websocket import WebSocket, is_websocket_upgrade
+from lorad.common.utils.http_threads import NamedThreadingMixIn
 from lorad.common.utils.logger import get_logger
 from lorad.common.utils.misc import get_version, read_config
 
 endpoints = {}
+ws_endpoints = {}
 logger = get_logger()
 config = read_config()
 MAX_DATA_LEN = config["REST"]["MAX_DATA_LEN_BYTES"]
 DEBUG_ONLY_PRINT_ENDPOINTS = ["/whatsplaying"]
 
+
+def rest_listen_port():
+    return config["REST"]["LISTEN_PORT"]
+
+
+def ws_listen_port():
+    return config["REST"].get("WS_LISTEN_PORT", 5478)
+
+
 def register_endpoints():
-    global endpoints
+    global endpoints, ws_endpoints
     logger.info("Registering API endpoints")
     import lorad.api.endpoints
     registered_endpoints = 0
@@ -24,18 +37,22 @@ def register_endpoints():
             for amethod in ["GET", "POST"]:
                 if amethod not in endpoints:
                     endpoints[amethod] = {}
+                if amethod not in ws_endpoints:
+                    ws_endpoints[amethod] = {}
 
                 # If the endpoint module does not have impl_{amethod}, continue to look for other methods
                 try:
-                    getattr(endpoint_module, f"impl_{amethod}")
+                    impl = getattr(endpoint_module, f"impl_{amethod}")
                 except AttributeError:
                     continue
 
-                logger.debug(f"Registering: {amethod} - {endpoint_module.ENDP_PATH}")
+                dest = ws_endpoints if getattr(impl, "_lrd_websocket", False) else endpoints
+                kind = "WS" if dest is ws_endpoints else amethod
+                logger.debug(f"Registering: {kind} - {endpoint_module.ENDP_PATH}")
 
-                if endpoint_module.ENDP_PATH not in endpoints[amethod]:
-                    endpoints[amethod][endpoint_module.ENDP_PATH] = getattr(endpoint_module, f"impl_{amethod}")
-                    registered_endpoints+=1
+                if endpoint_module.ENDP_PATH not in dest[amethod]:
+                    dest[amethod][endpoint_module.ENDP_PATH] = impl
+                    registered_endpoints += 1
                 else:
                     logger.error(f"Could not register {amethod} endpoint from module {endpoint_module.__name__}: endpoint path already taken.")
                     os._exit(0)
@@ -44,6 +61,12 @@ def register_endpoints():
             logger.exception(e)
             os._exit(0)
     logger.info(f"Registered {registered_endpoints} endpoints.")
+
+
+class ThreadingWSServer(NamedThreadingMixIn, HTTPServer):
+    daemon_threads = True
+    thread_prefix = "WS#"
+
 
 class LoRadAPIServer(BaseHTTPRequestHandler):
     @staticmethod
@@ -57,22 +80,55 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
 
     def error(self, code, message):
         self.send_response(code)
+        self._send_cors_headers()
         self.end_headers()
         self.wfile.write(json.dumps({"error": message}).encode("utf-8"))
         self.wfile.flush()
+
+    def _send_cors_headers(self):
+        origin = self.headers.get("Origin") or "*"
+        self.send_header("Access-Control-Allow-Origin", origin)
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Requested-With")
+        self.send_header("Access-Control-Max-Age", "1728000")
+        if origin != "*":
+            self.send_header("Vary", "Origin")
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self._send_cors_headers()
+        self.end_headers()
 
     def do_GET(self):
         try:
             ip_from_headers = self.headers.get('X-Real-IP')
             if ip_from_headers is not None:
                 self.client_address = (ip_from_headers, self.client_address[1])
-            if self.path in endpoints["GET"]:
-                endpoint_exec_result = endpoints["GET"][self.path](self.headers)
-                self.send_response(endpoint_exec_result["rc"])
+            parsed = urlsplit(self.path)
+            path = parsed.path
+            if path in ws_endpoints.get("GET", {}):
+                self.error(
+                    426,
+                    f"This endpoint is a WebSocket. Connect to port {ws_listen_port()}.",
+                )
+                logger.info(f"[{self.client_address[0]}] - RQ: GET {path}: 426")
+                return
+            if path in endpoints["GET"]:
+                query = {
+                    key: values[0] if len(values) == 1 else values
+                    for key, values in parse_qs(parsed.query, keep_blank_values=True).items()
+                }
+                fn = endpoints["GET"][path]
+                if query:
+                    endpoint_exec_result = fn(self.headers, query)
+                else:
+                    endpoint_exec_result = fn(self.headers)
+                self.send_response(endpoint_exec_result['rc'])
                 content_type = "application/json"
                 if "content-type" in endpoint_exec_result:
                     content_type = endpoint_exec_result["content-type"]
                 self.send_header('Content-type', content_type)
+                self._send_cors_headers()
                 self.end_headers()
                 if isinstance(endpoint_exec_result["data"], dict):
                     response = json.dumps(endpoint_exec_result["data"])
@@ -83,11 +139,11 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
                 real_ip = self.headers.get('X-Real-IP')
                 if real_ip is None:
                     real_ip = self.client_address[0]
-                if self.path in DEBUG_ONLY_PRINT_ENDPOINTS and int(endpoint_exec_result["rc"]) == 200:
-                    logger.debug(f"[{real_ip}] - RQ: GET {self.path}: {endpoint_exec_result["rc"]}." +
+                if path in DEBUG_ONLY_PRINT_ENDPOINTS and int(endpoint_exec_result['rc']) == 200:
+                    logger.debug(f"[{real_ip}] - RQ: GET {self.path}: {endpoint_exec_result['rc']}." +
                                 f" Data: TX:{sys.getsizeof(response)}b")
                 else:
-                    logger.info(f"[{real_ip}] - RQ: GET {self.path}: {endpoint_exec_result["rc"]}." +
+                    logger.info(f"[{real_ip}] - RQ: GET {self.path}: {endpoint_exec_result['rc']}." +
                                 f" Data: TX:{sys.getsizeof(response)}b")
                 logger.debug(f"RQ Headers: {self.headers}")
                 if sys.getsizeof(response) < 8192:
@@ -95,7 +151,7 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
                 else:
                     logger.debug(f"Data omitted: too big.")
             else:
-                self.error(404, f"No such endpoint: '{self.path}'")
+                self.error(404, f"No such endpoint: '{path}'")
                 logger.info(f"RQ: GET {self.path}: 404")
         except Exception as e:
             try:
@@ -114,6 +170,7 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
                 data_length = int(self.headers.get('Content-Length'))
                 if data_length > MAX_DATA_LEN:
                     self.send_response(413)
+                    self._send_cors_headers()
                     self.end_headers()
                 try:
                     data = json.loads(self.rfile.read(data_length).decode("utf-8"))
@@ -121,11 +178,12 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
                     self.error(400, "Malformed data")
                     return
                 endpoint_exec_result = endpoints["POST"][self.path](self.headers, data)
-                self.send_response(endpoint_exec_result["rc"])
+                self.send_response(endpoint_exec_result['rc'])
                 content_type = "application/json"
                 if "content-type" in endpoint_exec_result:
                     content_type = endpoint_exec_result["content-type"]
                 self.send_header('Content-type', content_type)
+                self._send_cors_headers()
                 self.end_headers()
                 if isinstance(endpoint_exec_result["data"], dict):
                     response = json.dumps(endpoint_exec_result["data"])
@@ -136,11 +194,11 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
                 real_ip = self.headers.get('X-Real-IP')
                 if real_ip is None:
                     real_ip = self.client_address[0]
-                if self.path in DEBUG_ONLY_PRINT_ENDPOINTS and int(endpoint_exec_result["rc"]) == 200:
-                    logger.debug(f"[{real_ip}] - RQ: POST {self.path}: {endpoint_exec_result["rc"]}." +
+                if self.path in DEBUG_ONLY_PRINT_ENDPOINTS and int(endpoint_exec_result['rc']) == 200:
+                    logger.debug(f"[{real_ip}] - RQ: POST {self.path}: {endpoint_exec_result['rc']}." +
                                 f" Data: TX:{sys.getsizeof(response)}b")
                 else:
-                    logger.info(f"[{real_ip}] - RQ: POST {self.path}: {endpoint_exec_result["rc"]}." +
+                    logger.info(f"[{real_ip}] - RQ: POST {self.path}: {endpoint_exec_result['rc']}." +
                                 f" Data: TX:{sys.getsizeof(response)}b")
                 logger.debug(f"RQ Headers: {self.headers}")
                 logger.debug(f"Data: {response}")
@@ -155,10 +213,79 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
             logger.error(f"RQ: POST {self.path}: 500 ({e.__class__.__name__})")
             logger.exception(e)
 
+
+class LoRadWSServer(LoRadAPIServer):
+    def do_POST(self):
+        self.error(405, "WebSocket port accepts GET upgrades only.")
+
+    def do_GET(self):
+        try:
+            ip_from_headers = self.headers.get("X-Real-IP")
+            if ip_from_headers is not None:
+                self.client_address = (ip_from_headers, self.client_address[1])
+            real_ip = self.headers.get("X-Real-IP") or self.client_address[0]
+            fn = ws_endpoints.get("GET", {}).get(self.path)
+            if fn is None:
+                self.error(404, f"No such WebSocket: '{self.path}'")
+                logger.info(f"[{real_ip}] - WS {self.path}: 404")
+                return
+            try:
+                pre = fn(self.headers)
+            except Exception as e:
+                logger.exception(e)
+                self.error(500, f"Server error: {e.__class__.__name__}")
+                return
+            if not isinstance(pre, dict) or not pre.get("websocket"):
+                if isinstance(pre, dict) and "rc" in pre:
+                    self.send_response(pre["rc"])
+                    self.send_header("Content-type", pre.get("content-type", "application/json"))
+                    self._send_cors_headers()
+                    self.end_headers()
+                    data = pre.get("data", {})
+                    body = json.dumps(data) if isinstance(data, dict) else str(data)
+                    self.wfile.write(body.encode("utf-8"))
+                    self.wfile.flush()
+                    return
+                self.error(500, "Incorrect output from the endpoint function.")
+                return
+            if not is_websocket_upgrade(self.headers):
+                self.error(426, "This endpoint is a WebSocket. Send Upgrade: websocket.")
+                logger.info(f"[{real_ip}] - RQ: GET {self.path}: 426")
+                return
+            ws = WebSocket(self)
+            if not ws.handshake():
+                self.error(400, "Bad WebSocket handshake")
+                logger.info(f"[{real_ip}] - RQ: GET {self.path}: 400 (websocket handshake)")
+                return
+            logger.info(f"[{real_ip}] - WS {self.path}: connected")
+            try:
+                fn(self.headers, ws)
+            except Exception as e:
+                logger.error(f"[{real_ip}] - WS {self.path}: {e.__class__.__name__}")
+                logger.exception(e)
+            finally:
+                try:
+                    if ws.open:
+                        ws.close()
+                except Exception:
+                    pass
+                logger.info(f"[{real_ip}] - WS {self.path}: disconnected")
+        except Exception as e:
+            try:
+                self.error(500, f"Server error: {e.__class__.__name__}")
+            except Exception:
+                pass
+            logger.error(f"WS: GET {self.path}: 500 ({e.__class__.__name__})")
+            logger.exception(e)
+
+
 def start_api_server():
-    global endpoints
     logger.info("Initializing LoRaD REST API...")
-    server = HTTPServer(("0.0.0.0", config["REST"]["LISTEN_PORT"]), LoRadAPIServer)
     register_endpoints()
-    logger.info(f"Ready. Listening on port {config["REST"]["LISTEN_PORT"]}.")
-    server.serve_forever()
+    rest_port = rest_listen_port()
+    ws_port = ws_listen_port()
+    ws_server = ThreadingWSServer(("0.0.0.0", ws_port), LoRadWSServer)
+    Thread(name="API-WS", target=ws_server.serve_forever, daemon=True).start()
+    logger.info(f"REST listening on port {rest_port} (single-threaded).")
+    logger.info(f"WebSocket listening on port {ws_port} (threaded).")
+    HTTPServer(("0.0.0.0", rest_port), LoRadAPIServer).serve_forever()

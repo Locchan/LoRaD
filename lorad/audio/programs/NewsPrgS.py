@@ -1,16 +1,16 @@
 import datetime
 import os
 import random
-import time
 from sqlalchemy.exc import IntegrityError
 from lorad.audio.programs.GenericPrg import GenericPrg
 from lorad.audio.programs.news.orm import News
-from lorad.audio.programs.news.neuro.neurovoice import check_voiced, get_filelist, voice_news
+from lorad.audio.programs.news.tts.service import check_voiced, get_filelist, voice_news
 from lorad.audio.utils.ffmpeg_utils import ffmpeg_concatenate, ffmpeg_reencode
 from lorad.common.database.MySQL import MySQL
 from lorad.common.utils.globs import FEAT_NEWS_ADS, FEAT_NEWS_RANDOM_FILE
 from lorad.common.utils.logger import get_logger
-from lorad.common.utils.misc import read_config, feature_enabled
+from lorad.common.utils.misc import local_path, read_config, feature_enabled
+from lorad.common.utils.shm import SHM_ROOT
 
 logger = get_logger()
 
@@ -64,7 +64,9 @@ class NewsPrgS(GenericPrg):
     def __init__(self, start_times: datetime.time, preparation_needed_mins: int):
         super().__init__(start_times, NewsPrgS.name, NewsPrgS.name_pretty, preparation_needed_mins)
         self.config = read_config()
-        self.jingle_path = os.path.join(self.config["RESDIR"], self.config["ENABLED_PROGRAMS"][NewsPrgS.name]["jingle_path"])
+        self.jingle_path = local_path(self.config["RESDIR"], self.config["ENABLED_PROGRAMS"][NewsPrgS.name]["jingle_path"])
+        if not os.path.exists(self.jingle_path):
+            logger.warning(f"Jingle not found: {self.jingle_path}")
 
     def _prepare_program_impl(self):
         news = News.get_news()
@@ -84,12 +86,14 @@ class NewsPrgS(GenericPrg):
         news_digest_filepath = self._reencode_news(news_files)
         logger.info("Program prepared")
         News.mark_as_read(news_ids)
-        news_name = f"{self.name_pretty}: {(datetime.datetime.now() + datetime.timedelta(hours=1)).strftime("%Y-%m-%d %H")}"
+        news_name = f"{self.name_pretty}: {(datetime.datetime.now() + datetime.timedelta(hours=1)).strftime('%Y-%m-%d %H')}"
         return {news_name: news_digest_filepath}
     
     def _reencode_news(self, news_files) -> str:
         reencode_date = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        digestdir = os.path.join(self.config["DATADIR"], "neurovoice", "digests")
+        digestdir = os.path.join(
+            self.config.get("RUNTIME_MEDIA_DIR", SHM_ROOT), "neurovoice", "digests"
+        )
         if not os.path.exists(digestdir):
             os.makedirs(digestdir)
         news_file = os.path.join(digestdir, "news_digest_" + reencode_date + ".mp3")
@@ -99,20 +103,20 @@ class NewsPrgS(GenericPrg):
             tmpfilename = afile[:-4] + "_reenc" + ".mp3"
             tempfiles.append(tmpfilename)
             if not os.path.exists(tmpfilename):
-                ffmpeg_reencode(afile, ["-b:a", f"{self.config["BITRATE_KBPS"]}k", "-c:a", "libmp3lame", "-ar", "44100", "-ac", "2", "-af", "apad=pad_dur=2"], tmpfilename)
+                ffmpeg_reencode(afile, ["-b:a", f"{self.config['BITRATE_KBPS']}k", "-c:a", "libmp3lame", "-ar", "44100", "-ac", "2", "-af", "apad=pad_dur=2"], tmpfilename)
         logger.info("Concatenating news files into a digest")
         if feature_enabled(FEAT_NEWS_ADS):
-            temp_files = self.add_ads(tempfiles)
+            tempfiles = self.add_ads(tempfiles)
         if feature_enabled(FEAT_NEWS_RANDOM_FILE):
-            temp_files = self.add_random_files(tempfiles)
+            tempfiles = self.add_random_files(tempfiles)
         logger.debug("Will use the following files:")
-        logger.debug(temp_files)
-        ffmpeg_concatenate(tempfiles, news_file, artist="NeuroNews", title=f"Новости за {datetime.datetime.now().strftime("%Y-%m-%d %H")}")
-        self._cleanup()
+        logger.debug(tempfiles)
+        ffmpeg_concatenate(tempfiles, news_file, artist="NeuroNews", title=f"Новости за {datetime.datetime.now().strftime('%Y-%m-%d %H')}")
+        self._cleanup(keep={news_file})
         return news_file
 
     def add_random_files(self, files_list, count=1):
-        random_filesdir = os.path.join(self.config["DATADIR"], "resources", "random_voices")
+        random_filesdir = local_path(self.config["DATADIR"], "resources", "random_voices")
         rnd_files = [os.path.join(random_filesdir, f) for f in os.listdir(random_filesdir) if os.path.isfile(os.path.join(random_filesdir, f))]
         logger.info(f"Adding {count} random files to the news of {len(rnd_files)} files total")
         if not rnd_files:
@@ -125,7 +129,7 @@ class NewsPrgS(GenericPrg):
         return files_list
 
     def add_ads(self, files_list, count=1):
-        adsdir = os.path.join(self.config["DATADIR"], "resources", "ads")
+        adsdir = local_path(self.config["DATADIR"], "resources", "ads")
         ad_files = [os.path.join(adsdir, f) for f in os.listdir(adsdir) if os.path.isfile(os.path.join(adsdir, f))]
         logger.info(f"Adding {count} ads to the news of {len(ad_files)} ads total")
         if not ad_files:
@@ -137,34 +141,20 @@ class NewsPrgS(GenericPrg):
         files_list.extend(ads_to_add)
         return files_list
 
-    def _cleanup(self):
+    def _cleanup(self, keep=None):
         logger.info("Starting voice file cleanup...")
-        newsdir = os.path.join(self.config["DATADIR"], "neurovoice")
-        digestdir = os.path.join(newsdir, "digests")
-
-        cutoff = time.time() - 24 * 60 * 60
+        keep = keep or set()
+        newsdir = os.path.join(self.config.get("RUNTIME_MEDIA_DIR", SHM_ROOT), "neurovoice")
         counter = 0
-        for filename in os.listdir(digestdir):
-            file_path = os.path.join(digestdir, filename)
-
-            if os.path.isfile(file_path):
+        for root, _, files in os.walk(newsdir):
+            for filename in files:
+                file_path = os.path.join(root, filename)
+                if file_path in keep:
+                    continue
                 try:
-                    if os.path.getmtime(file_path) < cutoff:
-                        os.remove(file_path)
-                        counter+=1
-                        logger.debug(f"Deleted old file: {file_path}")
-                except Exception as e:
-                    logger.warning(f"Could not delete {file_path}: {e}")
-        
-        for filename in os.listdir(newsdir):
-            file_path = os.path.join(newsdir, filename)
-
-            if os.path.isfile(file_path):
-                try:
-                    if os.path.getmtime(file_path) < cutoff:
-                        os.remove(file_path)
-                        counter+=1
-                        logger.debug(f"Deleted old file: {file_path}")
+                    os.remove(file_path)
+                    counter += 1
+                    logger.debug(f"Deleted transient file: {file_path}")
                 except Exception as e:
                     logger.warning(f"Could not delete {file_path}: {e}")
         logger.info(f"Cleaned {counter} files.")

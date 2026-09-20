@@ -8,6 +8,13 @@ import random
 
 logger = get_logger()
 
+DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
+
+def _openai_model(config=None):
+    if config is None:
+        config = read_config()
+    return config.get("OPENAI_MODEL", DEFAULT_OPENAI_MODEL)
+
 def get_summary(openai_api_key, body_full):
     client = OpenAI(
         base_url="https://openai-proxy.locchan.dev",
@@ -25,7 +32,7 @@ def get_summary(openai_api_key, body_full):
                 "content": f"Перескажи эту новость кратко без информации про телеграм бота и какой-либо рекламы: \n{body_full}",
             }
         ],
-        model="gpt-4o-mini"
+        model=_openai_model()
     )
     return chat_completion.choices[0].message.content
 
@@ -68,7 +75,7 @@ def get_most_important_news_by_source(source: str, titles_to_give: int, importan
                 "content": prompt,
             }
         ],
-        model="gpt-4o-mini"
+        model=_openai_model(config)
     )
     chat_response = chat_completion.choices[0].message.content
     filtered_response = filter_text(chat_response)
@@ -95,9 +102,14 @@ def fakeify_news(openai_api_key, news):
             },
             {
                 "role": "user",
-                "content": f"Измени новости так, чтобы они содержали ложную информацию (абсолютно рандомную, но по теме новости). Раздели новости тремя хэштегами (###), новости должны быть в исходном порядке: \n{'\n'.join(news)}",
+                "content": (
+                    "Измени новости так, чтобы они содержали ложную информацию "
+                    "(абсолютно рандомную, но по теме новости). Раздели новости тремя хэштегами (###), "
+                    "новости должны быть в исходном порядке: \n"
+                    + "\n".join(news)
+                ),
             }
         ],
-        model="gpt-4o-mini"
+        model=_openai_model()
     )
     return chat_completion.choices[0].message.content.split('###')

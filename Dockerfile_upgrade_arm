@@ -12,4 +12,5 @@ RUN chmod +x ./upgrade_install.sh && ./upgrade_install.sh
 WORKDIR /
 EXPOSE 5475
 EXPOSE 5476
+EXPOSE 5478
 ENTRYPOINT [ "lorad" ]

@@ -1,59 +1,61 @@
-# LoradFrontend
+# LoRaD frontend
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 19.2.5.
+Static HTML/CSS/JS UI for LoRaD. No build step.
 
-## Development server
+## Pages
 
-To start a local development server, run:
+- `#/` player
+- `#/login` login
+- `#/schedule` news schedule
 
-```bash
-ng serve
-```
+API, WebSocket, and stream URLs are built in `js/config.js` from `domain`, `scheme`, `apiPath`, `radioPath`, and `wsPath`. Docker builds can override the full URLs with `LORAD_API_URL`, `LORAD_RADIO_URL`, and `LORAD_WS_URL`.
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+## Local preview (no Docker)
 
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+API and stream still come from `js/config.js` (defaults: `radio.locchan.dev`). Point them at a running LoRaD, then:
 
 ```bash
-ng generate component component-name
+python3 -m http.server 5477
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+Open `http://localhost:5477/`.
+
+## Local Docker (host API + stream)
+
+Run LoRaD on the host (`5475` stream, `5476` REST, `5478` WebSocket), then:
 
 ```bash
-ng generate --help
+./frontend/run-local-docker.sh
 ```
 
-## Building
+That rebuilds the image with `http://127.0.0.1:5476`, `http://127.0.0.1:5475`, and `ws://127.0.0.1:5478`, replaces container `lorad-front-local`, and publishes the UI at `http://127.0.0.1:5477/ui/`.
 
-To build the project run:
+Optional env: `LORAD_API_URL`, `LORAD_RADIO_URL`, `LORAD_WS_URL`, `LORAD_FRONT_PORT`, `LORAD_FRONT_NAME`, `LORAD_FRONT_IMAGE`.
+
+## Docker (other environments)
+
+Development image (keeps `js/config.js` defaults, `radio.locchan.dev`):
 
 ```bash
-ng build
+docker build -t lorad-front .
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
+Production image (`radio.local`, HTTP, host nginx paths `/radio` and `/radio/api`):
 
 ```bash
-ng test
+docker build -t lorad-front --build-arg LORAD_ENV=production .
 ```
 
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
+Override any piece:
 
 ```bash
-ng e2e
+docker build -t lorad-front \
+  --build-arg LORAD_ENV=production \
+  --build-arg LORAD_DOMAIN=radio.local \
+  --build-arg LORAD_SCHEME=http \
+  --build-arg LORAD_API_PATH=/radio/api \
+  --build-arg LORAD_RADIO_PATH=/radio \
+  .
 ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+nginx listens on `5477` and serves the UI at `/ui/`.

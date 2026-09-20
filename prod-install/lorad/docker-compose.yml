@@ -1,0 +1,22 @@
+services:
+  lorad:
+    image: local/lorad-arm:${LORAD_VERSION}
+    container_name: lorad
+    privileged: true
+    restart: unless-stopped
+    shm_size: 512m
+    ports: ["5475:5475", "5476:5476", "5478:5478"]
+    env_file: .env
+    tmpfs:
+      - /tmp
+    volumes:
+      - type: bind
+        source: /opt/radio/lorad/data
+        target: /data/
+  lorad-front:
+    image: local/lorad-front-arm:${LORAD_VERSION}
+    container_name: lorad-front
+    privileged: true
+    restart: unless-stopped
+    ports: ["5477:5477"]
+    env_file: .env

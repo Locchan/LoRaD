@@ -5,7 +5,6 @@ from sqlalchemy import Result, String, Text, UniqueConstraint, select, desc
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, mapped_column
 
-from lorad.audio.programs.NewsPrgS import generate_fake_news
 from lorad.common.database.Base import Base
 from lorad.common.database.MySQL import MySQL
 from lorad.common.utils.globs import FEAT_FAKE_NEWS
@@ -80,6 +79,8 @@ def get_prepared_news_by_src(source) -> Result[Tuple[News]]:
 def get_news(news_to_get: int = 10) -> Result[Tuple[News]]:
     with MySQL.get_session() as session:
         if feature_enabled(FEAT_FAKE_NEWS):
+            from lorad.audio.programs.NewsPrgS import generate_fake_news
+
             generate_fake_news(session.scalars(select(News).order_by(desc(News.date_published)).limit(news_to_get)).all())
             fake_news = session.scalars(select(News).where(News.fake==1).order_by(desc(News.id)).limit(2)).all()
             news = session.scalars(select(News).order_by(desc(News.date_published)).limit(news_to_get - 2)).all()

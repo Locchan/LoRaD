@@ -1,5 +1,4 @@
 from lorad.api.utils.decorators import lrd_api_endp, lrd_auth, lrd_feat_req
-from lorad.api.utils.misc import get_yandex_stations
 import lorad.common.utils.globs as globs
 from lorad.common.utils.globs import FEAT_FILESTREAMER_YANDEX
 
@@ -12,7 +11,7 @@ RESULT_EXAMPLE = {"GET": "{'Pop':'genre:pop','Meditation':'genre:meditation'}"}
 @lrd_feat_req(FEAT_FILESTREAMER_YANDEX)
 @lrd_api_endp
 def impl_GET(headers):
-    stations = get_yandex_stations()
+    stations = globs.FILESTREAMER.list_sources()
     if stations is None:
         return {"rc": 406, "data": {"message": "Yandex is not initialized."}}
     else:

@@ -1,17 +1,18 @@
 # LoRaD (backend)
 
-LoRaD is a self-hosted internet radio: it muxes downloaded tracks and/or live radio into one HTTP MP3 stream, and optionally interrupts that stream with scheduled AI-voiced news. This file is the agent context for the **Python backend only**. Do not use it as guidance for `frontend/` (that tree has its own Angular rules).
+LoRaD is a self-hosted internet radio: it muxes downloaded tracks and/or live radio into one HTTP MP3 stream, and optionally interrupts that stream with scheduled AI-voiced news. This file is the agent context for the **Python backend only**. Do not use it as guidance for `frontend/` (static HTML/CSS/JS).
 
 ## Stack
 
-- Python `>3.10,<4`, packaged with Poetry (`pyproject.toml`, package `lorad`)
-- No web framework. Two stdlib HTTP servers:
+- Python `>3.10,<3.14`, packaged with Poetry (`pyproject.toml`, package `lorad`). Images use 3.12. The locked `openai`/`pydantic-core` stack has no 3.14 wheels.
+- No web framework. Three stdlib HTTP servers:
   - radio stream: `ThreadingHTTPServer` (`lorad/audio/server/AudioStream.py`)
   - REST API: non-threaded `HTTPServer` (`lorad/api/LoRadAPISrv.py`)
+  - WebSocket API: threaded `HTTPServer` on `REST.WS_LISTEN_PORT`
 - Threads, not asyncio. Fatal failures call `os._exit`
 - SQLAlchemy 2.x + PyMySQL (`mapped_column` / `Mapped[...]`)
 - ffmpeg on PATH (transcode, re-encode, concat). Required at runtime; Alpine images install it in the install scripts
-- Optional: Yandex Music, OpenAI, Google Cloud TTS
+- Optional: Yandex Music, OpenAI, Google Cloud TTS, Fish Audio TTS
 
 Version is `pyproject.toml` plus commit count. Runtime version is `/version` (Docker) via `get_version()`. `getver.sh` prints a human string.
 
@@ -32,10 +33,10 @@ lorad/
 tests/api/                    # live HTTP tests against a running API
 full_install.sh               # Alpine image: poetry build + /usr/bin/lorad
 upgrade_install.sh            # same, force-reinstall wheel
-Dockerfile_full / _upgrade    # ports 5475 (stream) and 5476 (API)
+Dockerfile_full / _upgrade    # ports 5475 (stream), 5476 (REST), 5478 (WebSocket)
 ```
 
-Ignore `frontend/`, `test.py` (ad-hoc leftover), and generated/runtime dirs (`data/`, `temp/`, `dist/`).
+Ignore `frontend/` and generated/runtime dirs (`data/`, `temp/`, `dist/`).
 
 ## Boot
 
@@ -50,15 +51,15 @@ Ignore `frontend/`, `test.py` (ad-hoc leftover), and generated/runtime dirs (`da
 7. `start_player` on the first registered player
 8. Watchdog: any dead thread → `os._exit(1)`
 
-Thread names you will see: `HTTPServer`, `Streamer`, `ReStreamer`, `NewsParser`, `Neuro`, `ProgramMgr`, `API`, plus per-listener `WRK#N`, `Transcoder`, `PrgRunner`/`PrgPrep`, `SW_Locker`.
+Thread names you will see: `HTTPServer`, `Streamer`, `ReStreamer`, `NewsParser`, `Neuro`, `ProgramMgr`, `API`, `API-WS`, plus per-listener `WRK#N`, per-WebSocket `WS#N`, `Transcoder`, `PrgRunner`/`PrgPrep`, `SW_Locker`.
 
 Import order matters. `read_config()` / `get_logger()` run at module import in many files. Config must exist before those imports. `lorad_main.py` loads config before importing `AudioStream` / `FileStreamer` / `YaMu` for that reason.
 
 ## Config
 
-JSON file. Path is `CFGFILE_PATH` env, else `./config.json`. First successful `read_config()` is cached in `lorad.common.utils.misc.CONFIG`. `write_config()` dumps JSON and reloads. `read_config(..., reload=True)` forces a reread.
+JSONC file (`//` and `/* */` comments, trailing commas allowed). Path is `CFGFILE_PATH` env, else `./config.json` or `./config.jsonc` (whichever exists). First successful `read_config()` is cached in `lorad.common.utils.misc.CONFIG`. `write_config()` dumps strict JSON to the file that was loaded (comments are not preserved) and reloads. `read_config(..., reload=True)` forces a reread.
 
-Stations for the restreamer are a second JSON (`STATIONS_FILE_PATH`, default `./stations.json`): `{ "<id>": { "name": "...", "url": "http..." } }`.
+Stations for the restreamer are a second JSONC file (`STATIONS_FILE_PATH`, default `./stations.json` or `./stations.jsonc`): `{ "<id>": { "name": "...", "url": "http..." } }`.
 
 | Key | Role |
 |---|---|
@@ -75,11 +76,16 @@ Stations for the restreamer are a second JSON (`STATIONS_FILE_PATH`, default `./
 | `TEMPDIR` / `DATADIR` / `RESDIR` | downloads, news audio, jingles |
 | `FALLBACK_TRACK_DIR` | local MP3s if a FileRide fails |
 | `MYSQL` | `{USERNAME,PASSWORD,ADDRESS,DATABASE}` plus optional `CHARSET` |
-| `REST` | `{LISTEN_PORT, MAX_DATA_LEN_BYTES, TOKEN_EXPIRATION_MIN}` |
+| `REST` | `{LISTEN_PORT, WS_LISTEN_PORT, MAX_DATA_LEN_BYTES, TOKEN_EXPIRATION_MIN}` |
 | `RESTREAMER.STATION` | default station id |
 | `YAMU_TOKEN` | Yandex Music |
 | `OPENAI_API_KEY` | news summarizer / fake-news |
+| `OPENAI_MODEL` | OpenAI chat model (default `gpt-4o-mini`) |
+| `NEWS_TTS_PROVIDER` | `google` (default) or `fish_audio` |
 | `GOOGLE_CLOUD_API_USERDATA` | full GCP service-account JSON for TTS |
+| `GOOGLE_TTS_LANGUAGE` / `GOOGLE_TTS_VOICE` | optional Google voice overrides |
+| `FISH_AUDIO_API_KEY` / `FISH_AUDIO_REFERENCE_ID` | Fish API key and voice model id |
+| `FISH_AUDIO_BASE_URL` / `FISH_AUDIO_TIMEOUT_SECONDS` | optional Fish endpoint/timeout |
 | `NEWS_PARSER_PERIOD_MIN` / `NEWS_NEURIFIER_PERIOD_MIN` | news loops |
 | `ENABLED_PROGRAMS` | `{ "NewsSmall": { start_times, jingle_path, preparation_needed_mins } }` |
 
@@ -110,7 +116,7 @@ Yandex requires both `FILESTREAMER` and `FILESTREAMER:YANDEX`. FileStreamer with
 
 ## Process-wide state
 
-`lorad/common/utils/globs.py` is the shared mutable process state: current streamer, players, Yandex object, locale, `SWITCH_LOCK`, station cache, capability strings. Players are objects with `name_tech`, `name_readable`, `start()` / `stop()`, `currently_playing`, `running`.
+`lorad/common/utils/globs.py` is the shared mutable process state: current streamer, players, Yandex object, locale, `SWITCH_LOCK`, station cache, capability strings. Players subclass `GenericPlayer` (`lorad/audio/sources/GenericPlayer.py`): `name_tech`, `name_readable`, `currently_playing`, `start()` / `stop()`, `list_sources()`, `current_source()`, `switch_source(id)`. `switch_players(name, start=True)` is only stop-old / flush-buffer / start-new. Station changes go through the current player's `switch_source`.
 
 Known `name_tech` values: `player_streaming` (`FileStreamer`), `player_radio` (`RadReStreamer`). First registered player becomes the default.
 
@@ -142,7 +148,7 @@ Over `MAX_CLIENTS`, any IP with more than two connections is added to `kick_list
 - `get_current_track()` → `(display_name, filepath)` or invalid (carousel falls back)
 - `next_track()` — advance, download, set current
 
-`YaMu` is the only provider. It wraps `yandex_music.Client` + `Radio` (Rotor). Tracks download into `TEMPDIR` as `yandex_<md5>.mp3`. Default station is `user:onyourwave`. Station switches go through `YANDEX_OBJ.radio.start_radio(station_id)` after stopping the carousel.
+`YaMu` is the only provider. It wraps `yandex_music.Client` + `Radio` (Rotor). Tracks download into `TEMPDIR` as `yandex_<md5>.mp3`. Default station is `user:onyourwave`. Station switches are `FileStreamer.switch_source(station_id)` (stop, `radio.start_radio`, start).
 
 To add a provider: subclass `FileRide`, construct it in `lorad_main.py` when its feature is on, append to `carousel_providers`.
 
@@ -155,13 +161,15 @@ Enabled only with `NEURONEWS`. `AVAILABLE_PROGRAMS` in `program_mgr.py` is the c
 1. `prepare_program` → `_prepare_program_impl()` must return `{track_name: filepath, ...}` (or fail)
 2. At start time, `start_program` stops the current player, plays each file via `FileStreamer.serve_file(..., unswitcheable=True)`, then restores the previous player
 
-`NewsPrgS` (`name = "NewsSmall"`, pretty `"Panorama"`): fetch latest news, TTS any missing `DATADIR/neurovoice/<id>.mp3`, re-encode to stream bitrate, optional ads/random files, concat after the jingle (`RESDIR` + config `jingle_path`), write `DATADIR/neurovoice/digests/news_digest_*.mp3`, mark news used, delete voice/digest files older than 24h.
+`NewsPrgS` (`name = "NewsSmall"`, pretty `"Panorama"`): fetch latest news, TTS any missing `RUNTIME_MEDIA_DIR/neurovoice/<id>.mp3`, re-encode to stream bitrate, optional ads/random files, concat after the jingle (`RESDIR` + config `jingle_path`), write `RUNTIME_MEDIA_DIR/neurovoice/digests/news_digest_*.mp3`, mark news used, and remove intermediate voice files after digest creation.
 
 News pipeline:
 
 1. `parse_news` — sources → `News.add_news` (unique on source+title+date)
-2. `neurify_news` — OpenAI (`gpt-4o-mini`, radio-announcer prompt) fills `body_prepared`. Summarizer uses `https://openai-proxy.locchan.dev`
-3. `voice_news` — Google Cloud TTS `ru-RU-Standard-B` → MP3
+2. `neurify_news` — OpenAI (`OPENAI_MODEL`, default `gpt-4o-mini`, radio-announcer prompt) fills `body_prepared`. Summarizer uses `https://openai-proxy.locchan.dev`
+3. `voice_news` — provider-neutral `news/tts/service.py` → MP3 in SHM. `NEWS_TTS_PROVIDER=google` uses Google Cloud (`ru-RU-Standard-B` by default); `fish_audio` calls `/v1/tts` with the fixed free model `s2.1-pro-free` and configured `FISH_AUDIO_REFERENCE_ID`
+
+TTS providers implement `TTSProvider.synthesize_mp3(text) -> bytes` under `news/tts/`. Provider modules own API details and map failures to neutral exceptions; the service owns news lookup and atomic SHM writes. Fish's free model is fair-use, has no SLA, and is intentionally not configurable to a paid model.
 
 `MdzSrc` is the only source. `GenericSource.parse_news()` → `list[News]`. To add a source: subclass, implement `parse_news`, append an instance in `parse_news()`'s `sources` list. To add a program: subclass `GenericPrg`, set class `name`, append the class to `AVAILABLE_PROGRAMS`, add an `ENABLED_PROGRAMS` block.
 
@@ -171,7 +179,9 @@ SQLAlchemy `News.body_prepared is None` filters in `orm/News.py` are Python `is`
 
 Started by `start_api_server()` on `REST.LISTEN_PORT` (images: 5476). **Not multi-threaded.** Keep handlers short; do not block on downloads or ffmpeg from an endpoint.
 
-Exact path match only (no query strings, no trailing slash). Methods: GET and POST. POST body is JSON; over `MAX_DATA_LEN_BYTES` → 413; bad JSON → 400.
+WebSocket endpoints (`@lrd_websocket`) bind a second **threaded** `HTTPServer` on `REST.WS_LISTEN_PORT` (images: 5478). REST GETs of those paths return 426.
+
+Exact path match only (no trailing slash). GET may carry a query string; matching uses the path before `?`. POST body is JSON; over `MAX_DATA_LEN_BYTES` → 413; bad JSON → 400.
 
 ### Endpoint module contract
 
@@ -228,11 +238,11 @@ Capabilities (`globs`): `BU` basic, `ADMIN` admin, `ALL` bypasses the check. Sto
 
 Unauthenticated: `GET /version`, `GET|POST /apidoc`, `GET /openapi`.
 
-`BU`: `GET /whatsplaying`, `/current_player`, `/available_players`, `/locale`, `/enabled_features`, `/user/whoami`, Yandex/radio station GETs (feature-gated).
+`BU`: WebSocket `GET /whatsplaying` on `WS_LISTEN_PORT`, REST `/current_player`, `/available_players`, `/locale`, `/enabled_features`, `/user/whoami`, Yandex/radio station GETs (feature-gated).
 
-`ADMIN`: `POST /user/register`, `/user/remove`, `/switch_player`, `/yandex/switch_station`, `/radio/switch_station`, `/admin/get_config`, `/admin/set_config`. Register: username ≥ 3, password ≥ 8.
+`ADMIN`: `POST /user/register`, `/user/remove`, `/switch_player`, `/yandex/switch_station`, `/radio/switch_station`, `/admin/set_config`. `GET /admin/get_config?key=`. `BU`: `POST /yandex/next_track`, `/yandex/like_track`. Register: username ≥ 3, password ≥ 8.
 
-`/whatsplaying` on the file player also returns Yandex `station_tech` / `station_readable` (special-case `user:onyourwave` → `"Моя волна"`).
+`/whatsplaying` on the file player also returns Yandex `station_tech` / `station_readable` (special-case `user:onyourwave` → `"Моя волна"`), plus `liked` while a Yandex track is active, and `length_s` / `position_s` for the playhead. Radio has no track, so those two are omitted. `position_s` is excluded from change detection. The server pushes on any other change, and otherwise every `PUSH_PERIOD_S` (30s); the UI counts seconds itself and resyncs past 2s of drift.
 
 `/switch_player` is feature-gated on `RESTREAMER` even though it switches among all registered players. After a successful player or station switch, switching is locked for 10 seconds.
 
@@ -276,10 +286,11 @@ Images are Alpine Python 3.12. `full_install.sh` / `upgrade_install.sh` build th
 
 ## Pitfalls
 
-- Config and logger execute at import. Instantiating `MySQL`, `AudioStream`, or API classes in a vacuum needs a real `config.json`
+- Config and logger execute at import. Instantiating `MySQL`, `AudioStream`, or API classes in a vacuum needs a real `config.json` or `config.jsonc`
 - API path matching is literal. `/foo` ≠ `/foo/`
 - `lrd_auth` reads `headers._headers` (stdlib private). Pass the real request headers object, not a plain dict, unless you change the decorator
 - `FileStreamer.cleanup` does not delete downloaded tracks (the `os.remove` is commented out)
+- The ffmpeg concat list is written into shm and ffmpeg resolves relative `file` entries against that list, so on-disk assets (`RESDIR`, `DATADIR`, `FALLBACK_TRACK_DIR`) must go through `local_path()`, which also fixes Windows separators in config
 - `NewsPrgS.add_ads` / `add_random_files` assign a new list that `_reencode_news` does not always pass to `ffmpeg_concatenate` — if you touch digest assembly, make the file list consistent
 - `lorad/audio/file_sources/yandex/Radio.py` and `RadReStreamer` import `get_logger` / `read_config` from odd places; prefer `lorad.common.utils.*` in new code
 - Watchdog uses `athread.is_alive` (method, always truthy) rather than `is_alive()`. Do not rely on it to detect dead threads until that is fixed

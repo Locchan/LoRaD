@@ -1,181 +1,249 @@
-import os
 import subprocess
 import time
-from collections import deque
 from threading import Thread
-from typing import Deque
 
-from lorad.common.utils.globs import END_OF_TRANSCODED_DATA
 from lorad.common.utils.logger import get_logger
 from lorad.common.utils.misc import read_config
 
-
 logger = get_logger()
 
+PCM_SAMPLE_RATE = 44100
+PCM_CHANNELS = 2
+PCM_SAMPLE_BYTES = 2
+PCM_FRAME_BYTES = PCM_CHANNELS * PCM_SAMPLE_BYTES
+PCM_BYTES_PER_SEC = PCM_SAMPLE_RATE * PCM_FRAME_BYTES
 
-class Transcoder:
-    def __init__(self, input_format, output_format="mp3", respect_chunk_size=False):
-        self.respect_chunk_size = respect_chunk_size
-        self.config = read_config()
-        self.data_in : Deque[bytes] = deque()
-        self.bytes_per_chunk = self.config["CHUNK_SIZE_KB"] * 1024
-        logger.debug(f"Transcoder chunk size: {self.bytes_per_chunk}b")
-        self.transcoder_buffer = b''
-        # This should be set to True when you have finished passing file data to the transcoder.
-        self.no_more_data = False
-        self.input_format = input_format
-        self.output_format = output_format
-        self.ffmpeg_process = None
-        self.loop_thread = None
-        self.interrupt = False
-        self.burst_done = False
-    
-    def ffmpeg_alive(self):
-        return self.ffmpeg_process and self.ffmpeg_process.poll() is None
-    
-    def start(self):
-        logger.info(f"Starting transcoder: {self.input_format} -> {self.output_format}")
-        logger.info(f"Output bitrate: {self.config["BITRATE_KBPS"]}")
-        if self.respect_chunk_size:
-            logger.info(f"Chunk size (respected): {self.bytes_per_chunk}")
-        self.__start_ffmpeg()
-        self.loop_thread = Thread(name="Transcoder", target=self.transcoder_loop)
-        self.loop_thread.start()
-        self.interrupt = False
-    
-    def stop(self):
-        logger.info("Stopping transcoder")
-        if self.ffmpeg_alive():
-            self.__stop_ffmpeg()
-            self.interrupt = True
-            while True:
-                if self.loop_thread.is_alive():
-                    logger.info("Waiting for the transcoder thread to stop...")
-                else:
-                    logger.info("Transcoder thread is stopped.")
-                    break
-                time.sleep(0.5)
+# Content-Type / config names -> ffmpeg demuxers. "mpeg" from audio/mpeg is mp3, not MPEG-PS.
+DEMUXERS = {
+    "mp3": "mp3",
+    "mpeg": "mp3",
+    "mpeg3": "mp3",
+    "x-mpeg": "mp3",
+    "mpegurl": None,
+    "aac": "aac",
+    "aacp": "aac",
+    "x-aac": "aac",
+    "ogg": "ogg",
+    "opus": "ogg",
+    "vorbis": "ogg",
+    "flac": "flac",
+    "wav": "wav",
+    "x-wav": "wav",
+}
+
+
+def demuxer_for(fmt):
+    if not fmt:
+        return None
+    return DEMUXERS.get(str(fmt).strip().lower())
+
+
+def decoder_label(fmt, bitrate_kbps=None) -> str:
+    demuxer = demuxer_for(fmt)
+    src = demuxer if demuxer else f"{fmt or 'unknown'} (probed)"
+    if bitrate_kbps:
+        src = f"{src} {int(bitrate_kbps)}k"
+    return f"{src} -> PCM"
+
+
+class Decoder:
+    """One source (file/track/station) decoded to raw PCM. Short-lived: one per elementary stream."""
+
+    def __init__(self, fmt, on_pcm, bitrate_kbps=None):
+        self.fmt = fmt
+        self.on_pcm = on_pcm
+        self._stop = False
+        command = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
+        demuxer = demuxer_for(fmt)
+        if demuxer:
+            command += ["-f", demuxer]
         else:
-            logger.warn("Transcoder was already stopped")
-    
-    def transcoder_loop(self):
-        logger.info("Entering transcoder loop")
-        while True:
-            if not self.interrupt:
-                if len(self.data_in) > 0:
-                    slab = b''
-                    while True:
-                        chunk = self.data_in.popleft()
-                        if chunk and chunk is not None:
-                            slab += chunk
-                        if len(self.data_in) == 0:
-                            self.__feed_ffmpeg(slab)
-                            break
-                else:
-                    time.sleep(0.1)
-                self.__get_transcoded_data()
-            else:
-                logger.info("Exiting transcoder loop.")
-                break
-
-    def __get_transcoded_data(self):
-        chunk = self.ffmpeg_process.stdout.read()
-        if chunk:
-            #logger.debug(f"Got {len(chunk)}b from ffmpeg.")
-            if self.transcoder_buffer is not None:
-                self.transcoder_buffer += chunk
-
-    # Returns data from self.transcoder_buffer one chunk at a call
-    #  Returns whatever is left here if someone has said that no more data is present
-    #  Returns b'EOTD' if there is no more data, and we've used the whole transcoder buffer
-    def get_transcoded_chunk(self) -> bytes:
-
-
-        # Create a burst chunk when the transcoder starts (this happens on start or on station/source switch)
-        #  Without this, the user may experience buffering as they have a very small buffer.
-        if not self.burst_done:
-            if len(self.transcoder_buffer) >= self.bytes_per_chunk * 2:
-                logger.info("Sending a burst chunk to AudioStream from a fresh transcoder instance.")
-                tmpbuf = self.transcoder_buffer
-                self.transcoder_buffer = b''
-                self.burst_done = True
-                return tmpbuf
-            else:
-                return b''
-
-        if self.transcoder_buffer is None:
-            return END_OF_TRANSCODED_DATA
-
-        if self.respect_chunk_size:
-            if len(self.transcoder_buffer) >= self.bytes_per_chunk:
-                chunk = self.transcoder_buffer[:self.bytes_per_chunk]
-                self.transcoder_buffer = self.transcoder_buffer[self.bytes_per_chunk:]
-                return chunk
-            if self.no_more_data and len(self.transcoder_buffer) < self.bytes_per_chunk:
-                tmpbuf = self.transcoder_buffer
-                self.transcoder_buffer = None
-                return tmpbuf
-        else:
-            if self.no_more_data and not self.transcoder_buffer:
-                self.transcoder_buffer = None
-            else:
-                tmpbuf = self.transcoder_buffer
-                self.transcoder_buffer = b''
-                return tmpbuf
-        return b''
-
-    def add_data(self, data: bytes):
-        #logger.debug(f"Adding {len(data)}b of data to transcoder queue.")
-        if not self.interrupt:
-            if isinstance(data, bytes):
-                self.data_in.append(data)
-            else:
-                logger.warning(f"Got wrongly-typed chunk: {type(data)}")
-
-    def __feed_ffmpeg(self, chunk) -> bool:
-        if not chunk or chunk is None:
-            return
-        #logger.debug(f"Feeding ffmpeg {len(chunk)}b of data.")
-        if self.ffmpeg_alive():
-            try:
-                self.ffmpeg_process.stdin.write(chunk)
-                return True
-            except Exception as e:
-                logger.error(f"Can't feed ffmpeg: {e}")
-                logger.exception(e)
-                self.ffmpeg_process.stdin.close()
-                logger.info(self.ffmpeg_process.stderr.read().decode("utf-8"))
-                return False
-        else:
-            logger.error("Can't feed ffmpeg: da process is ded")
-            return False
-    
-    def __start_ffmpeg(self):
-        command = [
-            'ffmpeg',
-            '-hide_banner',
-            '-loglevel', 'error',
-            '-f', self.input_format,
-            '-i', 'pipe:0',
-            '-c:a', self.output_format,
-            '-b:a', f'{self.config["BITRATE_KBPS"]}k',
-            '-ar', '44100',
-            '-f', 'mp3',
-            'pipe:1'
+            # unknown/absent format: let ffmpeg probe, but do not wait long for it
+            command += ["-probesize", "131072", "-analyzeduration", "0"]
+        command += [
+            "-i", "pipe:0",
+            "-vn",
+            "-f", "s16le",
+            "-ar", str(PCM_SAMPLE_RATE),
+            "-ac", str(PCM_CHANNELS),
+            "pipe:1",
         ]
-        logger.debug("Starting: " + " ".join(command))
-        self.ffmpeg_process = subprocess.Popen(
+        logger.debug("Starting decoder: " + " ".join(command))
+        self.process = subprocess.Popen(
             command,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            bufsize=0
+            stderr=subprocess.DEVNULL,
+            bufsize=0,
         )
-        os.set_blocking(self.ffmpeg_process.stdout.fileno(), False)
-        os.set_blocking(self.ffmpeg_process.stderr.fileno(), False)
-        os.set_blocking(self.ffmpeg_process.stdin.fileno(), False)
-    
-    def __stop_ffmpeg(self):
-        logger.info("Stopping ffmpeg.")
-        self.ffmpeg_process.stdin.close()
-        self.ffmpeg_process.terminate()
+        self.label = decoder_label(fmt, bitrate_kbps)
+        logger.info(f"Starting ffmpeg [{self.process.pid}]: {self.label}")
+        self.reader = Thread(name="Decoder", target=self._read_loop, daemon=True)
+        self.reader.start()
+
+    def alive(self):
+        return self.process is not None and self.process.poll() is None
+
+    def write(self, data: bytes) -> bool:
+        if not data or self.process is None:
+            return False
+        try:
+            self.process.stdin.write(data)
+            self.process.stdin.flush()
+            return True
+        except Exception:
+            return False
+
+    def _read_loop(self):
+        read_size = PCM_FRAME_BYTES * 2048
+        while not self._stop:
+            try:
+                pcm = self.process.stdout.read(read_size)
+            except Exception:
+                break
+            if not pcm:
+                break
+            self.on_pcm(pcm)
+
+    def close(self, drain_timeout=3.0) -> bool:
+        """Close the input and let the decoder flush what it already holds.
+
+        Returns False if the decoder still had audio pending when the timeout ran out.
+        """
+        try:
+            if self.process.stdin and not self.process.stdin.closed:
+                self.process.stdin.close()
+        except Exception:
+            pass
+        drained = True
+        if self.reader.is_alive():
+            self.reader.join(timeout=drain_timeout)
+            drained = not self.reader.is_alive()
+        self._stop = True
+        pid = self.process.pid
+        try:
+            if self.alive():
+                self.process.terminate()
+                self.process.wait(timeout=1)
+        except Exception:
+            try:
+                self.process.kill()
+            except Exception:
+                pass
+        logger.info(f"Stopping ffmpeg [{pid}]: {self.label}" + ("" if drained else " (cut short)"))
+        return drained
+
+
+class Encoder:
+    """The single long-lived PCM -> MP3 encoder. Never restarted for a source change."""
+
+    def __init__(self, hub):
+        self.hub = hub
+        self.config = read_config()
+        self.chunk_size = self.config["CHUNK_SIZE_KB"] * 1024
+        self.process = None
+        self.pump_thread = None
+        self._stop_pump = False
+        self.burst_done = False
+        self.label = "PCM -> mp3"
+
+    def alive(self):
+        return self.process is not None and self.process.poll() is None
+
+    def ensure(self):
+        if self.alive():
+            return
+        if self.process is not None:
+            logger.error("Encoder died, restarting it")
+        self._start()
+
+    def write(self, pcm: bytes) -> bool:
+        self.ensure()
+        try:
+            self.process.stdin.write(pcm)
+            self.process.stdin.flush()
+            return True
+        except Exception as e:
+            logger.error(f"Can't feed the encoder: {e.__class__.__name__}")
+            self._stop()
+            return False
+
+    def _start(self):
+        self._stop()
+        bitrate = self.config["BITRATE_KBPS"]
+        command = [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel", "error",
+            "-f", "s16le",
+            "-ar", str(PCM_SAMPLE_RATE),
+            "-ac", str(PCM_CHANNELS),
+            "-i", "pipe:0",
+            "-c:a", "libmp3lame",
+            "-b:a", f"{bitrate}k",
+            "-f", "mp3",
+            "pipe:1",
+        ]
+        logger.debug("Starting: " + " ".join(command))
+        self.process = subprocess.Popen(
+            command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            bufsize=0,
+        )
+        self.label = f"PCM -> mp3 {bitrate}k"
+        logger.info(f"Starting ffmpeg [{self.process.pid}]: {self.label}")
+        self.burst_done = False
+        self._stop_pump = False
+        self.pump_thread = Thread(name="Transcoder", target=self._pump, daemon=True)
+        self.pump_thread.start()
+
+    def _pump(self):
+        process = self.process
+        leftover = b""
+        while not self._stop_pump and process.poll() is None:
+            try:
+                chunk = process.stdout.read(self.chunk_size)
+            except Exception:
+                break
+            if not chunk:
+                time.sleep(0.05)
+                continue
+            leftover += chunk
+            if not self.burst_done:
+                # give browsers a fat first blob so they do not stall on connect
+                if len(leftover) >= self.chunk_size * 2:
+                    self.hub.publish(leftover)
+                    leftover = b""
+                    self.burst_done = True
+                continue
+            while len(leftover) >= self.chunk_size:
+                self.hub.publish(leftover[: self.chunk_size])
+                leftover = leftover[self.chunk_size :]
+        if leftover:
+            self.hub.publish(leftover)
+
+    def _stop(self):
+        self._stop_pump = True
+        if self.process is None:
+            return
+        pid = self.process.pid
+        try:
+            if self.process.stdin:
+                self.process.stdin.close()
+        except Exception:
+            pass
+        try:
+            self.process.terminate()
+            self.process.wait(timeout=2)
+        except Exception:
+            try:
+                self.process.kill()
+            except Exception:
+                pass
+        self.process = None
+        logger.info(f"Stopping ffmpeg [{pid}]: {self.label}")
+        if self.pump_thread is not None and self.pump_thread.is_alive():
+            self.pump_thread.join(timeout=2)
+        self.pump_thread = None

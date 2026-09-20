@@ -1,0 +1,12 @@
+[Unit]
+Description=LoRaD listener
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/radio_player
+Type=simple
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

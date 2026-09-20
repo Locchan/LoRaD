@@ -10,13 +10,6 @@
             "request": "launch",
             "program": "lorad_main.py",
             "console": "integratedTerminal"
-        },
-        {
-            "name": "Debug some test stuff",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "test.py",
-            "console": "integratedTerminal"
-        },
+        }
     ]
 }
