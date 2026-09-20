@@ -32,6 +32,7 @@
     bufferTimer: null,
     skipInFlight: false,
     canSkip: false,
+    canSwitch: true,
     liked: null,
     likeInFlight: false,
     stationTech: "",
@@ -239,8 +240,8 @@
   function updatePlayerSections() {
     setHidden($("player-init-loading"), !playerState.isLoading);
     setHidden($("player-loading"), !playerState.isPlayerLoading);
-    $("player").disabled = playerState.isPlayerLoading;
-    $("station").disabled = playerState.isLoading || playerState.isPlayerLoading;
+    $("player").disabled = playerState.isPlayerLoading || !playerState.canSwitch;
+    $("station").disabled = playerState.isLoading || playerState.isPlayerLoading || !playerState.canSwitch;
     setHidden($("audio-player-section"), !(playerState.currentTrack && !playerState.isLoading));
     setHidden($("track-fallback"), !(!playerState.currentTrack && playerState.selectedStation && !playerState.isLoading));
     $("track-title").textContent = playerState.currentTrack || "Нет информации о треке";
@@ -395,6 +396,10 @@
     if (!response) return;
     playerState.currentTrack = response.playing || "Нет информации о треке";
     playerState.canSkip = Boolean(response.can_skip);
+    // The server locks switching during programs and right after a switch.
+    playerState.canSwitch = Object.prototype.hasOwnProperty.call(response, "can_switch")
+      ? Boolean(response.can_switch)
+      : true;
     playerState.liked = Object.prototype.hasOwnProperty.call(response, "liked")
       ? response.liked
       : null;

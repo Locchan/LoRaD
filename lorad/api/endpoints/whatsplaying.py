@@ -11,17 +11,28 @@ ENDP_PATH = "/whatsplaying"
 LOGIN_REQUIRED = True
 DOCSTRING = {"GET": "WebSocket stream of current player, station, and track changes. Lives on REST.WS_LISTEN_PORT, not the REST port."}
 RESULT_EXAMPLE = {
-    "GET": "{'player_readable': 'File Player', 'playing': 'Artist - Track', 'liked': true}"
+    "GET": "{'player_readable': 'File Player', 'playing': 'Artist - Track', 'liked': true, 'can_switch': true}"
 }
 logger = get_logger()
 # Heartbeat when nothing else changed. Playhead is not a change.
 PUSH_PERIOD_S = 30
 
 
+def _can_switch(player) -> bool:
+    """Whether a player/station switch would be accepted right now (see the switch endpoints)."""
+    return not globs.SWITCH_LOCK and not getattr(player, "switching", False)
+
+
 def _state():
     player = get_current_player()
     if player is None:
-        return {"player_readable": None, "player_tech": None, "playing": None, "can_skip": False}
+        return {
+            "player_readable": None,
+            "player_tech": None,
+            "playing": None,
+            "can_skip": False,
+            "can_switch": False,
+        }
 
     response = {
         "player_readable": player.name_readable,
@@ -31,6 +42,7 @@ def _state():
             getattr(player, "supports_next_track", lambda: False)()
             and getattr(player, "running", False)
         ),
+        "can_switch": _can_switch(player),
     }
 
     if globs.FILESTREAMER is not None and player.name_tech == globs.FILESTREAMER.name_tech:
