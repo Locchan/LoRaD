@@ -12,6 +12,18 @@ SHM_PINNED = os.path.join(SHM_ROOT, "pinned")
 ORPHAN_MAX_AGE_S = 60 * 60
 PINNED_IGNORE = ("neurovoice",)
 
+# Fixed homes for the on-disk assets we copy in at boot. The config keeps pointing at the
+# real directories; code reads the copies from here.
+PINNED_RES = os.path.join(SHM_PINNED, "res")
+PINNED_DATA = os.path.join(SHM_PINNED, "data")
+PINNED_FALLBACK = os.path.join(SHM_PINNED, "fallback")
+
+
+def pinned_path(root: str, *parts: str) -> str:
+    # Config values may carry Windows separators; they are relative to a pinned root here.
+    cleaned = [str(part).replace("\\", os.sep).strip(os.sep) for part in parts if part]
+    return os.path.join(root, *cleaned)
+
 
 def prepare_shm() -> str:
     if not os.path.isdir("/dev/shm"):
@@ -86,11 +98,13 @@ def unlink_shm(path: str) -> bool:
         return False
 
 
-def _pin_tree(src: str, dest_name: str) -> str | None:
+def _pin_tree(src: str, dest: str) -> str | None:
+    if src and is_pinned_shm(src):
+        logger.error(f"Config points at pinned shm instead of on-disk media: {src}")
+        return None
     if not src or not os.path.exists(src):
         logger.warning(f"Nothing to pin into shm: {src}")
         return None
-    dest = os.path.join(SHM_PINNED, dest_name)
     os.makedirs(SHM_PINNED, mode=0o700, exist_ok=True)
     if os.path.isdir(src):
         shutil.copytree(
@@ -108,41 +122,18 @@ def _pin_tree(src: str, dest_name: str) -> str | None:
     return dest
 
 
-def _under(child: str, parent: str) -> bool:
-    try:
-        return os.path.commonpath(
-            (os.path.realpath(child), os.path.realpath(parent))
-        ) == os.path.realpath(parent)
-    except (TypeError, ValueError, OSError):
-        return False
-
-
 def seed_pinned_assets(config: dict) -> None:
+    """Copy the configured on-disk assets into shm. The config keeps the on-disk paths."""
     from lorad.common.utils.misc import local_path
 
-    res_src = local_path(config.get("RESDIR", ""))
-    data_src = local_path(config.get("DATADIR", ""))
-    fallback_src = local_path(config.get("FALLBACK_TRACK_DIR", ""))
-
-    res_dest = _pin_tree(res_src, "res") if res_src else None
-    if res_dest:
-        config["RESDIR"] = res_dest
-
-    if data_src and res_src and os.path.realpath(data_src) == os.path.realpath(res_src) and res_dest:
-        config["DATADIR"] = res_dest
-    elif data_src and res_src and _under(data_src, res_src) and res_dest:
-        config["DATADIR"] = os.path.join(res_dest, os.path.relpath(data_src, res_src))
-    elif data_src:
-        data_dest = _pin_tree(data_src, "data")
-        if data_dest:
-            config["DATADIR"] = data_dest
-
-    if fallback_src and res_src and _under(fallback_src, res_src) and res_dest:
-        config["FALLBACK_TRACK_DIR"] = os.path.join(res_dest, os.path.relpath(fallback_src, res_src))
-    elif fallback_src:
-        fallback_dest = _pin_tree(fallback_src, "fallback")
-        if fallback_dest:
-            config["FALLBACK_TRACK_DIR"] = fallback_dest
+    for key, dest in (
+        ("RESDIR", PINNED_RES),
+        ("DATADIR", PINNED_DATA),
+        ("FALLBACK_TRACK_DIR", PINNED_FALLBACK),
+    ):
+        src = local_path(config.get(key, ""))
+        if src:
+            _pin_tree(src, dest)
 
 
 def cleanup_orphans(max_age_s: int = ORPHAN_MAX_AGE_S):

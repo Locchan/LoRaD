@@ -9,8 +9,8 @@ from lorad.audio.utils.ffmpeg_utils import ffmpeg_concatenate, ffmpeg_reencode
 from lorad.common.database.MySQL import MySQL
 from lorad.common.utils.globs import FEAT_NEWS_ADS, FEAT_NEWS_RANDOM_FILE
 from lorad.common.utils.logger import get_logger
-from lorad.common.utils.misc import local_path, read_config, feature_enabled
-from lorad.common.utils.shm import SHM_ROOT
+from lorad.common.utils.misc import read_config, feature_enabled
+from lorad.common.utils.shm import PINNED_DATA, PINNED_RES, SHM_ROOT, pinned_path
 
 logger = get_logger()
 
@@ -64,7 +64,8 @@ class NewsPrgS(GenericPrg):
     def __init__(self, start_times: datetime.time, preparation_needed_mins: int):
         super().__init__(start_times, NewsPrgS.name, NewsPrgS.name_pretty, preparation_needed_mins)
         self.config = read_config()
-        self.jingle_path = local_path(self.config["RESDIR"], self.config["ENABLED_PROGRAMS"][NewsPrgS.name]["jingle_path"])
+        # Assets play from the shm copies made at boot; the config points at the on-disk originals.
+        self.jingle_path = pinned_path(PINNED_RES, self.config["ENABLED_PROGRAMS"][NewsPrgS.name]["jingle_path"])
         if not os.path.exists(self.jingle_path):
             logger.warning(f"Jingle not found: {self.jingle_path}")
 
@@ -116,7 +117,7 @@ class NewsPrgS(GenericPrg):
         return news_file
 
     def add_random_files(self, files_list, count=1):
-        random_filesdir = local_path(self.config["DATADIR"], "resources", "random_voices")
+        random_filesdir = pinned_path(PINNED_DATA, "resources", "random_voices")
         rnd_files = [os.path.join(random_filesdir, f) for f in os.listdir(random_filesdir) if os.path.isfile(os.path.join(random_filesdir, f)) and f != ".gitkeep"]
         logger.info(f"Adding {count} random files to the news of {len(rnd_files)} files total")
         if not rnd_files:
@@ -129,7 +130,7 @@ class NewsPrgS(GenericPrg):
         return files_list
 
     def add_ads(self, files_list, count=1):
-        adsdir = local_path(self.config["DATADIR"], "resources", "ads")
+        adsdir = pinned_path(PINNED_DATA, "resources", "ads")
         ad_files = [os.path.join(adsdir, f) for f in os.listdir(adsdir) if os.path.isfile(os.path.join(adsdir, f)) and f != ".gitkeep"]
         logger.info(f"Adding {count} ads to the news of {len(ad_files)} ads total")
         if not ad_files:
