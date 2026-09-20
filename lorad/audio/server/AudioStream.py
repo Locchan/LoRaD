@@ -6,6 +6,7 @@ from urllib.parse import urlsplit
 from lorad.audio.hub import get_hub
 from lorad.common.utils.http_threads import NamedThreadingMixIn
 from lorad.common.utils.logger import get_logger
+from lorad.common.utils.priority import realtime_thread
 from lorad.common.utils.misc import get_version, read_config
 
 logger = get_logger()
@@ -95,6 +96,8 @@ class AudioStream(BaseHTTPRequestHandler):
             self.end_headers()
 
             hub = get_hub()
+            # This worker only ships chunks from here on; it must not queue behind other work.
+            realtime_thread()
             last_seq = -1
             while True:
                 if self.client_address[0] in AudioStream.kick_list:

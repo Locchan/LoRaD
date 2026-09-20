@@ -5,6 +5,10 @@ services:
     privileged: true
     restart: unless-stopped
     shm_size: 512m
+    # The stream generator renices itself and runs its pacing threads realtime.
+    cap_add: ["SYS_NICE"]
+    cpu_shares: 4096
+    oom_score_adj: -800
     ports: ["5475:5475", "5476:5476", "5478:5478"]
     env_file: .env
     tmpfs:
@@ -18,5 +22,7 @@ services:
     container_name: lorad-front
     privileged: true
     restart: unless-stopped
+    # Static files; it can wait when the box is busy.
+    cpu_shares: 256
     ports: ["5477:5477"]
     env_file: .env

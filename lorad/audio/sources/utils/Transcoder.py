@@ -4,6 +4,7 @@ from threading import Thread
 
 from lorad.common.utils.logger import get_logger
 from lorad.common.utils.misc import read_config
+from lorad.common.utils.priority import realtime_thread
 
 logger = get_logger()
 
@@ -95,6 +96,7 @@ class Decoder:
             return False
 
     def _read_loop(self):
+        realtime_thread()
         read_size = PCM_FRAME_BYTES * 2048
         while not self._stop:
             try:
@@ -200,6 +202,7 @@ class Encoder:
         self.pump_thread.start()
 
     def _pump(self):
+        realtime_thread()
         process = self.process
         leftover = b""
         while not self._stop_pump and process.poll() is None:

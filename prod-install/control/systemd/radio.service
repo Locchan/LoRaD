@@ -7,6 +7,15 @@ ExecStart=/usr/bin/radio_player
 Type=simple
 Restart=on-failure
 RestartSec=5
+# mpg123 feeds the sound card and must never miss its deadline. The policy is inherited
+# by curl and mpg123, and the kernel still caps all RT tasks at sched_rt_runtime_us.
+CPUSchedulingPolicy=fifo
+CPUSchedulingPriority=20
+IOSchedulingClass=realtime
+IOSchedulingPriority=0
+LimitRTPRIO=infinity
+LimitMEMLOCK=infinity
+OOMScoreAdjust=-800
 
 [Install]
 WantedBy=multi-user.target

@@ -8,6 +8,7 @@ from lorad.audio.sources.utils.Transcoder import (
     PCM_FRAME_BYTES,
 )
 from lorad.common.utils.logger import get_logger
+from lorad.common.utils.priority import realtime_thread
 
 logger = get_logger()
 
@@ -176,6 +177,7 @@ class AudioHub:
         return self._audio_stream.connected_clients > 0
 
     def _clock(self):
+        realtime_thread()
         tick_bytes = int(PCM_BYTES_PER_SEC * PCM_TICK_S)
         tick_bytes -= tick_bytes % PCM_FRAME_BYTES
         next_tick = time.monotonic()
