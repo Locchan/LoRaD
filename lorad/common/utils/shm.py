@@ -12,6 +12,60 @@ SHM_PINNED = os.path.join(SHM_ROOT, "pinned")
 ORPHAN_MAX_AGE_S = 60 * 60
 PINNED_IGNORE = ("neurovoice",)
 
+# Voiced news is kept so the same headlines are not sent to the TTS again. It is only
+# given up when shm gets tight, and then just a few files at a time.
+NEUROVOICE_DIRNAME = "neurovoice"
+NEUROVOICE_TRIM_AT_USAGE = 0.5
+NEUROVOICE_TRIM_COUNT = 4
+_pause_lock = threading.Lock()
+_paused_until = None
+_pause_reason = ""
+
+
+def pause_cleanup(reason: str, hold_s: float):
+    """Hold the janitor off until hold_s has elapsed (or resume_cleanup is called)."""
+    global _paused_until, _pause_reason
+    until = time.monotonic() + max(0.0, float(hold_s))
+    with _pause_lock:
+        _paused_until = until
+        _pause_reason = reason
+    logger.debug(f"shm cleanup paused for {hold_s:.0f}s: {reason}")
+
+
+def resume_cleanup():
+    global _paused_until, _pause_reason
+    with _pause_lock:
+        if _paused_until is None:
+            return
+        _paused_until = None
+        _pause_reason = ""
+    logger.debug("shm cleanup resumed")
+
+
+def cleanup_paused() -> bool:
+    global _paused_until, _pause_reason
+    with _pause_lock:
+        if _paused_until is None:
+            return False
+        if time.monotonic() < _paused_until:
+            return True
+        logger.info(f"shm cleanup pause for [{_pause_reason}] expired, resuming")
+        _paused_until = None
+        _pause_reason = ""
+    return False
+
+
+def shm_usage() -> float:
+    """Fraction of the shm filesystem in use, 0.0 if it cannot be read."""
+    try:
+        stat = os.statvfs(SHM_ROOT)
+    except OSError:
+        return 0.0
+    total = stat.f_blocks
+    if not total:
+        return 0.0
+    return (total - stat.f_bfree) / total
+
 # Fixed homes for the on-disk assets we copy in at boot. The config keeps pointing at the
 # real directories; code reads the copies from here.
 PINNED_RES = os.path.join(SHM_PINNED, "res")
@@ -161,12 +215,41 @@ def seed_pinned_assets(config: dict) -> None:
             _pin_tree(src, dest)
 
 
+def trim_neurovoice():
+    """Drop the few oldest voiced files, but only once shm is filling up."""
+    usage = shm_usage()
+    if usage < NEUROVOICE_TRIM_AT_USAGE:
+        return 0
+    newsdir = os.path.join(SHM_ROOT, NEUROVOICE_DIRNAME)
+    candidates = []
+    for root, _, files in os.walk(newsdir):
+        for filename in files:
+            path = os.path.join(root, filename)
+            try:
+                candidates.append((os.path.getmtime(path), path))
+            except OSError:
+                pass
+    if not candidates:
+        return 0
+    candidates.sort()
+    removed = 0
+    for _, path in candidates[:NEUROVOICE_TRIM_COUNT]:
+        if unlink_shm(path):
+            removed += 1
+    if removed:
+        logger.info(f"shm at {usage:.0%}, dropped {removed} oldest news voice files")
+    return removed
+
+
 def cleanup_orphans(max_age_s: int = ORPHAN_MAX_AGE_S):
     cutoff = time.time() - max_age_s
     pinned_name = os.path.basename(SHM_PINNED)
     for root, dirs, files in os.walk(SHM_ROOT, topdown=True):
         if pinned_name in dirs:
             dirs.remove(pinned_name)
+        if NEUROVOICE_DIRNAME in dirs:
+            # Voiced news is not aged out; trim_neurovoice decides when it goes.
+            dirs.remove(NEUROVOICE_DIRNAME)
         if is_pinned_shm(root):
             dirs[:] = []
             continue
@@ -180,7 +263,10 @@ def cleanup_orphans(max_age_s: int = ORPHAN_MAX_AGE_S):
         if root == SHM_ROOT:
             continue
         try:
-            os.rmdir(root)
+            # An empty dir is usually one something just made to write into (news digests),
+            # so only reap it once it has been sitting unused for as long as the files.
+            if os.path.getmtime(root) < cutoff:
+                os.rmdir(root)
         except OSError:
             pass
 
@@ -189,6 +275,9 @@ def start_shm_janitor():
     def run():
         while True:
             time.sleep(60)
+            if cleanup_paused():
+                continue
             cleanup_orphans()
+            trim_neurovoice()
 
     threading.Thread(name="ShmJanitor", target=run, daemon=True).start()

@@ -7,7 +7,7 @@ from lorad.api.utils.misc import forbid_switching
 import lorad.common.utils.globs as globs
 from lorad.common.utils.logger import get_logger
 from lorad.common.utils.misc import read_config
-from lorad.common.utils.shm import unlink_shm
+from lorad.common.utils.shm import pause_cleanup, resume_cleanup, unlink_shm
 
 logger = get_logger()
 
@@ -27,7 +27,15 @@ class GenericPrg:
         self.preparations_started = True
         logger.info(f"Starting to prepare program: {self.name}.")
         logger.info(f"Program will start in {self.preparation_needed_mins} minutes.")
-        self.prepared_program = self._prepare_program_impl()
+        # Nothing in shm may be collected from here until the program is done with it.
+        pause_cleanup(self.name, hold_s=self.preparation_needed_mins * 60 * 3)
+        try:
+            self.prepared_program = self._prepare_program_impl()
+        except Exception:
+            resume_cleanup()
+            raise
+        if not self.prepared_program:
+            resume_cleanup()
 
     def _prepare_program_impl(self) -> dict:
         return {}
@@ -37,6 +45,7 @@ class GenericPrg:
         if self.prepared_program is None:
             logger.error(f"Can't run program [{self.name}]: not prepared!")
             self.preparations_started = False
+            resume_cleanup()
             return
         hub = get_hub()
         buffers = DoubleBuffer()
@@ -98,3 +107,4 @@ class GenericPrg:
             self.prepared_program = None
             self.preparations_started = False
             self.program_running = False
+            resume_cleanup()

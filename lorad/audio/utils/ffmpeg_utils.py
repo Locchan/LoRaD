@@ -21,6 +21,13 @@ def _loglevel_args() -> list[str]:
     return ["-loglevel", "info" if _debug_enabled() else "error"]
 
 
+def _ensure_output_dir(output_filename: str):
+    # The shm janitor may have reaped the directory between creating it and getting here.
+    parent = os.path.dirname(output_filename)
+    if parent:
+        os.makedirs(parent, mode=0o700, exist_ok=True)
+
+
 def _run_ffmpeg(command: list[str], what: str) -> bool:
     logger.debug(f"{what} command: {' '.join(command)}")
     result = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
@@ -41,6 +48,7 @@ def ffmpeg_reencode(filename: str, params: list[str], output_filename: str):
     ffmpeg_command = ["ffmpeg", *_loglevel_args(), "-i", filename]
     ffmpeg_command.extend(params)
     ffmpeg_command.append(output_filename)
+    _ensure_output_dir(output_filename)
     if not _run_ffmpeg(ffmpeg_command, "Re-encoder"):
         unlink_shm(output_filename)
 
@@ -65,6 +73,7 @@ def ffmpeg_concatenate(filenames: list[str], output_filename: str, artist=None, 
         if title is not None:
             ffmpeg_command.extend(["-metadata", f"title='{title}'"])
         ffmpeg_command.append(output_filename)
+        _ensure_output_dir(output_filename)
         if not _run_ffmpeg(ffmpeg_command, "Concatenator"):
             # Usually one of the inputs went missing, so name them all.
             for entry in entries:

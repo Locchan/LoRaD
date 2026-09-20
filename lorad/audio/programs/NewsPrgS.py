@@ -113,7 +113,8 @@ class NewsPrgS(GenericPrg):
         logger.debug("Will use the following files:")
         logger.debug(tempfiles)
         ffmpeg_concatenate(tempfiles, news_file, artist="NeuroNews", title=f"Новости за {datetime.datetime.now().strftime('%Y-%m-%d %H')}")
-        self._cleanup(keep={news_file})
+        # Voice files stay so the same headlines are not voiced again; the shm janitor
+        # trims the oldest ones once shm fills up.
         return news_file
 
     def add_random_files(self, files_list, count=1):
@@ -141,21 +142,3 @@ class NewsPrgS(GenericPrg):
             ads_to_add = [ads_to_add]
         files_list.extend(ads_to_add)
         return files_list
-
-    def _cleanup(self, keep=None):
-        logger.info("Starting voice file cleanup...")
-        keep = keep or set()
-        newsdir = os.path.join(self.config.get("RUNTIME_MEDIA_DIR", SHM_ROOT), "neurovoice")
-        counter = 0
-        for root, _, files in os.walk(newsdir):
-            for filename in files:
-                file_path = os.path.join(root, filename)
-                if file_path in keep:
-                    continue
-                try:
-                    os.remove(file_path)
-                    counter += 1
-                    logger.debug(f"Deleted transient file: {file_path}")
-                except Exception as e:
-                    logger.warning(f"Could not delete {file_path}: {e}")
-        logger.info(f"Cleaned {counter} files.")
