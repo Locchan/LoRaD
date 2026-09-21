@@ -1,56 +1,59 @@
-# Features that can be enabled via config:
-- **FILESTREAMER**
-- **FILESTREAMER:YANDEX**
-- **RESTREAMER**
-- **NEURONEWS**
-- **API**
+# Features that can be enabled via config (`ENABLED_FEATURES`):
 
-# Feature flags available:
-- **DEBUG** - debug logging and debug logic
-- **NO_DOWNLOADING** - use fallback tracks, don't download stuff
+Exact strings (also in `lorad/common/utils/globs.py`):
 
-# Configuration:
-`config.json` / `config.jsonc` (and `stations.json` / `stations.jsonc`) accept JSON with `//` / `/* */` comments and trailing commas. If both names are given, the exact path is used when it exists; otherwise the other extension is tried. `POST /admin/set_config` rewrites the loaded file as strict JSON.
-- **FEATURE_FLAGS**: The list of available feature flags. See above for the available feature flags
-- **ENABLED_FEATURES**: The list of enabled features. See above for the available features.
-- **DEFAULT_AUDIO_FORMAT**: The format to which all audio will be encoded.
-- **STATIONS_FILE_PATH**: Path to the stations file. Default: stations.json or stations.jsonc
-- **RESTREAMER**: (RESTREAMER) Radio restreamer configuration. \
-Example:\
-{"STATION": "default"}
-- **REST**: (API) REST API configuration.\
-Example:\
-{"LISTEN_PORT": 5476,"WS_LISTEN_PORT": 5478,"MAX_DATA_LEN_BYTES": 1024000,"TOKEN_EXPIRATION_MIN": 1440}
-- **YAMU_TOKEN**: (FILESTREAMER:YANDEX) Yandex Music token.
-- **NAME**: The name of the radio.
-- **LOCALE**: Locale (language). See lorad/common/localization/dictionary.py for available locales.
-- **MAX_SINGLE_IP_CLIENTS**: Maximum number of clients from a single IP.
-- **MAX_CLIENTS**: Maximum listeners on the LISTEN_PORT.
-- **BITRATE_KBPS**: The constant bitrate which the we will try to maintain.
-- **CHUNK_SIZE_KB**: A size of a single chunk of audio data.
-- **LISTEN_PORT**: Radio HTTP port,
-- **MYSQL**: MySQL credentials.\
-Example:\
-{"USERNAME": "","PASSWORD": "","ADDRESS": "","DATABASE": ""}
-- **FALLBACK_TRACK_DIR**: Directory with fallback tracks to play if the current file streamer fails to download/get a file to play
-- **TEMPDIR**: Legacy setting. Transient media is always written to `/dev/shm/lorad`.
-- **DATADIR**: Persistent resources directory. Generated voices, re-encoded audio, and digests use `/dev/shm/lorad` instead.
-- **RESDIR**: Resouces directory
-- **NEWS_PARSER_PERIOD_MIN**: (NEURONEWS) how often the news get parsed.
-- **NEWS_NEURIFIER_PERIOD_MIN**: (NEURONEWS) how often the news get summarized by AI (not all news will do that, see code). 
-- **ENABLED_PROGRAMS**: Enabled programs and their configuration.
-Example:\
-"NewsSmall": {"start_times": [],"jingle_path": "","preparation_needed_mins": ""}
-- **OPENAI_API_KEY**: nuff said
-- **OPENAI_MODEL**: OpenAI chat model for news summarizer / fake-news / ranking. Default: `gpt-4o-mini`
-- **NEWS_TTS_PROVIDER**: News speech provider: `google` (default) or `fish_audio`.
-- **GOOGLE_CLOUD_API_USERDATA**: Whole Google API auth JSON. Required when `NEWS_TTS_PROVIDER` is `google`.
-- **GOOGLE_TTS_LANGUAGE** / **GOOGLE_TTS_VOICE**: Optional Google voice overrides. Defaults: `ru-RU` / `ru-RU-Standard-B`.
-- **FISH_AUDIO_API_KEY**: Fish Audio API key. Required when `NEWS_TTS_PROVIDER` is `fish_audio`.
-- **FISH_AUDIO_REFERENCE_ID**: Fish Audio voice model ID from the Voice Library or your custom models.
-- **FISH_AUDIO_BASE_URL**: Optional Fish API base URL. Default: `https://api.fish.audio`.
-- **FISH_AUDIO_TIMEOUT_SECONDS**: Optional request timeout. Default: `120`.
+- **FILESTREAMER** — file carousel (needs at least one provider)
+- **FILESTREAMER:YANDEX** — Yandex Music provider for that carousel
+- **RESTREAMER** — live HTTP radio restreamer
+- **NEURONEWS** — news parse / TTS / scheduled `NewsSmall`
+- **REST** — REST + WebSocket API (older notes call this `API`; the value is `REST`)
+- **NEWS_FAKENEWS** — mix two AI-falsified items into the news digest
+- **NEWS_ADVERTISEMENTS** — append files from `DATADIR/resources/ads`
+- **NEWS_RANDOM_FILES** — append files from `DATADIR/resources/random_voices`
 
-The Fish integration always sends the `s2.1-pro-free` model header. That model is
-currently priced at $0 under Fish Audio's fair-use policy, with no SLA or latency
-guarantee; the model is intentionally not configurable to avoid accidental paid use.
+Yandex needs both `FILESTREAMER` and `FILESTREAMER:YANDEX`.
+
+# Feature flags (`FEATURE_FLAGS`, or top-level `"DEBUG": true`):
+
+- **DEBUG** — debug logging
+- **NO_DOWNLOADING** — YaMu skips downloads and plays fallback tracks
+
+# Configuration
+
+`config.json` / `config.jsonc` (and `stations.json` / `stations.jsonc`) accept JSON with `//` / `/* */` comments and trailing commas. Path is env `CFGFILE_PATH`, else `./config.json` or `./config.jsonc`. If a path is given with one extension and missing, the other is tried. `POST /admin/set_config` rewrites the loaded file as strict JSON (comments are not kept).
+
+Stations file (`STATIONS_FILE_PATH`, default `stations.json` / `stations.jsonc`): `{ "<id>": { "name": "...", "url": "http..." } }`.
+
+- **FEATURE_FLAGS**: list of flags (see above). `DEBUG` is also accepted as a top-level boolean.
+- **ENABLED_FEATURES**: modules to start (see above).
+- **DEFAULT_AUDIO_FORMAT**: codec name passed to ffmpeg (`mp3`).
+- **STATIONS_FILE_PATH**: restreamer stations file.
+- **RESTREAMER**: `{ "STATION": "<id>" }` — default station id from the stations file.
+- **REST**: `{ "LISTEN_PORT": 5476, "WS_LISTEN_PORT": 5478, "MAX_DATA_LEN_BYTES": 1024000, "TOKEN_EXPIRATION_MIN": 1440 }`
+- **YAMU_TOKEN**: Yandex Music token (`FILESTREAMER:YANDEX`).
+- **NAME**: radio name; also in log lines.
+- **LOCALE**: `EN` or `RU` (`lorad/common/localization/dictionary.py`).
+- **MAX_SINGLE_IP_CLIENTS**: when total listeners exceed `MAX_CLIENTS`, any IP with more than this many connections is kicked for the process lifetime (default 2).
+- **MAX_CLIENTS**: listener cap on `LISTEN_PORT` (default 10). Over the cap, extras get **503**; already-kicked IPs get **302**.
+- **BITRATE_KBPS**: CBR the encoder maintains.
+- **CHUNK_SIZE_KB**: MP3 chunk size for hub/encoder (`* 1024` bytes).
+- **LISTEN_PORT**: stream HTTP port (images: 5475).
+- **MYSQL**: `{ "USERNAME", "PASSWORD", "ADDRESS", "DATABASE" }` plus optional `CHARSET`.
+- **FALLBACK_TRACK_DIR**: local MP3s if a FileRide fails. Copied into shm (`pinned/fallback`) at boot.
+- **TEMPDIR** / **RUNTIME_MEDIA_DIR**: ignored at runtime. Boot always sets both to `/dev/shm/lorad`.
+- **DATADIR**: persistent resources (ads, random voices). Copied into shm at boot.
+- **RESDIR**: jingles and other static assets. Copied into shm at boot.
+- **NEWS_PARSER_PERIOD_MIN**: (`NEURONEWS`) how often news are parsed.
+- **NEWS_NEURIFIER_PERIOD_MIN**: (`NEURONEWS`) how often news are summarized.
+- **ENABLED_PROGRAMS**: `"NewsSmall": { "start_times": ["HH:MM"], "jingle_path": "", "preparation_needed_mins": 5 }`
+- **OPENAI_API_KEY** / **OPENAI_MODEL**: news summarizer / fake-news (default model `gpt-4o-mini`).
+- **NEWS_TTS_PROVIDER**: `google` (default) or `fish_audio`.
+- **GOOGLE_CLOUD_API_USERDATA**: full GCP service-account JSON. Required for `google`.
+- **GOOGLE_TTS_LANGUAGE** / **GOOGLE_TTS_VOICE**: optional. Defaults `ru-RU` / `ru-RU-Standard-B`.
+- **FISH_AUDIO_API_KEY** / **FISH_AUDIO_REFERENCE_ID**: required for `fish_audio`.
+- **FISH_AUDIO_BASE_URL**: default `https://api.fish.audio`.
+- **FISH_AUDIO_TIMEOUT_SECONDS**: default `120`.
+
+The Fish integration always sends the `s2.1-pro-free` model header. That model is currently priced at $0 under Fish Audio's fair-use policy, with no SLA or latency guarantee; the model is intentionally not configurable to a paid model.
+
+`POST /admin/set_config` may only write `ENABLED_PROGRAMS/NewsSmall/start_times`. Full HTTP API: `API.md`. Frontend: `frontend/README.md`. Backend agent notes: `AGENTS.md`.

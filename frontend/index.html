@@ -21,11 +21,6 @@
 <body>
   <div id="view-login" class="login-container" hidden>
     <div class="login-card card">
-      <h1 class="app-title">
-        <i class="fas fa-radio"></i>
-        <span data-bind="radio-title"></span>
-      </h1>
-
       <form id="login-form" class="login-form" novalidate>
         <div class="form-group">
           <label for="username" class="form-label">Имя пользователя</label>
@@ -54,11 +49,6 @@
 
   <div id="view-player" class="page" hidden>
     <header class="app-header card">
-      <h1 class="app-title">
-        <i class="fas fa-radio"></i>
-        <span data-bind="radio-title"></span>
-      </h1>
-
       <nav class="navigation">
         <a href="#/" class="nav-link active"><i class="fas fa-play-circle"></i> Плеер</a>
         <a href="#/schedule" class="nav-link"><i class="fas fa-calendar-alt"></i> Новости</a>
@@ -134,11 +124,6 @@
 
   <div id="view-schedule" class="page" hidden>
     <header class="app-header card">
-      <h1 class="app-title">
-        <i class="fas fa-calendar-alt"></i>
-        Расписание новостей
-      </h1>
-
       <nav class="navigation">
         <a href="#/" class="nav-link"><i class="fas fa-play-circle"></i> Плеер</a>
         <a href="#/schedule" class="nav-link active"><i class="fas fa-calendar-alt"></i> Новости</a>
@@ -165,15 +150,13 @@
           <button type="button" id="add-time-btn" class="add-btn" disabled>
             <i class="fas fa-plus"></i> Добавить
           </button>
+          <button type="button" id="save-schedule-btn" class="save-btn" disabled>
+            <i class="fas fa-save"></i> Сохранить изменения
+          </button>
         </div>
 
         <div id="times-list" hidden>
-          <div class="times-header">
-            <h3>Настроенные времена</h3>
-            <button type="button" id="save-schedule-btn" class="save-btn" disabled>
-              <i class="fas fa-save"></i> Сохранить изменения
-            </button>
-          </div>
+          <h3 class="times-header">Настроенные времена</h3>
           <div id="times-grid" class="times-grid"></div>
         </div>
 

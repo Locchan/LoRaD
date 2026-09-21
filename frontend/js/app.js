@@ -83,12 +83,21 @@
     select.value = value || "";
   }
 
+  function stationLabel(tech, readable) {
+    if (tech === "user:onyourwave") return "Моя волна";
+    return readable || tech;
+  }
+
   function syncStation() {
     const select = $("station");
     if (!state.stationTech) return;
-    if (!Array.from(select.options).some((option) => option.value === state.stationTech)) {
-      // the backend plays something outside the list (e.g. "Моя волна"): show it anyway
-      select.appendChild(new Option(state.stationName || state.stationTech, state.stationTech));
+    const option = Array.from(select.options).find((item) => item.value === state.stationTech);
+    if (option) {
+      // the list already carries readable names; only the Yandex wave needs its own label
+      if (state.stationTech === "user:onyourwave") option.textContent = "Моя волна";
+    } else {
+      // the backend plays something outside the list: show it anyway
+      select.appendChild(new Option(stationLabel(state.stationTech, state.stationName), state.stationTech));
     }
     select.value = state.stationTech;
   }
@@ -134,23 +143,25 @@
 
   function renderPlayer() {
     const playing = Boolean(state.audio && !state.audio.paused);
+    const locked = !state.canSwitch;
     setHidden($("player-init-loading"), !state.loading);
     setHidden($("player-loading"), !state.switchingPlayer);
     setHidden($("audio-player-section"), state.loading);
-    $("player").disabled = state.switchingPlayer || !state.canSwitch;
-    $("station").disabled = state.loading || state.switchingPlayer || !state.canSwitch;
+    $("player").disabled = locked || state.switchingPlayer;
+    $("station").disabled = locked || state.loading || state.switchingPlayer;
     $("track-title").textContent = state.track || "Нет информации о треке";
     $("play-pause-icon").className = playing ? "fas fa-pause" : "fas fa-play";
     $("play-pause-btn").classList.toggle("playing", playing);
-    $("play-pause-btn").disabled = !state.track;
+    $("play-pause-btn").disabled = locked || !state.track;
+    $("refresh-btn").disabled = locked;
     $("status-dot").classList.toggle("active", playing);
     $("status-text").textContent = playing ? "Воспроизводится" : "Остановлено";
     setHidden($("next-track-btn"), !state.canSkip);
-    $("next-track-btn").disabled = state.skipInFlight;
+    $("next-track-btn").disabled = locked || state.skipInFlight;
     $("next-track-icon").className = state.skipInFlight ? "fas fa-spinner fa-spin" : "fas fa-forward-step";
     const canLike = typeof state.liked === "boolean";
     setHidden($("like-track-btn"), !canLike);
-    $("like-track-btn").disabled = state.likeInFlight;
+    $("like-track-btn").disabled = locked || state.likeInFlight;
     $("like-track-btn").classList.toggle("liked", state.liked === true);
     $("like-track-icon").className = state.likeInFlight
       ? "fas fa-spinner fa-spin"
@@ -234,7 +245,10 @@
     // The API maps a readable name to a technical id; the option value is the id.
     fillSelect(
       $("station"),
-      Object.keys(state.stations).map((name) => [state.stations[name], name]),
+      Object.keys(state.stations).map((name) => {
+        const tech = state.stations[name];
+        return [tech, stationLabel(tech, name)];
+      }),
       state.stationTech
     );
     try {
@@ -341,7 +355,7 @@
   }
 
   async function skipTrack() {
-    if (!state.canSkip || state.skipInFlight) return;
+    if (!state.canSwitch || !state.canSkip || state.skipInFlight) return;
     state.skipInFlight = true;
     renderPlayer();
     try {
@@ -355,7 +369,7 @@
   }
 
   async function toggleLike() {
-    if (typeof state.liked !== "boolean" || state.likeInFlight) return;
+    if (!state.canSwitch || typeof state.liked !== "boolean" || state.likeInFlight) return;
     state.likeInFlight = true;
     renderPlayer();
     try {
@@ -508,9 +522,6 @@
     }
 
     document.title = config.radioTitle;
-    document.querySelectorAll("[data-bind='radio-title']").forEach((el) => {
-      el.textContent = config.radioTitle;
-    });
     document.querySelectorAll("[data-bind='username']").forEach((el) => {
       el.textContent = api.getUsername() || "";
     });
@@ -548,19 +559,24 @@
     });
 
     $("player").addEventListener("change", (event) => {
-      if (event.target.value && event.target.value !== state.currentPlayer) {
+      if (state.canSwitch && event.target.value && event.target.value !== state.currentPlayer) {
         switchToPlayer(event.target.value);
       }
     });
-    $("station").addEventListener("change", (event) => switchStation(event.target.value));
+    $("station").addEventListener("change", (event) => {
+      if (state.canSwitch) switchStation(event.target.value);
+    });
     $("play-pause-btn").addEventListener("click", () => {
-      if (!state.audio) return;
+      if (!state.canSwitch || !state.audio) return;
       if (state.audio.paused) state.audio.play();
       else state.audio.pause();
     });
     $("next-track-btn").addEventListener("click", skipTrack);
     $("like-track-btn").addEventListener("click", toggleLike);
-    $("refresh-btn").addEventListener("click", refreshStream);
+    $("refresh-btn").addEventListener("click", () => {
+      if (state.canSwitch) refreshStream();
+    });
+    // Volume is a local audio-element setting, so it stays usable even while the backend is locked.
     $("volume-slider").addEventListener("input", (event) => {
       state.volume = parseInt(event.target.value, 10);
       if (state.audio) state.audio.volume = state.volume / 100;

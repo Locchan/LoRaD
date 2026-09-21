@@ -21,7 +21,7 @@ window.LORAD_CONFIG = (function () {
     radioUrl,
     wsUrl,
     autoplay: false,
-    radioTitle: "ЙОПТЫМОПТЫ",
+    radioTitle: "ДедоРадио",
     // how much of the live stream the browser is allowed to sit on before we drop back to the edge
     maxBufferKb: 128,
     streamBitrateKbps: 128,

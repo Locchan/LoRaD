@@ -79,7 +79,7 @@ Player and station switches take `SWITCH_LOCK` for **10 seconds** after a succes
 {"message": "Cannot switch right now. Try later."}
 ```
 
-Programs can hold the lock longer for unswitcheable playback.
+Programs call `forbid_switching()` with no duration at start and `allow_switching()` in `finally`, so the lock lasts the whole show (news included). FileStreamer also 406s while `player.switching` (Yandex station prefetch in flight). `/whatsplaying` exposes this as `can_switch`.
 
 ## WebSocket protocol
 
@@ -253,6 +253,7 @@ Common fields:
 | `player_tech` | string or `null` | e.g. `player_streaming`, `player_radio` |
 | `playing` | string or `null` | Current track / station label |
 | `can_skip` | bool | `true` if the current player supports skip and is running (Yandex file player) |
+| `can_switch` | bool | `false` while `SWITCH_LOCK` is held or the current player is mid-station-switch. Always present. A change in this field is a push. |
 
 When the file/Yandex player is current, extra fields:
 
@@ -264,7 +265,9 @@ When the file/Yandex player is current, extra fields:
 | `length_s` | float | Track length in seconds. Absent when unknown, and always absent for radio (a live restream has no track) |
 | `position_s` | float | Playhead in seconds, already corrected for the hub's decode lead. Sent only alongside `length_s` |
 
-`position_s` is **not** part of change detection: the server pushes on any other change, and otherwise every 30 seconds, so a client should count seconds locally and resync when the two disagree.
+Radio (`player_radio`) does **not** include `station_tech` / `station_readable` / playhead / `liked`. Use `/radio/current_station` and `/radio/available_stations` for those. `playing` is whatever `currently_playing` is set to (often empty or a station label).
+
+`position_s` is **not** part of change detection: the server pushes on any other change (including `can_switch`), and otherwise every 30 seconds, so a client should count seconds locally and resync when the two disagree.
 
 Example:
 
@@ -274,6 +277,7 @@ Example:
   "player_tech": "player_streaming",
   "playing": "Artist - Track",
   "can_skip": true,
+  "can_switch": true,
   "station_tech": "user:onyourwave",
   "station_readable": "Моя волна",
   "liked": true,
@@ -289,7 +293,8 @@ No player yet:
   "player_readable": null,
   "player_tech": null,
   "playing": null,
-  "can_skip": false
+  "can_skip": false,
+  "can_switch": false
 }
 ```
 
@@ -299,7 +304,7 @@ No player yet:
 
 Auth: `BU`. Feature: `FILESTREAMER:YANDEX`.
 
-Map of **readable name → technical id**. Not inverted.
+Map of **readable name → technical id**. Not inverted. Served from the shm pin written at startup (`YaMu.cache_stations_async`); a miss falls through to a live fetch.
 
 ```json
 {"Pop": "genre:pop", "Meditation": "genre:meditation"}
@@ -334,7 +339,7 @@ Auth: `ADMIN`. Feature: `FILESTREAMER:YANDEX`. Current player must be the file/Y
 | Code | Body |
 |---|---|
 | 400 | Unknown station / missing field |
-| 406 | Wrong current player, Yandex not initialized, or switch lock |
+| 406 | Wrong current player, Yandex not initialized, switch lock, or a station switch already in progress |
 
 Locks switching for 10 seconds on success.
 

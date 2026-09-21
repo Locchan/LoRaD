@@ -21,11 +21,13 @@ Version is `pyproject.toml` plus commit count. Runtime version is `/version` (Do
 ```
 lorad_main.py                 # process entry; starts threads
 lorad/
-  common/                     # config, logger, globs, locale, MySQL
+  common/                     # config, logger, globs, locale, MySQL, shm
   audio/
+    hub.py                    # exclusive PCM bus + long-lived MP3 encoder
+    ramfile.py                # RAM double-buffer of current/next MP3
     server/AudioStream.py     # listener HTTP stream (audio/mpeg)
     sources/                  # players: FileStreamer, RadReStreamer
-    sources/utils/Transcoder.py
+    sources/utils/Transcoder.py  # Decoder (per source) + Encoder (hub)
     file_sources/             # FileRide providers (YaMu)
     programs/                 # scheduled shows (NewsSmall)
     utils/ffmpeg_utils.py     # file re-encode / concat helpers
@@ -43,15 +45,15 @@ Ignore `frontend/` and generated/runtime dirs (`data/`, `temp/`, `dist/`).
 `lorad_main.py`:
 
 1. `SIGTERM`/`SIGINT` → `os._exit(0)`
-2. `read_config()` then `init_localization()`
-3. `FEATURE_FLAGS` from config; `DEBUG` enables debug logging
+2. `read_config()`, `prepare_shm()` (forces `TEMPDIR`/`RUNTIME_MEDIA_DIR` to `/dev/shm/lorad`), `seed_pinned_assets()`, shm janitor
+3. `init_localization()`; `FEATURE_FLAGS` from config; `DEBUG` enables debug logging
 4. Bind stream server on `LISTEN_PORT`
-5. For each item in `ENABLED_FEATURES`, start the matching threads and register players
+5. For each item in `ENABLED_FEATURES`, start the matching threads and register players (Yandex stations cache starts async)
 6. If `PLAYERS` is empty, exit
-7. `start_player` on the first registered player
-8. Watchdog: any dead thread → `os._exit(1)`
+7. `start_player` on the first registered player (`hub.acquire`)
+8. Watchdog: any dead thread → `os._exit(1)` (currently broken: see Pitfalls)
 
-Thread names you will see: `HTTPServer`, `Streamer`, `ReStreamer`, `NewsParser`, `Neuro`, `ProgramMgr`, `API`, `API-WS`, plus per-listener `WRK#N`, per-WebSocket `WS#N`, `Transcoder`, `PrgRunner`/`PrgPrep`, `SW_Locker`.
+Thread names you will see: `HTTPServer`, `Streamer`, `ReStreamer`, `NewsParser`, `Neuro`, `ProgramMgr`, `API`, `API-WS`, `PcmClock`, `Decoder`, `Transcoder`, `ShmJanitor`, `YaStations`, `Prefetch`, `StationSw`, `RamFill`, plus per-listener `WRK#N`, per-WebSocket `WS#N`, `PrgRunner`/`PrgPrep`, `SW_Locker`.
 
 Import order matters. `read_config()` / `get_logger()` run at module import in many files. Config must exist before those imports. `lorad_main.py` loads config before importing `AudioStream` / `FileStreamer` / `YaMu` for that reason.
 
@@ -72,8 +74,9 @@ Stations for the restreamer are a second JSONC file (`STATIONS_FILE_PATH`, defau
 | `CHUNK_SIZE_KB` | transcoder output chunk size |
 | `DEFAULT_AUDIO_FORMAT` | output codec name passed to ffmpeg (`mp3`) |
 | `MAX_CLIENTS` | stream listener cap (default 10) |
-| `MAX_SINGLE_IP_CLIENTS` | documented; stream kick logic currently uses `>2` connections per IP |
-| `TEMPDIR` / `DATADIR` / `RESDIR` | downloads, news audio, jingles |
+| `MAX_SINGLE_IP_CLIENTS` | over `MAX_CLIENTS`, IPs with more than this many connections are kicked (default 2) |
+| `TEMPDIR` / `RUNTIME_MEDIA_DIR` | overwritten at boot to `/dev/shm/lorad` |
+| `DATADIR` / `RESDIR` | on-disk assets copied into shm `pinned/` at boot |
 | `FALLBACK_TRACK_DIR` | local MP3s if a FileRide fails |
 | `MYSQL` | `{USERNAME,PASSWORD,ADDRESS,DATABASE}` plus optional `CHARSET` |
 | `REST` | `{LISTEN_PORT, WS_LISTEN_PORT, MAX_DATA_LEN_BYTES, TOKEN_EXPIRATION_MIN}` |
@@ -105,7 +108,7 @@ Do not log or return secrets. Admin get/set already reject keys containing `user
 | `FEAT_FILESTREAMER_YANDEX` | `FILESTREAMER:YANDEX` | `YaMu` provider + `globs.YANDEX_OBJ` |
 | `FEAT_RESTREAMER` | `RESTREAMER` | `RadReStreamer` |
 | `FEAT_NEURONEWS` | `NEURONEWS` | news parse / neurify / program scheduler |
-| `FEAT_REST` | `REST` | API server (README also calls this `API`) |
+| `FEAT_REST` | `REST` | REST + WebSocket API |
 | `FEAT_FAKE_NEWS` | `NEWS_FAKENEWS` | mix two AI-falsified items into the digest |
 | `FEAT_NEWS_ADS` | `NEWS_ADVERTISEMENTS` | append files from `DATADIR/resources/ads` |
 | `FEAT_NEWS_RANDOM_FILE` | `NEWS_RANDOM_FILES` | append files from `DATADIR/resources/random_voices` |
@@ -116,29 +119,33 @@ Yandex requires both `FILESTREAMER` and `FILESTREAMER:YANDEX`. FileStreamer with
 
 ## Process-wide state
 
-`lorad/common/utils/globs.py` is the shared mutable process state: current streamer, players, Yandex object, locale, `SWITCH_LOCK`, station cache, capability strings. Players subclass `GenericPlayer` (`lorad/audio/sources/GenericPlayer.py`): `name_tech`, `name_readable`, `currently_playing`, `start()` / `stop()`, `list_sources()`, `current_source()`, `switch_source(id)`. `switch_players(name, start=True)` is only stop-old / flush-buffer / start-new. Station changes go through the current player's `switch_source`.
+`lorad/common/utils/globs.py` is the shared mutable process state: current streamer, players, Yandex object, locale, `SWITCH_LOCK`, station cache, capability strings. Players subclass `GenericPlayer` (`lorad/audio/sources/GenericPlayer.py`): `name_tech`, `name_readable`, `currently_playing`, `switching`, `start()` / `stop()`, `list_sources()`, `current_source()`, `switch_source(id)`. `switch_players(name, start=True)` stops the old player, `hub.release`s it, then starts the new one and `hub.acquire`s. Station changes go through the current player's `switch_source`.
 
 Known `name_tech` values: `player_streaming` (`FileStreamer`), `player_radio` (`RadReStreamer`). First registered player becomes the default.
 
-`SWITCH_LOCK` blocks station/player switches (API returns 406). `forbid_switching(seconds)` starts `SW_Locker`. Programs call it for the duration of an unswitcheable track.
+`SWITCH_LOCK` blocks station/player switches (API returns 406). `forbid_switching(seconds)` shares one deadline so overlapping timed locks cannot unlock each other early; `seconds <= 0` holds until `allow_switching()`. FileStreamer also sets `player.switching` while a Yandex station prefetch is in flight (same 406). After a successful player/station switch the API locks for 10 seconds. Programs call `forbid_switching()` with no duration at start and `allow_switching()` in `finally`.
 
 ## Audio pipeline
 
 ```
-FileRide / live HTTP  →  Transcoder (ffmpeg stdin/stdout)  →  AudioStream.current_data  →  listeners
+FileRide / live HTTP
+  → AudioHub.begin_source (Decoder ffmpeg: encoded → PCM)
+  → PcmClock (realtime PCM, silence when idle)
+  → Encoder ffmpeg (PCM → MP3 CBR BITRATE_KBPS)
+  → hub.wait_chunk → AudioStream listeners
 ```
 
-`AudioStream` is a long-lived `GET /` that sends `audio/mpeg`. Other paths 404. `X-Real-IP` is treated as the client IP when proxied. New listeners get a burst of whatever is already in `current_data`; after that they take the newest chunk. `AudioStream.add_data` keeps a one-chunk deque (pop left, append). `track_ended` / full-buffer rewrite signals a new track. `player_switch` is set during player changes.
+`AudioHub` (`lorad/audio/hub.py`) is exclusive: one owner at a time (`acquire` / `release` / `feed`). `begin_source` reuses the current Decoder when owner, drain flag, and signature `(demuxer, sample_rate, channels)` match; otherwise it restarts ffmpeg and logs why. `release(..., drain=True)` lets the encoder play out remaining PCM; `drain=False` drops it. The encoder is long-lived so listeners always see one continuous MP3 stream.
 
-Over `MAX_CLIENTS`, any IP with more than two connections is added to `kick_list`. Kicked IPs get a 302 to a YouTube URL. IPs in `kick_list` stay kicked for the process lifetime.
+`AudioStream` is a long-lived `GET /` (and `HEAD /`) that sends `audio/mpeg`. Other paths 404. Query strings are ignored so the UI can cache-bust. `X-Real-IP` is treated as the client IP when proxied. Each worker waits on `hub.wait_chunk` and writes the latest MP3 chunk.
 
-`Transcoder` runs ffmpeg: `-i pipe:0` → MP3 CBR `BITRATE_KBPS` @ 44100. First output is a burst (`>= 2` chunks) so browsers do not stall on switch. `get_transcoded_chunk()` returns `globs.END_OF_TRANSCODED_DATA` (`b'EOTD'`) when input is exhausted. Set `no_more_data = True` after the last source bytes.
+Over `MAX_CLIENTS`, `ddos_protection` adds any IP with more than `MAX_SINGLE_IP_CLIENTS` connections to `kick_list` and returns **503**. Already-kicked IPs get **302** to a YouTube URL. Kicked IPs stay kicked for the process lifetime.
 
-`FileStreamer.carousel` loops: `get_current_track()` → `serve_file()` → `next_track()`, rotating providers. On any exception it plays `FALLBACK_TRACK_DIR` (empty dir is fatal). `serve_file` is single-flight (`self.free`). It can pause feeding ffmpeg when there are no listeners (`only_if_listeners_there=True`). FileStreamer is hardcoded to source MP3.
+`Decoder` / `Encoder` live in `Transcoder.py`. Decoder: `-f <demuxer> -i pipe:0` → s16le PCM @ 44100 stereo. Encoder: PCM → MP3 CBR `BITRATE_KBPS`. Chunk size is `CHUNK_SIZE_KB * 1024`.
 
-`RadReStreamer.standby` waits until `running`, then preflights the station URL for `Content-Type` / Icecast bitrate and streams through `Transcoder`. Network errors retry with backoff (cap 15s). `current_station` is a stations-file id.
+`FileStreamer.carousel` loads tracks into `DoubleBuffer` (`ramfile.py`), feeds the hub, and prefetches the next file ~30s before the end (`Prefetch`). On failure it plays pinned fallback MP3s (empty dir is fatal). Yandex station changes run on `StationSw`: keep the current track playing, load the first new-station track into preload, then skip over. FileStreamer is hardcoded to source MP3.
 
-`FileStreamer.chunk_size_bytes` is `CHUNK_SIZE_KB * 102` (not 1024). Transcoder uses `* 1024`. Do not "fix" one without checking pacing.
+`RadReStreamer.standby` waits until `running`, then preflights the station URL for `Content-Type` / Icecast bitrate and feeds the hub. `_epoch` increments on `switch_source` so a stale `_stream` loop exits. Network errors retry with backoff (cap 15s). `current_station` is a stations-file id.
 
 ## File sources
 
@@ -148,7 +155,7 @@ Over `MAX_CLIENTS`, any IP with more than two connections is added to `kick_list
 - `get_current_track()` → `(display_name, filepath)` or invalid (carousel falls back)
 - `next_track()` — advance, download, set current
 
-`YaMu` is the only provider. It wraps `yandex_music.Client` + `Radio` (Rotor). Tracks download into `TEMPDIR` as `yandex_<md5>.mp3`. Default station is `user:onyourwave`. Station switches are `FileStreamer.switch_source(station_id)` (stop, `radio.start_radio`, start).
+`YaMu` is the only provider. It wraps `yandex_music.Client` + `Radio` (Rotor). Tracks download into shm (`TEMPDIR`) as `yandex_<md5>.mp3`. Default station is `user:onyourwave`. Station lists are pinned to shm (`pinned/yandex_available_stations.json`) at startup via `cache_stations_async()` (`YaStations` thread) and served from that cache afterwards. Station switches are `FileStreamer.switch_source(station_id)` → `YaMu.switch_station` (drop prefetch, `radio.start_radio`, prepare the first new track as next).
 
 To add a provider: subclass `FileRide`, construct it in `lorad_main.py` when its feature is on, append to `carousel_providers`.
 
@@ -159,7 +166,7 @@ Enabled only with `NEURONEWS`. `AVAILABLE_PROGRAMS` in `program_mgr.py` is the c
 `GenericPrg` contract:
 
 1. `prepare_program` → `_prepare_program_impl()` must return `{track_name: filepath, ...}` (or fail)
-2. At start time, `start_program` stops the current player, plays each file via `FileStreamer.serve_file(..., unswitcheable=True)`, then restores the previous player
+2. At start time, `start_program` takes an open-ended `SWITCH_LOCK`, `hub.acquire(self)`, plays each prepared file through the hub, then in `finally` `hub.release(self, drain=completed)` and `allow_switching()`, restoring the previous player
 
 `NewsPrgS` (`name = "NewsSmall"`, pretty `"Panorama"`): fetch latest news, TTS any missing `RUNTIME_MEDIA_DIR/neurovoice/<id>.mp3`, re-encode to stream bitrate, optional ads/random files, concat after the jingle (`RESDIR` + config `jingle_path`), write `RUNTIME_MEDIA_DIR/neurovoice/digests/news_digest_*.mp3`, mark news used, and remove intermediate voice files after digest creation.
 
@@ -242,9 +249,9 @@ Unauthenticated: `GET /version`, `GET|POST /apidoc`, `GET /openapi`.
 
 `ADMIN`: `POST /user/register`, `/user/remove`, `/switch_player`, `/yandex/switch_station`, `/radio/switch_station`, `/admin/set_config`. `GET /admin/get_config?key=`. `BU`: `POST /yandex/next_track`, `/yandex/like_track`. Register: username ≥ 3, password ≥ 8.
 
-`/whatsplaying` on the file player also returns Yandex `station_tech` / `station_readable` (special-case `user:onyourwave` → `"Моя волна"`), plus `liked` while a Yandex track is active, and `length_s` / `position_s` for the playhead. Radio has no track, so those two are omitted. `position_s` is excluded from change detection. The server pushes on any other change, and otherwise every `PUSH_PERIOD_S` (30s); the UI counts seconds itself and resyncs past 2s of drift.
+`/whatsplaying` always includes `can_switch` (`not SWITCH_LOCK` and not `player.switching`). A change in `can_switch` is a push. On the file player it also returns Yandex `station_tech` / `station_readable` (special-case `user:onyourwave` → `"Моя волна"`), plus `liked` while a Yandex track is active, and `length_s` / `position_s` for the playhead. Radio has no track and no station fields on this socket; use `/radio/current_station`. `position_s` is excluded from change detection. The server pushes on any other change, and otherwise every `PUSH_PERIOD_S` (30s); the UI counts seconds itself and resyncs past 2s of drift.
 
-`/switch_player` is feature-gated on `RESTREAMER` even though it switches among all registered players. After a successful player or station switch, switching is locked for 10 seconds.
+`/switch_player` is feature-gated on `RESTREAMER` even though it switches among all registered players. After a successful player or station switch, switching is locked for 10 seconds. Yandex `switch_station` also 406s while `player.switching`.
 
 ## Database
 
@@ -271,7 +278,7 @@ Passwords are SHA-512 with a hardcoded salt in `hash_password`. Do not change th
 
 ## Docker / install
 
-Images are Alpine Python 3.12. `full_install.sh` / `upgrade_install.sh` build the Poetry wheel, install it, copy `lorad_main.py` to `/usr/bin/lorad`, write `/version`, set timezone `Europe/Minsk`. `requests` is imported by the restreamer but is not a direct Poetry dependency; if you add import-time use of a new third-party lib, put it in `pyproject.toml`.
+Images are Alpine Python 3.12. `full_install.sh` / `upgrade_install.sh` build the Poetry wheel, install it, copy `lorad_main.py` to `/usr/bin/lorad`, write `/version`, set timezone `Europe/Minsk`. Third-party imports used at runtime belong in `pyproject.toml` (`requests` already is).
 
 ## Conventions
 
@@ -289,9 +296,7 @@ Images are Alpine Python 3.12. `full_install.sh` / `upgrade_install.sh` build th
 - Config and logger execute at import. Instantiating `MySQL`, `AudioStream`, or API classes in a vacuum needs a real `config.json` or `config.jsonc`
 - API path matching is literal. `/foo` ≠ `/foo/`
 - `lrd_auth` reads `headers._headers` (stdlib private). Pass the real request headers object, not a plain dict, unless you change the decorator
-- `FileStreamer.cleanup` does not delete downloaded tracks (the `os.remove` is commented out)
 - The ffmpeg concat list is written into shm and ffmpeg resolves relative `file` entries against that list, so on-disk assets (`RESDIR`, `DATADIR`, `FALLBACK_TRACK_DIR`) are copied into `/dev/shm/lorad/pinned` at boot (`seed_pinned_assets`). The janitor and `unlink_shm` never delete that tree. `local_path()` still resolves the on-disk source (Windows separators included) before the copy.
-- `NewsPrgS.add_ads` / `add_random_files` assign a new list that `_reencode_news` does not always pass to `ffmpeg_concatenate` — if you touch digest assembly, make the file list consistent
 - `lorad/audio/file_sources/yandex/Radio.py` and `RadReStreamer` import `get_logger` / `read_config` from odd places; prefer `lorad.common.utils.*` in new code
 - Watchdog uses `athread.is_alive` (method, always truthy) rather than `is_alive()`. Do not rely on it to detect dead threads until that is fixed
-- `MAX_SINGLE_IP_CLIENTS` is not what the kick list uses
+- `lorad_main.py` assigns `config["TEMPDIR"]` after `read_config()`; modules that captured TEMPDIR at import still see the shm path because that assignment happens before FileStreamer/YaMu are imported
