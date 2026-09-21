@@ -1,3 +1,4 @@
 - Ability to put a yandex track in a loop
 - Fix hiccup when switching from gimn to playback
 - Sort yandex stations by name (in backend preferrably)
+- Add liked songs as a custom yandex station
