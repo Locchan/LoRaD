@@ -8,7 +8,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 from lorad.common.database.Base import Base
 from lorad.common.database.MySQL import MySQL
 from lorad.common.utils.globs import FEAT_FAKE_NEWS
+from lorad.common.utils.logger import get_logger
 from lorad.common.utils.misc import feature_enabled, read_config
+
+logger = get_logger()
 
 
 
@@ -78,17 +81,20 @@ def get_prepared_news_by_src(source) -> Result[Tuple[News]]:
 
 def get_news(news_to_get: int = 10) -> Result[Tuple[News]]:
     with MySQL.get_session() as session:
-        if feature_enabled(FEAT_FAKE_NEWS):
+        latest = session.scalars(select(News).order_by(desc(News.date_published)).limit(news_to_get)).all()
+        if not feature_enabled(FEAT_FAKE_NEWS):
+            return latest
+        try:
             from lorad.audio.programs.NewsPrgS import generate_fake_news
 
-            generate_fake_news(session.scalars(select(News).order_by(desc(News.date_published)).limit(news_to_get)).all())
-            fake_news = session.scalars(select(News).where(News.fake==1).order_by(desc(News.id)).limit(2)).all()
+            generate_fake_news(latest)
+            fake_news = session.scalars(select(News).where(News.fake == 1).order_by(desc(News.id)).limit(2)).all()
             news = session.scalars(select(News).order_by(desc(News.date_published)).limit(news_to_get - 2)).all()
-            for anews in fake_news:
-                print(anews.body_prepared)
             news.extend(fake_news)
             return news
-        else:
+        except Exception as e:
+            # OpenAI quota, parse failures, too few items: the digest still goes out with real news.
+            logger.warn(f"Skipping fake news ({e.__class__.__name__}): {e}")
             return session.scalars(select(News).order_by(desc(News.date_published)).limit(news_to_get)).all()
 
 def mark_as_read(ids) -> None:

@@ -24,12 +24,23 @@ def generate_fake_news(news):
         logger.info("No need to generate fake news.")
         return news
     logger.info("Generating fake news...")
+    if len(news) < 2:
+        logger.warn("Not enough news to generate fake items; skipping.")
+        return news
     news_to_fake = random.sample(news, 2)
     config = read_config()
     openai_api_key = config["OPENAI_API_KEY"]
     for anitem in news_to_fake:
         news.remove(anitem)
-    fake_text = fakeify_news(openai_api_key, [x.body_prepared for x in news_to_fake])
+    try:
+        fake_text = fakeify_news(openai_api_key, [x.body_prepared for x in news_to_fake if x.body_prepared])
+    except Exception:
+        news.extend(news_to_fake)
+        raise
+    if len(fake_text) < len(news_to_fake):
+        logger.warn("Fake news model returned fewer jokes than requested; skipping.")
+        news.extend(news_to_fake)
+        return news
     news_to_fake_filtered = []
     for iter, anewstofake in enumerate(news_to_fake):
         news_to_fake_filtered.append(
