@@ -123,6 +123,8 @@
     nextYandexTrack: () => request("/yandex/next_track", { method: "POST", body: {} }),
     setYandexTrackLiked: (liked) =>
       request("/yandex/like_track", { method: "POST", body: { liked } }),
+    setYandexTrackLoop: (loop) =>
+      request("/yandex/loop_track", { method: "POST", body: { loop } }),
     switchRadioStation: (newStation) =>
       request("/radio/switch_station", { method: "POST", body: { new_station: newStation } }),
     getAvailablePlayers: () => request("/available_players"),
@@ -134,5 +136,24 @@
     getConfig: (key) =>
       request(`/admin/get_config?key=${encodeURIComponent(key)}`),
     setConfig: (key, value) => request("/admin/set_config", { method: "POST", body: { key, value } }),
+    getBackground: async () => {
+      const headers = { Authorization: authHeader() };
+      const response = await fetch(`${config().apiUrl}/background?t=${Date.now()}`, { headers });
+      if (response.status === 401) {
+        logout();
+        global.dispatchEvent(new CustomEvent("lorad:unauthorized"));
+        const error = new Error("Unauthorized");
+        error.status = 401;
+        throw error;
+      }
+      if (response.status === 501) {
+        const error = new Error("IMMICH_BACKGROUNDS is disabled");
+        error.status = 501;
+        throw error;
+      }
+      if (!response.ok) return null;
+      // X-Background-Date is absent when Immich has no date for the photo
+      return { blob: await response.blob(), date: response.headers.get("X-Background-Date") };
+    },
   };
 })(window);

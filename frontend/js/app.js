@@ -1,6 +1,7 @@
 (function (global) {
   const TIMES_KEY = "ENABLED_PROGRAMS/NewsSmall/start_times";
   const PREP_KEY = "ENABLED_PROGRAMS/NewsSmall/preparation_needed_mins";
+  const BACKGROUND_FEATURE_OFF_KEY = "lorad_immich_backgrounds_off";
   const BACKGROUNDS = [
     "1VuZTnscmraqYUZHZ1EQbecdrVfPm_l244Nl7PF1FkChpTa4adEpJMsKskpKRJXqryRvomDp.jpeg",
     "20160308_preview.jpeg",
@@ -30,8 +31,10 @@
     canSkip: false,
     canSwitch: true,
     liked: null,
+    looping: null,
     skipInFlight: false,
     likeInFlight: false,
+    loopInFlight: false,
     loading: true,
     switchingPlayer: false,
     socket: null,
@@ -41,6 +44,10 @@
     length: null,
     position: null,
     positionKey: "",
+    backgroundUrl: "",
+    backgroundLoaded: false,
+    backgroundFeatureOff: sessionStorage.getItem(BACKGROUND_FEATURE_OFF_KEY) === "1",
+    backgroundNatural: null,
   };
 
   const schedule = {
@@ -85,6 +92,7 @@
 
   function stationLabel(tech, readable) {
     if (tech === "user:onyourwave") return "Моя волна";
+    if (tech === "user:likes") return "Понравившееся";
     return readable || tech;
   }
 
@@ -95,6 +103,7 @@
     if (option) {
       // the list already carries readable names; only the Yandex wave needs its own label
       if (state.stationTech === "user:onyourwave") option.textContent = "Моя волна";
+      if (state.stationTech === "user:likes") option.textContent = "Понравившееся";
     } else {
       // the backend plays something outside the list: show it anyway
       select.appendChild(new Option(stationLabel(state.stationTech, state.stationName), state.stationTech));
@@ -168,6 +177,11 @@
       : state.liked
         ? "fas fa-heart"
         : "far fa-heart";
+    const canLoop = typeof state.looping === "boolean";
+    setHidden($("loop-track-btn"), !canLoop);
+    $("loop-track-btn").disabled = locked || state.loopInFlight;
+    $("loop-track-btn").classList.toggle("looping", state.looping === true);
+    $("loop-track-icon").className = state.loopInFlight ? "fas fa-spinner fa-spin" : "fas fa-repeat";
   }
 
   function streamUrl() {
@@ -205,6 +219,7 @@
     // The server locks switching during programs and right after a switch.
     state.canSwitch = data.can_switch !== false;
     state.liked = typeof data.liked === "boolean" ? data.liked : null;
+    state.looping = typeof data.looping === "boolean" ? data.looping : null;
     if (data.player_tech && data.player_tech !== state.currentPlayer) {
       state.currentPlayer = data.player_tech;
       $("player").value = data.player_tech;
@@ -383,6 +398,20 @@
     }
   }
 
+  async function toggleLoop() {
+    if (!state.canSwitch || typeof state.looping !== "boolean" || state.loopInFlight) return;
+    state.loopInFlight = true;
+    renderPlayer();
+    try {
+      await api.setYandexTrackLoop(!state.looping);
+    } catch (error) {
+      console.error("Failed to change Yandex loop status:", error);
+    } finally {
+      state.loopInFlight = false;
+      renderPlayer();
+    }
+  }
+
   function scheduleChanged() {
     return schedule.times.join() !== schedule.saved.join();
   }
@@ -528,6 +557,7 @@
 
     if (path === "/login") {
       stopPlayer();
+      clearBackground();
       showView("view-login");
       updateLoginValidation(false);
       return;
@@ -536,6 +566,7 @@
     if (path === "/schedule") {
       // the player keeps running in the background: the views are only hidden, not torn down
       showView("view-schedule");
+      loadBackground();
       if (schedule.loaded || schedule.loading) {
         renderSchedule();
       } else {
@@ -545,6 +576,7 @@
     }
 
     showView("view-player");
+    loadBackground();
     if (!state.audio) await initPlayer();
   }
 
@@ -573,6 +605,7 @@
     });
     $("next-track-btn").addEventListener("click", skipTrack);
     $("like-track-btn").addEventListener("click", toggleLike);
+    $("loop-track-btn").addEventListener("click", toggleLoop);
     $("refresh-btn").addEventListener("click", () => {
       if (state.canSwitch) refreshStream();
     });
@@ -601,22 +634,150 @@
       button.addEventListener("click", () => {
         api.logout();
         stopPlayer();
+        clearBackground();
         schedule.loaded = false;
         navigate("/login");
       });
     });
 
+    global.addEventListener("resize", positionBackgroundDate);
     global.addEventListener("hashchange", render);
     global.addEventListener("lorad:unauthorized", () => {
       stopPlayer();
+      clearBackground();
       navigate("/login");
     });
   }
 
+  function clearBackground() {
+    if (state.backgroundUrl && state.backgroundUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(state.backgroundUrl);
+    }
+    state.backgroundUrl = "";
+    state.backgroundLoaded = false;
+    ["view-player", "view-schedule"].forEach((id) => {
+      $(id).style.removeProperty("--bg-image");
+      $(id).style.backgroundColor = "";
+    });
+    state.backgroundNatural = null;
+    showBackgroundDate(null);
+  }
+
+  // Only Immich backgrounds carry a date, and only when Immich has one for that photo
+  function showBackgroundDate(isoDate) {
+    const label = $("background-date");
+    if (!label) return;
+    const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate || "");
+    if (!parts) {
+      label.textContent = "";
+      setHidden(label, true);
+      return;
+    }
+    label.textContent = `${parts[3]}.${parts[2]}.${parts[1]}`;
+    setHidden(label, false);
+    positionBackgroundDate();
+  }
+
+  function measureImage(url) {
+    return new Promise((resolve) => {
+      const probe = new Image();
+      probe.onload = () => resolve({ width: probe.naturalWidth, height: probe.naturalHeight });
+      probe.onerror = () => resolve(null);
+      probe.src = url;
+    });
+  }
+
+  // The photo is painted with background-size: contain against the viewport, so its own
+  // bottom-right corner sits inside the page by however much the aspect ratios differ.
+  function positionBackgroundDate() {
+    const label = $("background-date");
+    if (!label || label.hidden) return;
+    const natural = state.backgroundNatural;
+    const viewWidth = document.documentElement.clientWidth;
+    const viewHeight = document.documentElement.clientHeight;
+    if (!natural || !natural.width || !natural.height) {
+      label.style.removeProperty("right");
+      label.style.removeProperty("bottom");
+      return;
+    }
+    const scale = Math.min(viewWidth / natural.width, viewHeight / natural.height);
+    const insetX = Math.round((viewWidth - natural.width * scale) / 2);
+    const insetY = Math.round((viewHeight - natural.height * scale) / 2);
+    label.style.right = `${insetX + 14}px`;
+    label.style.bottom = `${insetY + 12}px`;
+  }
+
+  function applyBackground(url) {
+    if (!api.isAuthenticated() || route() === "/login") return;
+    // url() inside a custom property resolves against styles.css, not the page, so absolutise it
+    const absolute = new URL(url, location.href).href;
+    ["view-player", "view-schedule"].forEach((id) => {
+      $(id).style.setProperty("--bg-image", `url('${absolute}')`);
+    });
+  }
+
+  function applyBackgroundColor() {
+    if (!api.isAuthenticated() || route() === "/login") return;
+    ["view-player", "view-schedule"].forEach((id) => {
+      $(id).style.setProperty("--bg-image", "none");
+      $(id).style.backgroundColor = "#59636f";
+    });
+  }
+
+  async function loadLocalBackground() {
+    const candidates = [...BACKGROUNDS].sort(() => Math.random() - 0.5);
+    for (const filename of candidates) {
+      const url = `randomBackground/${filename}`;
+      const loaded = await new Promise((resolve) => {
+        const probe = new Image();
+        probe.onload = () => resolve(true);
+        probe.onerror = () => resolve(false);
+        probe.src = url;
+      });
+      if (loaded) {
+        applyBackground(url);
+        state.backgroundNatural = null;
+        showBackgroundDate(null);
+        return;
+      }
+    }
+    applyBackgroundColor();
+    state.backgroundNatural = null;
+    showBackgroundDate(null);
+  }
+
+  async function loadBackground() {
+    if (state.backgroundLoaded) return;
+    state.backgroundLoaded = true;
+    applyBackgroundColor();
+    if (state.backgroundFeatureOff) {
+      await loadLocalBackground();
+      return;
+    }
+    try {
+      const picked = await api.getBackground();
+      const blob = picked && picked.blob;
+      if (!blob || !blob.size || (blob.type && !blob.type.startsWith("image/"))) {
+        await loadLocalBackground();
+        return;
+      }
+      if (state.backgroundUrl && state.backgroundUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(state.backgroundUrl);
+      }
+      state.backgroundUrl = URL.createObjectURL(blob);
+      applyBackground(state.backgroundUrl);
+      state.backgroundNatural = await measureImage(state.backgroundUrl);
+      showBackgroundDate(picked.date);
+    } catch (error) {
+      if (error.status === 501) {
+        state.backgroundFeatureOff = true;
+        sessionStorage.setItem(BACKGROUND_FEATURE_OFF_KEY, "1");
+      }
+      if (error.status !== 401) await loadLocalBackground();
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
-    const background = `randomBackground/${BACKGROUNDS[Math.floor(Math.random() * BACKGROUNDS.length)]}`;
-    $("view-player").style.backgroundImage = `url('${background}')`;
-    $("view-schedule").style.backgroundImage = `url('${background}')`;
     bindEvents();
     if (location.hash) {
       render();

@@ -73,6 +73,8 @@ PINNED_RES = os.path.join(SHM_PINNED, "res")
 PINNED_DATA = os.path.join(SHM_PINNED, "data")
 PINNED_FALLBACK = os.path.join(SHM_PINNED, "fallback")
 PINNED_YANDEX_STATIONS = os.path.join(SHM_PINNED, "yandex_available_stations.json")
+PINNED_IMMICH_BACKGROUNDS = os.path.join(SHM_PINNED, "immich_backgrounds.json")
+IMMICH_CACHE_TTL_S = 60 * 60
 
 
 def write_pinned_json(path: str, payload) -> None:
@@ -105,6 +107,32 @@ def read_yandex_stations() -> dict | None:
     if isinstance(payload, dict):
         return payload
     return None
+
+
+def write_immich_backgrounds(assets: list[dict]) -> None:
+    """assets: [{"id": "<uuid>", "date": "YYYY-MM-DD" or None}, ...]"""
+    write_pinned_json(
+        PINNED_IMMICH_BACKGROUNDS,
+        {"assets": assets, "built_at": time.time()},
+    )
+
+
+def read_immich_backgrounds() -> list[dict] | None:
+    payload = read_pinned_json(PINNED_IMMICH_BACKGROUNDS)
+    if not isinstance(payload, dict):
+        return None
+    assets = payload.get("assets")
+    built_at = payload.get("built_at")
+    if not isinstance(assets, list) or not isinstance(built_at, (int, float)):
+        return None
+    if time.time() - float(built_at) > IMMICH_CACHE_TTL_S:
+        return None
+    known = []
+    for item in assets:
+        if not isinstance(item, dict) or not item.get("id"):
+            continue
+        known.append({"id": str(item["id"]), "date": item.get("date") or None})
+    return known
 
 
 def pinned_path(root: str, *parts: str) -> str:

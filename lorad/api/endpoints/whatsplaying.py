@@ -11,7 +11,7 @@ ENDP_PATH = "/whatsplaying"
 LOGIN_REQUIRED = True
 DOCSTRING = {"GET": "WebSocket stream of current player, station, and track changes. Lives on REST.WS_LISTEN_PORT, not the REST port."}
 RESULT_EXAMPLE = {
-    "GET": "{'player_readable': 'File Player', 'playing': 'Artist - Track', 'liked': true, 'can_switch': true}"
+    "GET": "{'player_readable': 'File Player', 'playing': 'Artist - Track', 'liked': true, 'looping': false, 'can_switch': true}"
 }
 logger = get_logger()
 # Heartbeat when nothing else changed. Playhead is not a change.
@@ -47,6 +47,7 @@ def _state():
 
     if globs.FILESTREAMER is not None and player.name_tech == globs.FILESTREAMER.name_tech:
         response["station_tech"] = player.current_source()
+        response["looping"] = bool(getattr(player, "looping", False))
         # Files have a playhead; a live restream does not, so these stay absent for radio.
         length = player.track_length()
         if length:
@@ -59,9 +60,10 @@ def _state():
                 logger.warning(f"Could not get Yandex like status: {e}")
                 response["liked"] = None
         stations = player.list_sources(cached=True) or {}
-        if response["station_tech"] == "user:onyourwave":
-            response["station_readable"] = "Моя волна"
-            return response
+        for name, tech in globs.YANDEX_SYNTHETIC_STATIONS.items():
+            if response["station_tech"] == tech:
+                response["station_readable"] = name
+                return response
         for astation in stations:
             if stations[astation] == response["station_tech"]:
                 response["station_readable"] = astation

@@ -91,6 +91,7 @@ Stations for the restreamer are a second JSONC file (`STATIONS_FILE_PATH`, defau
 | `FISH_AUDIO_BASE_URL` / `FISH_AUDIO_TIMEOUT_SECONDS` | optional Fish endpoint/timeout |
 | `NEWS_PARSER_PERIOD_MIN` / `NEWS_NEURIFIER_PERIOD_MIN` | news loops |
 | `ENABLED_PROGRAMS` | `{ "NewsSmall": { start_times, jingle_path, preparation_needed_mins } }` |
+| `IMMICH` | `{BASE_URL, API_KEY, BACKGROUNDS: {PERSON_IDS, MIN_PEOPLE}}`; backgrounds overlap defaults to `3`. API key needs Immich v3.2.2 capabilities `asset.read`, `asset.view`, `asset.download` (see README) |
 
 `EDITABLE_CONFIG_KEYS` in `globs.py` is the allowlist for `POST /admin/set_config`. Today only `ENABLED_PROGRAMS/NewsSmall/start_times`. After that key is written, programs are re-registered.
 
@@ -112,6 +113,7 @@ Do not log or return secrets. Admin get/set already reject keys containing `user
 | `FEAT_FAKE_NEWS` | `NEWS_FAKENEWS` | mix two AI-falsified items into the digest |
 | `FEAT_NEWS_ADS` | `NEWS_ADVERTISEMENTS` | append files from `DATADIR/resources/ads` |
 | `FEAT_NEWS_RANDOM_FILE` | `NEWS_RANDOM_FILES` | append files from `DATADIR/resources/random_voices` |
+| `FEAT_IMMICH_BACKGROUNDS` | `IMMICH_BACKGROUNDS` | enable admin-only Immich backgrounds and warm their cache |
 
 **Flags** (`FEATURE_FLAGS`): `DEBUG` (also accepted as top-level `"DEBUG": true`), `NO_DOWNLOADING` (YaMu skips downloads → fallback).
 
@@ -155,7 +157,7 @@ Over `MAX_CLIENTS`, `ddos_protection` adds any IP with more than `MAX_SINGLE_IP_
 - `get_current_track()` → `(display_name, filepath)` or invalid (carousel falls back)
 - `next_track()` — advance, download, set current
 
-`YaMu` is the only provider. It wraps `yandex_music.Client` + `Radio` (Rotor). Tracks download into shm (`TEMPDIR`) as `yandex_<md5>.mp3`. Default station is `user:onyourwave`. Station lists are pinned to shm (`pinned/yandex_available_stations.json`) at startup via `cache_stations_async()` (`YaStations` thread) and served from that cache afterwards. Station switches are `FileStreamer.switch_source(station_id)` → `YaMu.switch_station` (drop prefetch, `radio.start_radio`, prepare the first new track as next).
+`YaMu` is the only provider. It wraps `yandex_music.Client` + `Radio` (Rotor). Tracks download into shm (`TEMPDIR`) as `yandex_<md5>.mp3`. Default station is `user:onyourwave`. Station lists always inject synthetic `user:onyourwave` (`Моя волна`) and `user:likes` (`Понравившееся`) at the top in that order, with the rotor stations after them sorted by name, and are pinned to shm (`pinned/yandex_available_stations.json`) at startup via `cache_stations_async()` (`YaStations` thread). `user:likes` shuffles liked tracks locally with no rotor feedback. Station switches are `FileStreamer.switch_source(station_id)` → `YaMu.switch_station` (drop prefetch, `radio.start_radio`, prepare the first new track as next). Looping repeats the current RAM file without Yandex skip/finish.
 
 To add a provider: subclass `FileRide`, construct it in `lorad_main.py` when its feature is on, append to `carousel_providers`.
 
@@ -220,7 +222,7 @@ Rules:
 
 - First argument is always `headers` (`email.message.Message` from the stdlib server)
 - GET: `impl_GET(headers)`. POST: `impl_POST(headers, data)` where `data` is a dict
-- Return `(status, payload)`, a payload dict (implies 200), a pre-shaped `{rc, data, content-type?}`, or a string
+- Return `(status, payload)`, a payload dict (implies 200), a pre-shaped `{rc, data, content-type?, cache-control?, headers?}`, or a string. `headers` is a dict of extra response headers; they are also listed in `Access-Control-Expose-Headers` so the browser can read them cross-origin
 - Always register: import the module in the package `__init__` if needed, then append it to `endpoints_to_register` in `lorad/api/endpoints/__init__.py`
 - Duplicate `ENDP_PATH`+method is fatal (`os._exit`)
 - Decorators **above** `@lrd_api_endp` must return `{rc, data}` (and optional `content-type`). Preferred order, top to bottom: `@lrd_auth` → `@lrd_feat_req` → `@lrd_validate` → `@lrd_api_endp`
@@ -247,9 +249,11 @@ Unauthenticated: `GET /version`, `GET|POST /apidoc`, `GET /openapi`.
 
 `BU`: WebSocket `GET /whatsplaying` on `WS_LISTEN_PORT`, REST `/current_player`, `/available_players`, `/locale`, `/enabled_features`, `/user/whoami`, Yandex/radio station GETs (feature-gated).
 
-`ADMIN`: `POST /user/register`, `/user/remove`, `/switch_player`, `/yandex/switch_station`, `/radio/switch_station`, `/admin/set_config`. `GET /admin/get_config?key=`. `BU`: `POST /yandex/next_track`, `/yandex/like_track`. Register: username ≥ 3, password ≥ 8.
+`ADMIN`: `POST /user/register`, `/user/remove`, `/switch_player`, `/yandex/switch_station`, `/radio/switch_station`, `/admin/set_config`. `GET /admin/get_config?key=`. `GET /background` (404 if Immich is not configured; 501 if the feature is off; adds `X-Background-Date` when the asset has a date). `BU`: `POST /yandex/next_track`, `/yandex/like_track`, `/yandex/loop_track`. Register: username ≥ 3, password ≥ 8.
 
-`/whatsplaying` always includes `can_switch` (`not SWITCH_LOCK` and not `player.switching`). A change in `can_switch` is a push. On the file player it also returns Yandex `station_tech` / `station_readable` (special-case `user:onyourwave` → `"Моя волна"`), plus `liked` while a Yandex track is active, and `length_s` / `position_s` for the playhead. Radio has no track and no station fields on this socket; use `/radio/current_station`. `position_s` is excluded from change detection. The server pushes on any other change, and otherwise every `PUSH_PERIOD_S` (30s); the UI counts seconds itself and resyncs past 2s of drift.
+`/whatsplaying` always includes `can_switch` (`not SWITCH_LOCK` and not `player.switching`). Skip sets `FileStreamer.switching` for the same grey-out. A change in `can_switch` is a push. On the file player it also returns Yandex `station_tech` / `station_readable` (synthetic `user:onyourwave` → `"Моя волна"`, `user:likes` → `"Понравившееся"`), plus `liked` while a Yandex track is active, `looping`, and `length_s` / `position_s` for the playhead. Radio has no track and no station fields on this socket; use `/radio/current_station`. `position_s` is excluded from change detection. The server pushes on any other change, and otherwise every `PUSH_PERIOD_S` (30s); the UI counts seconds itself and resyncs past 2s of drift.
+
+Yandex station list always injects those two synthetic ids first (`Моя волна`, then `Понравившееся`) and sorts the rest by name. `user:likes` shuffles `users_likes_tracks` locally with no rotor feedback.
 
 `/switch_player` is feature-gated on `RESTREAMER` even though it switches among all registered players. After a successful player or station switch, switching is locked for 10 seconds. Yandex `switch_station` also 406s while `player.switching`.
 

@@ -1,6 +1,6 @@
 # LoRaD frontend
 
-Static HTML/CSS/JS UI. No build step. Hash routes, three views in `index.html`.
+Static HTML/CSS/JS UI. No build step. Hash routes, three views in `index.html`. Self-hosted fonts live in `fonts/` and are copied into the image by the `Dockerfile`.
 
 ## Pages
 
@@ -13,10 +13,11 @@ Auth is `localStorage` (`username` + `authToken`). REST uses `Authorization: <us
 ## Player behavior
 
 - Stream URL is `radioUrl` plus a cache-busting `?t=`. Volume is local (`<audio>` + `localStorage`); it is never disabled by backend state.
-- `/whatsplaying` (WebSocket on `wsUrl`) is the live source of track, skip, like, playhead, and `can_switch`. A change in `can_switch` greys out player/station dropdowns, play/pause, skip, like, and refresh. Volume stays usable.
-- Station `<select>` values are technical ids; labels are readable names. `user:onyourwave` is always shown as **Моя волна**. Radio stations come from `/radio/*`; file/Yandex from `/yandex/*`. Radio `whatsplaying` frames do not carry station fields — current radio id is loaded from `/radio/current_station`.
+- `/whatsplaying` (WebSocket on `wsUrl`) is the live source of track, skip, like, loop, playhead, and `can_switch`. A change in `can_switch` greys out player/station dropdowns, play/pause, skip, like, loop, and refresh. Volume stays usable. Skip also sets `switching` on the backend.
+- Station `<select>` values are technical ids; labels are readable names. `user:onyourwave` is **Моя волна**; `user:likes` is **Понравившееся**. The dropdown keeps the order the API sends (those two first), so do not sort it client-side. Radio stations come from `/radio/*`; file/Yandex from `/yandex/*`. Radio `whatsplaying` frames do not carry station fields — current radio id is loaded from `/radio/current_station`.
 - Playhead: the UI ticks locally and resyncs if the server `position_s` drifts by more than 2 seconds.
 - Live-stream buffer: if the browser holds more than `maxBufferKb` ahead of the playhead, the UI seeks to the edge (or reconnects if the stream is not seekable).
+- Background: after login, `GET {apiUrl}/background` with `Authorization` (ADMIN). A **501** is remembered for the current frontend session as “feature disabled.” The UI then probes `randomBackground/`; if no bundled image loads, it uses a slate-gray color. The login view has no photo background. If the response carries `X-Background-Date`, the date is stamped as `DD.MM.YYYY` in the Date Stamp font (`fonts/Date Stamp Bold.otf`) on the **photo's** bottom-right corner, not the page's: `positionBackgroundDate()` derives the letterbox insets from the photo's natural size against the viewport and reapplies them on resize. Local fallback photos and undated Immich photos show nothing. The photo is scaled to fit the whole viewport without cropping or stretching (`background-size: contain`), and the leftover area is filled with a blurred, zoomed copy of the same photo. Both layers read the `--bg-image` custom property that `app.js` sets on the page elements; the value must be an absolute URL, because `url()` inside a custom property resolves against `css/styles.css`, not the document.
 
 ## Config (`js/config.js`)
 

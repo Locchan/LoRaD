@@ -10,6 +10,7 @@ Exact strings (also in `lorad/common/utils/globs.py`):
 - **NEWS_FAKENEWS** — mix two AI-falsified items into the news digest
 - **NEWS_ADVERTISEMENTS** — append files from `DATADIR/resources/ads`
 - **NEWS_RANDOM_FILES** — append files from `DATADIR/resources/random_voices`
+- **IMMICH_BACKGROUNDS** — authenticated Immich-backed UI backgrounds
 
 Yandex needs both `FILESTREAMER` and `FILESTREAMER:YANDEX`.
 
@@ -53,6 +54,17 @@ Stations file (`STATIONS_FILE_PATH`, default `stations.json` / `stations.jsonc`)
 - **FISH_AUDIO_API_KEY** / **FISH_AUDIO_REFERENCE_ID**: required for `fish_audio`.
 - **FISH_AUDIO_BASE_URL**: default `https://api.fish.audio`.
 - **FISH_AUDIO_TIMEOUT_SECONDS**: default `120`.
+- **IMMICH**: `{ "BASE_URL": "", "API_KEY": "", "BACKGROUNDS": { "PERSON_IDS": [], "MIN_PEOPLE": 3 } }`. Connection keys are shared; `BACKGROUNDS` is only for `GET /background` (`IMMICH_BACKGROUNDS`). Secrets are never returned by `/admin/get_config`.
+
+  API key capabilities (Immich **v3.2.2**, [API docs](https://api.immich.app) and server controllers on the `v3.2.2` line). Create the key in Immich Account Settings and enable only:
+
+  | Capability | Why LoRaD needs it |
+  |---|---|
+  | `asset.read` | `POST /api/search/metadata` with `personIds` |
+  | `asset.view` | `GET /api/assets/{id}/thumbnail?size=preview` |
+  | `asset.download` | `GET /api/assets/{id}/original` (fallback if preview is missing; a preview/fullsize request can also redirect here) |
+
+  `people.read` is **not** required: person UUIDs are already in `IMMICH.BACKGROUNDS.PERSON_IDS`. Do not grant `all`.
 
 The Fish integration always sends the `s2.1-pro-free` model header. That model is currently priced at $0 under Fish Audio's fair-use policy, with no SLA or latency guarantee; the model is intentionally not configurable to a paid model.
 

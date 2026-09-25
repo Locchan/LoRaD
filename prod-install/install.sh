@@ -61,6 +61,7 @@ fi
 
 echo "Installing tree to ${DEST}..."
 mkdir -p "${DEST}/control" "${DEST}/lorad/data" "${DEST}/lorad_build"
+cp "${SRC}/README.md" /opt/README.md
 
 cp -a "${SRC}/control/." "${DEST}/control/"
 chmod 755 \

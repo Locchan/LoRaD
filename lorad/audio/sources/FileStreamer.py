@@ -43,6 +43,7 @@ class FileStreamer(GenericPlayer):
         self._prefetching = False
         self._prefetch_epoch = 0
         self.switching = False
+        self.looping = False
         self._track_started = 0.0
         self._track_duration = 0.0
         self._listen_open = False
@@ -135,16 +136,32 @@ class FileStreamer(GenericPlayer):
 
     def stop(self):
         logger.info("Stopping carousel")
+        self.looping = False
         self.running = False
         self._stop_current = True
         get_hub().release(self)
 
+    def set_looping(self, looping: bool) -> bool:
+        self.looping = bool(looping)
+        with self.buffers.lock:
+            if self.buffers.preload.ready and self.buffers.preload.kind == "track":
+                same = self.buffers.preload.path == self.current_filepath
+                if self.looping and not same:
+                    self.buffers.preload.clear()
+                    ride = self.current_ride
+                    if hasattr(ride, "drop_prefetched"):
+                        ride.drop_prefetched()
+                elif not self.looping and same:
+                    self.buffers.preload.clear()
+        return self.looping
+
     def list_sources(self, cached=False):
-        if globs.YANDEX_STATION_CACHE is not None:
-            return globs.YANDEX_STATION_CACHE
-        stations = read_yandex_stations()
-        if stations is not None:
-            globs.YANDEX_STATION_CACHE = stations
+        stations = globs.YANDEX_STATION_CACHE
+        if stations is None:
+            stations = read_yandex_stations()
+        from lorad.audio.file_sources.yandex.YaMu import YaMu
+        stations = YaMu._with_synthetic(stations or {})
+        globs.YANDEX_STATION_CACHE = stations
         return stations
 
     def current_source(self):
@@ -159,6 +176,7 @@ class FileStreamer(GenericPlayer):
             raise RuntimeError("Yandex is not initialized.")
         if self.switching:
             raise RuntimeError("A station switch is already in progress.")
+        self.looping = False
         self.switching = True
         # The first track of the new station has to be downloaded; keep playing until it is here.
         Thread(name="StationSw", target=self._switch_worker, args=(ride, source_id), daemon=True).start()
@@ -231,7 +249,15 @@ class FileStreamer(GenericPlayer):
         if self._skip_busy:
             return False
         self._skip_busy = True
+        self.switching = True
+        self.looping = False
         try:
+            with self.buffers.lock:
+                if self.buffers.preload.ready and self.buffers.preload.path == self.current_filepath:
+                    self.buffers.preload.clear()
+                ride = self.current_ride
+                if hasattr(ride, "drop_prefetched") and getattr(ride, "next_track_path", None) == self.current_filepath:
+                    ride.drop_prefetched()
             self._ensure_next_track_preloaded()
             deadline = time.time() + 180
             while time.time() < deadline:
@@ -247,6 +273,7 @@ class FileStreamer(GenericPlayer):
             return self._skip_to_preloaded()
         finally:
             self._skip_busy = False
+            self.switching = False
 
     def _skip_to_preloaded(self) -> bool:
         """Ask the feeding loop to cut over to whatever sits in the preload buffer."""
@@ -282,6 +309,9 @@ class FileStreamer(GenericPlayer):
 
     def _prefetch_next_track(self):
         if self._prefetching:
+            return
+        if self.looping and self.current_filepath and os.path.exists(self.current_filepath):
+            self.buffers.load_preload_track(self.current_filepath, self.currently_playing)
             return
         if not self.current_ride.supports_next_track():
             return
@@ -387,6 +417,15 @@ class FileStreamer(GenericPlayer):
                 if self.buffers.preload.ready and self.buffers.preload.kind == "track":
                     self._commit_next_track(listen_report=listen_report)
                     continue
+                if self.looping:
+                    if self.buffers.current.file_offset == 0 and self.buffers.current.is_last_window():
+                        self._track_started = time.monotonic()
+                        continue
+                    self._prefetch_next_track()
+                    if self.buffers.wait_preload(timeout=60) and self.buffers.preload.kind == "track":
+                        self._commit_next_track(listen_report=listen_report)
+                        continue
+                    break
                 next_off = self.buffers.current.window_end()
                 if next_off < self.buffers.current.file_size:
                     self.buffers.wait_preload(timeout=30)
@@ -415,10 +454,12 @@ class FileStreamer(GenericPlayer):
         return self.bytes_per_sec
 
     def _commit_next_track(self, user_skip=False, listen_report=True):
-        self._close_listen(skipped=user_skip)
         name = self.buffers.preload.name
         path = self.buffers.preload.path
         finished = self.current_filepath
+        looping_same = self.looping and not user_skip and path == finished
+        if not looping_same:
+            self._close_listen(skipped=user_skip)
         hub = get_hub()
         if user_skip:
             hub.drop_buffered_audio()
@@ -431,14 +472,17 @@ class FileStreamer(GenericPlayer):
             sample_rate=self.buffers.current.sample_rate,
             channels=self.buffers.current.channels,
         )
-        self.current_ride.promote_next()
+        if not looping_same:
+            self.current_ride.promote_next()
         self.currently_playing = name
         self.current_filepath = path
         self._track_started = time.monotonic()
         self._track_duration = self.buffers.current.duration_s or file_duration_s(path)
-        unlink_shm(finished)
+        if not looping_same:
+            unlink_shm(finished)
         logger.info(
-            f"Switched to buffered track: {name} "
+            f"{'Looping' if looping_same else 'Switched to buffered track'}: {name} "
             f"({format_slot_size(self.buffers.current)}, {format_duration(self._track_duration)})"
         )
-        self._open_listen(listen_report)
+        if not looping_same:
+            self._open_listen(listen_report)

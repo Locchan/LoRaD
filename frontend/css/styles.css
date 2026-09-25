@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Date Stamp";
+  src: url("../fonts/Date%20Stamp%20Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --primary: #6366f1;
   --secondary: #8b5cf6;
@@ -41,22 +49,56 @@ body {
   box-shadow: none;
 }
 
-/* Page shell (player + schedule) */
+/* Page shell (player + schedule). --bg-image is set by app.js */
 .page {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
   position: relative;
+  /* Own stacking context, otherwise the backdrop below sinks behind .page's colour */
+  isolation: isolate;
 }
 
+/* Whole photo, scaled to the viewport, aspect ratio untouched */
 .page::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(30, 41, 59, 0.56) 0%, rgba(15, 23, 42, 0.63) 100%);
+  background-image: linear-gradient(135deg, rgba(30, 41, 59, 0.56) 0%, rgba(15, 23, 42, 0.63) 100%),
+    var(--bg-image, none);
+  background-size: auto, contain;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+  background-attachment: fixed, fixed;
+}
+
+/* Blurred, cropped copy fills whatever the contained photo leaves empty */
+.page::after {
+  content: "";
+  position: fixed;
+  inset: -4vmax;
+  z-index: -1;
+  background-image: var(--bg-image, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(32px) saturate(115%);
+}
+
+/* Camera-style stamp for Immich photos that have a date. app.js parks it on the
+   bottom-right corner of the contained photo, so right/bottom here are only a fallback. */
+.background-date {
+  position: fixed;
+  right: 20px;
+  bottom: 16px;
+  z-index: 1;
+  font-family: "Date Stamp", monospace;
+  font-weight: 700;
+  font-size: 28px;
+  line-height: 1;
+  color: rgba(196, 142, 44, 0.45);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
 }
 
 .page > * {
@@ -295,6 +337,11 @@ body {
 .like-track-btn.liked,
 .like-track-btn:hover:not(:disabled) {
   color: var(--error);
+}
+
+.loop-track-btn.looping,
+.loop-track-btn:hover:not(:disabled) {
+  color: var(--primary);
 }
 
 .track-progress {

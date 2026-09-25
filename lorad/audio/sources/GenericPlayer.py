@@ -3,7 +3,7 @@ class GenericPlayer:
     name_readable = ""
     currently_playing = ""
     running = False
-    switching = False
+    looping = False
 
     def start(self):
         pass

@@ -34,8 +34,8 @@ class YaMu(FileRide):
         """Warm the station cache off the boot path; the pinned copy serves until it lands."""
         pinned = read_yandex_stations()
         if pinned:
-            globs.YANDEX_STATION_CACHE = pinned
-            logger.info(f"Serving {len(pinned)} Yandex stations from shm while refreshing")
+            globs.YANDEX_STATION_CACHE = self._with_synthetic(pinned)
+            logger.info(f"Serving {len(globs.YANDEX_STATION_CACHE)} Yandex stations from shm while refreshing")
         Thread(name="YaStations", target=self.cache_stations, daemon=True).start()
 
     def cache_stations(self) -> dict | None:
@@ -50,19 +50,37 @@ class YaMu(FileRide):
             logger.exception(e)
             existing = read_yandex_stations()
             if existing:
-                globs.YANDEX_STATION_CACHE = existing
-                logger.warning(f"Using previously pinned Yandex stations ({len(existing)})")
-                return existing
-            return None
+                stations = self._with_synthetic(existing)
+                globs.YANDEX_STATION_CACHE = stations
+                logger.warning(f"Using previously pinned Yandex stations ({len(stations)})")
+                return stations
+            fallback = self._with_synthetic({})
+            globs.YANDEX_STATION_CACHE = fallback
+            return fallback
 
     @staticmethod
-    def _station_map(raw) -> dict:
+    def _with_synthetic(stations: dict) -> dict:
+        """Synthetic stations lead, in their own order; the rotor list follows, sorted by name."""
+        synthetic_ids = set(globs.YANDEX_SYNTHETIC_STATIONS.values())
+        # A pinned map already carries the synthetic pair, so drop it before re-adding
+        rest = {
+            name: tech
+            for name, tech in stations.items()
+            if name not in globs.YANDEX_SYNTHETIC_STATIONS and tech not in synthetic_ids
+        }
+        merged = dict(globs.YANDEX_SYNTHETIC_STATIONS)
+        for name in sorted(rest, key=str.casefold):
+            merged[name] = rest[name]
+        return merged
+
+    @classmethod
+    def _station_map(cls, raw) -> dict:
         stations = {}
         for astation in raw:
             stations[astation["station"]["name"]] = (
                 f"{astation['station']['id']['type']}:{astation['station']['id']['tag']}"
             )
-        return stations
+        return cls._with_synthetic(stations)
 
     def initialize(self) -> Track:
         logger.info("Initializing Yandex Music...")
@@ -95,6 +113,8 @@ class YaMu(FileRide):
         # Whatever was prefetched belongs to the old station.
         self.drop_prefetched()
         track = self.radio.start_radio(station_id)
+        if track is None:
+            return None
         self.radio_started = True
         self.__set_next_track(track)
         if not self.next_track_path:
@@ -144,6 +164,9 @@ class YaMu(FileRide):
                 self._liked_track_ids.add(track_id)
             else:
                 self._liked_track_ids.discard(track_id)
+                radio = self.radio
+                if radio is not None and radio.station_id == globs.YANDEX_STATION_LIKES:
+                    radio.drop_liked_track(track_id)
             logger.info(
                 f"Yandex track {'liked' if liked else 'unliked'}: {self.current_track_name}"
             )
@@ -193,6 +216,49 @@ class YaMu(FileRide):
         logger.warn("Radio was not started, but next_track was called. Starting radio...")
         return self.radio.start_radio()
 
+    def __track_name(self, track) -> str:
+        if track is None:
+            return "unknown"
+        artists = [x.name for x in (track.artists or [])]
+        return f"{','.join(artists)} - {track.title}"
+
+    def __apply_track(self, track, as_next: bool) -> bool:
+        retries = 16 if self.radio is not None and self.radio._is_likes() else 1
+        current = track
+        for _ in range(max(1, retries)):
+            if current is None:
+                break
+            name = self.__track_name(current)
+            path = self.__download_track(current, name)
+            if path:
+                if as_next:
+                    self.next_track_obj = current
+                    self.next_track_name = name
+                    self.next_track_path = path
+                else:
+                    self.current_track = current
+                    self.current_track_name = name
+                    self.current_track_path = path
+                return True
+            if retries == 1:
+                break
+            current = self.radio.play_next()
+        if as_next:
+            self.next_track_obj = None
+            self.next_track_name = None
+            self.next_track_path = None
+        else:
+            self.current_track = None
+            self.current_track_name = None
+            self.current_track_path = None
+        return False
+
+    def __set_current_track(self, track) -> None:
+        self.__apply_track(track, as_next=False)
+
+    def __set_next_track(self, track) -> None:
+        self.__apply_track(track, as_next=True)
+
     def __download_track(self, track, name) -> str | None:
         try:
             if globs.FLG_NO_DOWNLOADING in globs.FEATURE_FLAGS:
@@ -233,20 +299,6 @@ class YaMu(FileRide):
             if "partial_path" in locals():
                 unlink_shm(partial_path)
             raise
-
-    def __track_name(self, track) -> str:
-        artists = [x.name for x in track.artists]
-        return f"{','.join(artists)} - {track.title}"
-
-    def __set_current_track(self, track) -> None:
-        self.current_track = track
-        self.current_track_name = self.__track_name(track)
-        self.current_track_path = self.__download_track(track, self.current_track_name)
-
-    def __set_next_track(self, track) -> None:
-        self.next_track_obj = track
-        self.next_track_name = self.__track_name(track)
-        self.next_track_path = self.__download_track(track, self.next_track_name)
 
     def get_current_track(self) -> tuple[str, str]:
         if self.current_track is None:

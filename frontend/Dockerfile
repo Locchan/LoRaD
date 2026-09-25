@@ -3,6 +3,7 @@ FROM docker.io/library/nginx:stable-alpine
 RUN rm -rf /usr/share/nginx/html/* && mkdir -p /usr/share/nginx/html/ui
 
 COPY css /usr/share/nginx/html/ui/css
+COPY fonts /usr/share/nginx/html/ui/fonts
 COPY js /usr/share/nginx/html/ui/js
 COPY randomBackground /usr/share/nginx/html/ui/randomBackground
 COPY index.html favicon.ico logo.png /usr/share/nginx/html/ui/

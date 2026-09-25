@@ -3,7 +3,6 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 import json
 import os
-import sys
 
 from lorad.api.utils.websocket import WebSocket, is_websocket_upgrade
 from lorad.common.utils.http_threads import NamedThreadingMixIn
@@ -99,6 +98,42 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
         self._send_cors_headers()
         self.end_headers()
 
+    def _write_endpoint_result(self, path, endpoint_exec_result):
+        self.send_response(endpoint_exec_result["rc"])
+        content_type = endpoint_exec_result.get("content-type", "application/json")
+        self.send_header("Content-type", content_type)
+        if endpoint_exec_result.get("cache-control"):
+            self.send_header("Cache-Control", endpoint_exec_result["cache-control"])
+        extra_headers = endpoint_exec_result.get("headers") or {}
+        for header, value in extra_headers.items():
+            self.send_header(header, value)
+        if extra_headers:
+            # The UI is served from another origin, so custom headers stay invisible to it otherwise
+            self.send_header("Access-Control-Expose-Headers", ", ".join(extra_headers))
+        self._send_cors_headers()
+        self.end_headers()
+        data = endpoint_exec_result["data"]
+        binary = isinstance(data, (bytes, bytearray))
+        if binary:
+            body = bytes(data)
+        elif isinstance(data, dict):
+            body = json.dumps(data).encode("utf-8")
+        else:
+            body = str(data).encode("utf-8")
+        self.wfile.write(body)
+        self.wfile.flush()
+        real_ip = self.headers.get("X-Real-IP") or self.client_address[0]
+        size = len(body)
+        log = logger.debug if path in DEBUG_ONLY_PRINT_ENDPOINTS and int(endpoint_exec_result["rc"]) == 200 else logger.info
+        log(f"[{real_ip}] - RQ: {self.command} {self.path}: {endpoint_exec_result['rc']}. Data: TX:{size}b")
+        logger.debug(f"RQ Headers: {self.headers}")
+        if binary:
+            logger.debug("Data omitted: binary.")
+        elif size < 8192:
+            logger.debug(f"Data: {body.decode('utf-8', errors='replace')}")
+        else:
+            logger.debug("Data omitted: too big.")
+
     def do_GET(self):
         try:
             ip_from_headers = self.headers.get('X-Real-IP')
@@ -123,33 +158,7 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
                     endpoint_exec_result = fn(self.headers, query)
                 else:
                     endpoint_exec_result = fn(self.headers)
-                self.send_response(endpoint_exec_result['rc'])
-                content_type = "application/json"
-                if "content-type" in endpoint_exec_result:
-                    content_type = endpoint_exec_result["content-type"]
-                self.send_header('Content-type', content_type)
-                self._send_cors_headers()
-                self.end_headers()
-                if isinstance(endpoint_exec_result["data"], dict):
-                    response = json.dumps(endpoint_exec_result["data"])
-                else:
-                    response = endpoint_exec_result["data"]
-                self.wfile.write(response.encode("utf-8"))
-                self.wfile.flush()
-                real_ip = self.headers.get('X-Real-IP')
-                if real_ip is None:
-                    real_ip = self.client_address[0]
-                if path in DEBUG_ONLY_PRINT_ENDPOINTS and int(endpoint_exec_result['rc']) == 200:
-                    logger.debug(f"[{real_ip}] - RQ: GET {self.path}: {endpoint_exec_result['rc']}." +
-                                f" Data: TX:{sys.getsizeof(response)}b")
-                else:
-                    logger.info(f"[{real_ip}] - RQ: GET {self.path}: {endpoint_exec_result['rc']}." +
-                                f" Data: TX:{sys.getsizeof(response)}b")
-                logger.debug(f"RQ Headers: {self.headers}")
-                if sys.getsizeof(response) < 8192:
-                    logger.debug(f"Data: {response}")
-                else:
-                    logger.debug(f"Data omitted: too big.")
+                self._write_endpoint_result(path, endpoint_exec_result)
             else:
                 self.error(404, f"No such endpoint: '{path}'")
                 logger.info(f"RQ: GET {self.path}: 404")
@@ -178,30 +187,7 @@ class LoRadAPIServer(BaseHTTPRequestHandler):
                     self.error(400, "Malformed data")
                     return
                 endpoint_exec_result = endpoints["POST"][self.path](self.headers, data)
-                self.send_response(endpoint_exec_result['rc'])
-                content_type = "application/json"
-                if "content-type" in endpoint_exec_result:
-                    content_type = endpoint_exec_result["content-type"]
-                self.send_header('Content-type', content_type)
-                self._send_cors_headers()
-                self.end_headers()
-                if isinstance(endpoint_exec_result["data"], dict):
-                    response = json.dumps(endpoint_exec_result["data"])
-                else:
-                    response = endpoint_exec_result["data"]
-                self.wfile.write(response.encode("utf-8"))
-                self.wfile.flush()
-                real_ip = self.headers.get('X-Real-IP')
-                if real_ip is None:
-                    real_ip = self.client_address[0]
-                if self.path in DEBUG_ONLY_PRINT_ENDPOINTS and int(endpoint_exec_result['rc']) == 200:
-                    logger.debug(f"[{real_ip}] - RQ: POST {self.path}: {endpoint_exec_result['rc']}." +
-                                f" Data: TX:{sys.getsizeof(response)}b")
-                else:
-                    logger.info(f"[{real_ip}] - RQ: POST {self.path}: {endpoint_exec_result['rc']}." +
-                                f" Data: TX:{sys.getsizeof(response)}b")
-                logger.debug(f"RQ Headers: {self.headers}")
-                logger.debug(f"Data: {response}")
+                self._write_endpoint_result(self.path, endpoint_exec_result)
             else:
                 self.error(404, f"No such endpoint: '{self.path}'")
                 logger.info(f"RQ: POST {self.path}: 404")
@@ -282,6 +268,8 @@ class LoRadWSServer(LoRadAPIServer):
 def start_api_server():
     logger.info("Initializing LoRaD REST API...")
     register_endpoints()
+    from lorad.api.utils.immich import start_immich_cache
+    start_immich_cache()
     rest_port = rest_listen_port()
     ws_port = ws_listen_port()
     ws_server = ThreadingWSServer(("0.0.0.0", ws_port), LoRadWSServer)

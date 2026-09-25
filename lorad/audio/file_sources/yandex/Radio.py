@@ -1,7 +1,8 @@
-from random import random
+from random import random, shuffle
 
 from yandex_music import Track
 
+import lorad.common.utils.globs as globs
 from lorad.common.utils.logger import get_logger
 
 logger = get_logger()
@@ -21,21 +22,35 @@ class Radio:
         self.station_tracks = None
         self._listening_track = None
         self._listening_batch_id = None
+        self._likes_queue: list[Track] = []
+
+    def _is_likes(self) -> bool:
+        return self.station_id == globs.YANDEX_STATION_LIKES
 
     def get_stations(self):
         return self.client.rotor_stations_list()
 
-    def start_radio(self, station_id=None, station_from=None) -> Track:
-        if station_id is not None:
-            self.station_id = station_id
+    def start_radio(self, station_id=None, station_from=None) -> Track | None:
+        requested = station_id if station_id is not None else self.station_id
         if station_from is not None:
             self.station_from = station_from
-        logger.info(f"Starting radio. Station: {self.station_id}")
+        logger.info(f"Starting radio. Station: {requested}")
+        if requested == globs.YANDEX_STATION_LIKES:
+            queue = self._fetch_likes()
+            if not queue:
+                logger.warn("Liked songs station is empty; staying on the previous station")
+                return None
+            self.station_id = requested
+            return self._start_likes(queue)
+        self.station_id = requested
+        self._likes_queue = []
         self.__update_radio_batch(None)
         self.current_track = self.__track_at_index()
         return self.current_track
 
-    def play_next(self) -> Track:
+    def play_next(self) -> Track | None:
+        if self._is_likes():
+            return self._likes_next()
         last_id = self.current_track.track_id if self.current_track is not None else None
         self.index += 1
         if self.station_tracks is None or self.index >= len(self.station_tracks.sequence):
@@ -43,8 +58,73 @@ class Radio:
         self.current_track = self.__track_at_index()
         return self.current_track
 
+    def drop_liked_track(self, track_id: str) -> None:
+        if not self._is_likes() or not self._likes_queue:
+            return
+        current_id = self.current_track.track_id if self.current_track is not None else None
+        self._likes_queue = [track for track in self._likes_queue if track.track_id != track_id]
+        if not self._likes_queue:
+            self.index = 0
+            return
+        if current_id and current_id != track_id:
+            for idx, track in enumerate(self._likes_queue):
+                if track.track_id == current_id:
+                    self.index = idx
+                    return
+        self.index = min(self.index, len(self._likes_queue) - 1)
+
+    def _start_likes(self, queue: list[Track] | None = None) -> Track | None:
+        self.station_tracks = None
+        self._likes_queue = queue if queue is not None else self._fetch_likes()
+        if not self._likes_queue:
+            logger.warn("Liked songs station is empty")
+            self.current_track = None
+            return None
+        shuffle(self._likes_queue)
+        self.index = 0
+        self.current_track = self._likes_queue[0]
+        return self.current_track
+
+    def _likes_next(self) -> Track | None:
+        if not self._likes_queue:
+            return self._start_likes()
+        self.index = (self.index + 1) % len(self._likes_queue)
+        self.current_track = self._likes_queue[self.index]
+        return self.current_track
+
+    def _fetch_likes(self) -> list[Track]:
+        try:
+            likes = self.client.users_likes_tracks()
+        except Exception as e:
+            logger.warn(f"Could not load liked tracks: {e.__class__.__name__}: {e}")
+            return []
+        if likes is None:
+            return []
+        tracks = []
+        try:
+            fetched = likes.fetch_tracks() if hasattr(likes, "fetch_tracks") else None
+        except Exception as e:
+            logger.warn(f"Could not fetch liked tracks: {e.__class__.__name__}: {e}")
+            fetched = None
+        if fetched:
+            tracks = [track for track in fetched if track is not None]
+        else:
+            ids = list(getattr(likes, "tracks_ids", []) or [])
+            batch = 50
+            for offset in range(0, len(ids), batch):
+                chunk = ids[offset : offset + batch]
+                try:
+                    loaded = self.client.tracks(chunk)
+                except Exception as e:
+                    logger.warn(f"Could not fetch liked tracks: {e.__class__.__name__}: {e}")
+                    continue
+                tracks.extend(track for track in (loaded or []) if track is not None)
+        return [track for track in tracks if getattr(track, "available", True)]
+
     def notify_play_start(self, track: Track):
         if track is None:
+            return
+        if self._is_likes():
             return
         if self._listening_track is not None:
             logger.debug("Yandex play start while a previous listen was still open")
@@ -55,6 +135,8 @@ class Radio:
         self.__send_play_start_radio(track, self._listening_batch_id)
 
     def notify_play_end(self, track: Track, played_seconds: float, skipped: bool = False):
+        if self._is_likes():
+            return
         self._close_listen(track, played_seconds, skipped)
 
     def _close_listen(self, track: Track, played_seconds: float, skipped: bool):

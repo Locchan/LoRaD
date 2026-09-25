@@ -60,6 +60,8 @@ def lrd_api_endp(func):
                     return {"rc": 200, "data": result}
             elif isinstance(result, str):
                 return {"rc": 200, "data": result}
+            elif isinstance(result, (bytes, bytearray)):
+                return {"rc": 200, "data": bytes(result), "content-type": "application/octet-stream"}
             else:
                 return {"rc": 500, "data": {"error": "Incorrect output from the endpoint function."}}
         except Exception as e:

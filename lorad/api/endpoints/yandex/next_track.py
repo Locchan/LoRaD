@@ -15,7 +15,7 @@ def impl_POST(headers, data):
     player = get_current_player()
     if player is None or not getattr(player, "supports_next_track", lambda: False)():
         return (406, {"error": "Current source cannot skip to the next track."})
-    if getattr(player, "_skip_busy", False):
+    if getattr(player, "_skip_busy", False) or getattr(player, "switching", False):
         return (409, {"error": "A skip is already in progress."})
     ok = player.skip_to_next()
     if not ok:

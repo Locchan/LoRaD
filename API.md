@@ -68,6 +68,7 @@ Relevant features:
 |---|---|
 | `FILESTREAMER:YANDEX` | `/yandex/*` |
 | `RESTREAMER` | `/radio/*` and `POST /switch_player` |
+| `IMMICH_BACKGROUNDS` | `GET /background`; disabled returns **501** |
 
 `POST /switch_player` is gated on `RESTREAMER` even though it can switch to any registered player.
 
@@ -79,7 +80,7 @@ Player and station switches take `SWITCH_LOCK` for **10 seconds** after a succes
 {"message": "Cannot switch right now. Try later."}
 ```
 
-Programs call `forbid_switching()` with no duration at start and `allow_switching()` in `finally`, so the lock lasts the whole show (news included). FileStreamer also 406s while `player.switching` (Yandex station prefetch in flight). `/whatsplaying` exposes this as `can_switch`.
+Programs call `forbid_switching()` with no duration at start and `allow_switching()` in `finally`, so the lock lasts the whole show (news included). FileStreamer also 406s while `player.switching` (Yandex station prefetch in flight, or a track skip). `/whatsplaying` exposes this as `can_switch`.
 
 ## WebSocket protocol
 
@@ -124,6 +125,16 @@ Unknown format → **400**. HTML response uses `Content-Type: text/html`.
 ### `GET /openapi`
 
 OpenAPI 3.0 object. Security scheme `AuthHeader` is `Authorization` as `username, token`. Generated metadata treats POST fields as query parameters; prefer this file for request bodies.
+
+### `GET /background`
+
+Auth: `ADMIN`. Feature: `IMMICH_BACKGROUNDS`. Returns a JPEG (`Content-Type: image/jpeg`, `Cache-Control: private, max-age=3600`) of a random Immich asset tagged with **at least** `IMMICH.BACKGROUNDS.MIN_PEOPLE` (default 3) of `IMMICH.BACKGROUNDS.PERSON_IDS`. Credentials in `IMMICH.BASE_URL` / `IMMICH.API_KEY` stay in backend config; the browser never sees the API key.
+
+When Immich knows when the photo was taken, the response also carries **`X-Background-Date`** as a plain `YYYY-MM-DD` date (from the asset's `localDateTime`, `exifInfo.dateTimeOriginal`, or `fileCreatedAt`, in that order). Undated assets come back without the header. It is listed in `Access-Control-Expose-Headers`, so a cross-origin UI can read it.
+
+Disabled feature → **501**. Missing Immich config, empty eligible set, or a failed fetch → **404** so the UI can fall back to local files. The eligible assets (id plus date) are pinned in shm for about an hour and refreshed on a daemon thread (`ImmichBg`); the REST handler does not rescan Immich.
+
+The Immich API key (Account Settings → API Keys) must include **`asset.read`**, **`asset.view`**, and **`asset.download`**. Documented against Immich **v3.2.2** ([api.immich.app](https://api.immich.app): search metadata uses `asset.read`; thumbnail uses `asset.view`; original download uses `asset.download`). `people.read` is not needed.
 
 ---
 
@@ -260,8 +271,9 @@ When the file/Yandex player is current, extra fields:
 | Field | Type | Notes |
 |---|---|---|
 | `station_tech` | string | Station id, e.g. `user:onyourwave`, `genre:pop` |
-| `station_readable` | string | Display name. `user:onyourwave` is always `"Моя волна"` even if it is not in `/yandex/available_stations` |
+| `station_readable` | string | Display name. Synthetic ids: `user:onyourwave` → `"Моя волна"`, `user:likes` → `"Понравившееся"` |
 | `liked` | bool or `null` | Only if the current source supports liking (Yandex track). `null` if the like lookup failed |
+| `looping` | bool | File/Yandex player only. `true` while the current file is repeating locally |
 | `length_s` | float | Track length in seconds. Absent when unknown, and always absent for radio (a live restream has no track) |
 | `position_s` | float | Playhead in seconds, already corrected for the hub's decode lead. Sent only alongside `length_s` |
 
@@ -281,6 +293,7 @@ Example:
   "station_tech": "user:onyourwave",
   "station_readable": "Моя волна",
   "liked": true,
+  "looping": false,
   "length_s": 267.0,
   "position_s": 41.5
 }
@@ -304,15 +317,20 @@ No player yet:
 
 Auth: `BU`. Feature: `FILESTREAMER:YANDEX`.
 
-Map of **readable name → technical id**. Not inverted. Served from the shm pin written at startup (`YaMu.cache_stations_async`); a miss falls through to a live fetch.
+Map of **readable name → technical id**. Two synthetic stations are always injected and come first, in this order; the Yandex rotor stations follow, Unicode-sorted by name. Key order is meaningful — the UI renders the dropdown as served.
+
+| Readable | Id |
+|---|---|
+| Моя волна | `user:onyourwave` |
+| Понравившееся | `user:likes` (local shuffle of liked tracks; no rotor feedback) |
+
+Served from the shm pin written at startup (`YaMu.cache_stations_async`); a miss falls through to a live fetch.
 
 ```json
-{"Pop": "genre:pop", "Meditation": "genre:meditation"}
+{"Моя волна": "user:onyourwave", "Понравившееся": "user:likes", "Meditation": "genre:meditation", "Pop": "genre:pop"}
 ```
 
 Yandex not initialized → **406** `{"message": "Yandex is not initialized."}`.
-
-`user:onyourwave` (“Моя волна”) may be current without appearing in this map.
 
 ### `GET /yandex/current_station`
 
@@ -330,7 +348,7 @@ Auth: `ADMIN`. Feature: `FILESTREAMER:YANDEX`. Current player must be the file/Y
 
 | Field | Required | Notes |
 |---|---|---|
-| `new_station` | yes | Technical id (value from `/yandex/available_stations`, not the readable name) |
+| `new_station` | yes | Technical id (value from `/yandex/available_stations`, including `user:onyourwave` and `user:likes`) |
 
 ```json
 {"success": true}
@@ -347,7 +365,7 @@ Locks switching for 10 seconds on success.
 
 Auth: `BU`. Feature: `FILESTREAMER:YANDEX`. JSON body may be `{}`.
 
-Skips to the next buffered Yandex track. One skip at a time (`_skip_busy`).
+Skips to the next buffered Yandex track. One skip at a time (`_skip_busy`). Sets `player.switching` for the duration so `/whatsplaying` `can_switch` is `false` (UI greys out). Clears track loop.
 
 ```json
 {"success": true, "playing": "Artist - Track"}
@@ -370,7 +388,21 @@ Auth: `BU`. Feature: `FILESTREAMER:YANDEX`.
 {"success": true, "liked": true}
 ```
 
-Missing or non-boolean `liked` → **400** `{"error": "'liked' must be a boolean."}`. Not a Yandex track → **406** `{"error": "Current source is not a Yandex track."}`. After a successful change, `/whatsplaying` will push an updated `liked` field.
+Missing or non-boolean `liked` → **400** `{"error": "'liked' must be a boolean."}`. Not a Yandex track → **406** `{"error": "Current source is not a Yandex track."}`. After a successful change, `/whatsplaying` will push an updated `liked` field. Unlike while on `user:likes` drops the id from the shuffle queue but does not yank the current file.
+
+### `POST /yandex/loop_track`
+
+Auth: `BU`. Feature: `FILESTREAMER:YANDEX`. Current player must be the file/Yandex player.
+
+| Field | Required | Type |
+|---|---|---|
+| `loop` | yes | JSON boolean (`true` / `false`) |
+
+```json
+{"success": true, "looping": true}
+```
+
+Repeats the current RAM file until skip, station change, or player stop. Does **not** send Yandex skip/finish each loop. Missing or non-boolean `loop` → **400**. Wrong player → **406**. `/whatsplaying` includes `looping` while the file player is current.
 
 ---
 
@@ -496,6 +528,7 @@ Error bodies are usually `{"error": "…"}`. Some older handlers use `{"message"
 | GET | `/apidoc` | REST | — | — |
 | POST | `/apidoc` | REST | — | — |
 | GET | `/openapi` | REST | — | — |
+| GET | `/background` | REST | ADMIN | `IMMICH_BACKGROUNDS` |
 | POST | `/user/auth` | REST | — | — |
 | GET | `/user/whoami` | REST | BU | — |
 | POST | `/user/register` | REST | ADMIN | — |
@@ -511,6 +544,7 @@ Error bodies are usually `{"error": "…"}`. Some older handlers use `{"message"
 | POST | `/yandex/switch_station` | REST | ADMIN | `FILESTREAMER:YANDEX` |
 | POST | `/yandex/next_track` | REST | BU | `FILESTREAMER:YANDEX` |
 | POST | `/yandex/like_track` | REST | BU | `FILESTREAMER:YANDEX` |
+| POST | `/yandex/loop_track` | REST | BU | `FILESTREAMER:YANDEX` |
 | GET | `/radio/available_stations` | REST | BU | `RESTREAMER` |
 | GET | `/radio/current_station` | REST | BU | `RESTREAMER` |
 | POST | `/radio/switch_station` | REST | ADMIN | `RESTREAMER` |
