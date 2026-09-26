@@ -696,6 +696,13 @@ body {
   background: rgba(99, 102, 241, 0.35);
 }
 
+.like-track-btn,
+.queue-view-btn {
+  flex-shrink: 0;
+  min-width: 44px;
+  width: 44px;
+}
+
 .like-track-btn.liked,
 .like-track-btn:hover:not(:disabled) {
   color: var(--error);
