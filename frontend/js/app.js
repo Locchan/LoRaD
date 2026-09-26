@@ -15,6 +15,8 @@
   // whatsplaying corrects the playhead every few seconds; the UI counts on its own
   // and snaps to the server when the two disagree by more than this.
   const RESYNC_S = 2;
+  // Reconnect if the socket is silent longer than the server's push period plus this.
+  const WS_STALE_GRACE_S = 5;
 
   const api = global.LoradApi;
   const config = global.LORAD_CONFIG;
@@ -52,6 +54,9 @@
     switchingPlayer: false,
     socket: null,
     reconnectTimer: null,
+    wsWatchdogTimer: null,
+    wsPushPeriodS: null,
+    wsLastMsgAt: 0,
     bufferTimer: null,
     positionTimer: null,
     length: null,
@@ -77,7 +82,16 @@
   }
 
   function setHidden(el, hidden) {
+    if (!el) return;
     el.hidden = hidden;
+  }
+
+  function parkSearchActions() {
+    // Play/queue live inside the selected result row; clearing the list would destroy them
+    // and every later renderPlayer → syncSearchActions would throw, freezing the UI.
+    const panel = $("yandex-search-panel");
+    const actions = $("yandex-search-actions");
+    if (panel && actions && actions.parentElement !== panel) panel.appendChild(actions);
   }
 
   function route() {
@@ -302,6 +316,7 @@
     state.audio.src = streamUrl();
     state.audio.load();
     if (wasPlaying) state.audio.play();
+    reconnectSocket();
   }
 
   // The browser keeps buffering the live stream and drifts behind; jump back to the edge.
@@ -361,17 +376,56 @@
     }
   }
 
+  function clearWsWatchdog() {
+    clearInterval(state.wsWatchdogTimer);
+    state.wsWatchdogTimer = null;
+  }
+
+  function armWsWatchdog() {
+    clearWsWatchdog();
+    state.wsWatchdogTimer = setInterval(() => {
+      if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
+      const period = Number(state.wsPushPeriodS);
+      if (!Number.isFinite(period) || period <= 0 || !state.wsLastMsgAt) return;
+      if (Date.now() - state.wsLastMsgAt < (period + WS_STALE_GRACE_S) * 1000) return;
+      console.warn("whatsplaying WebSocket stale; reconnecting");
+      state.socket.close();
+    }, 1000);
+  }
+
+  function reconnectSocket() {
+    clearTimeout(state.reconnectTimer);
+    state.reconnectTimer = null;
+    clearWsWatchdog();
+    const socket = state.socket;
+    state.socket = null;
+    if (socket) socket.close();
+    connectSocket();
+  }
+
   function connectSocket() {
     if (state.socket) return;
-    state.socket = api.openWhatsPlaying(applyWhatsPlaying, (closed) => {
-      if (state.socket !== closed) return;
-      state.socket = null;
-      if (route() === "/login" || !api.isAuthenticated()) return;
-      state.reconnectTimer = setTimeout(() => {
-        state.reconnectTimer = null;
-        connectSocket();
-      }, 2000);
-    });
+    state.wsLastMsgAt = 0;
+    state.socket = api.openWhatsPlaying(
+      (data) => {
+        if (typeof data.push_period_s === "number" && data.push_period_s > 0) {
+          state.wsPushPeriodS = data.push_period_s;
+        }
+        state.wsLastMsgAt = Date.now();
+        applyWhatsPlaying(data);
+      },
+      (closed) => {
+        if (state.socket !== closed) return;
+        state.socket = null;
+        clearWsWatchdog();
+        if (route() === "/login" || !api.isAuthenticated()) return;
+        state.reconnectTimer = setTimeout(() => {
+          state.reconnectTimer = null;
+          connectSocket();
+        }, 2000);
+      }
+    );
+    armWsWatchdog();
   }
 
   function isRadio() {
@@ -504,6 +558,7 @@
   function closeSearchResults() {
     const panel = $("yandex-search-panel");
     const list = $("yandex-search-results");
+    parkSearchActions();
     list.innerHTML = "";
     state.selectedSearchTrackId = "";
     setHidden(panel, true);
@@ -516,8 +571,9 @@
     const playBtn = $("search-play-btn");
     const queueBtn = $("search-queue-btn");
     const panel = $("yandex-search-panel");
+    if (!actions || !playBtn || !queueBtn || !panel) return;
     const hasSelection = Boolean(state.selectedSearchTrackId);
-    const panelOpen = panel && !panel.hidden;
+    const panelOpen = !panel.hidden;
     const locked =
       !state.canSwitch ||
       state.switchingPlayer ||
@@ -531,7 +587,7 @@
       if (row && actions.parentElement !== row) row.appendChild(actions);
       setHidden(actions, false);
     } else {
-      if (panel && actions.parentElement !== panel) panel.appendChild(actions);
+      parkSearchActions();
       setHidden(actions, true);
     }
     setHidden(queueBtn, !state.customPlaying);
@@ -550,8 +606,7 @@
   function renderSearchResults(tracks) {
     const panel = $("yandex-search-panel");
     const list = $("yandex-search-results");
-    const actions = $("yandex-search-actions");
-    if (actions && panel && actions.parentElement !== panel) panel.appendChild(actions);
+    parkSearchActions();
     list.innerHTML = "";
     state.selectedSearchTrackId = "";
     if (!tracks || !tracks.length) {
@@ -560,7 +615,7 @@
       empty.textContent = "Ничего не найдено";
       list.appendChild(empty);
       setHidden(panel, false);
-      setHidden(actions, true);
+      setHidden($("yandex-search-actions"), true);
       syncSearchActions();
       layoutSearchPopup();
       return;
@@ -729,6 +784,7 @@
     clearTimeout(state.reconnectTimer);
     clearInterval(state.bufferTimer);
     clearInterval(state.positionTimer);
+    clearWsWatchdog();
     state.reconnectTimer = null;
     state.bufferTimer = null;
     state.positionTimer = null;

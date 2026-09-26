@@ -32,6 +32,7 @@ def _state():
             "playing": None,
             "can_skip": False,
             "can_switch": False,
+            "push_period_s": PUSH_PERIOD_S,
         }
 
     response = {
@@ -43,6 +44,7 @@ def _state():
             and getattr(player, "running", False)
         ),
         "can_switch": _can_switch(player),
+        "push_period_s": PUSH_PERIOD_S,
     }
     playing = response["playing"] or ""
     title = getattr(player, "track_title", None) or ""
