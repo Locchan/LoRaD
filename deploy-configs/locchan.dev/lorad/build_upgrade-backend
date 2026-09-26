@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+set -e
+set -x
+
+source "config"
+rm -rf ./temp
+mkdir -p ./temp
+git clone https://github.com/Locchan/LoRaD ./temp
+cd ./temp
+
+VERSION=$(/bin/sh getver.sh)
+VERSION_SHORT=$(/bin/sh getver.sh --short)
+
+docker build --build-arg "VERSION=$VERSION" -t "$REGISTRY/${IMAGE_NAME}:$VERSION_SHORT" -t "$REGISTRY/$IMAGE_NAME:latest" -f Dockerfile_upgrade .
+cd ../
+rm -rf ./temp
+docker push "$REGISTRY/${IMAGE_NAME}:$VERSION_SHORT"
+docker push "$REGISTRY/$IMAGE_NAME:latest"
+docker image prune --force

@@ -1,0 +1,14 @@
+#!/bin/bash
+
+set -e
+set -x
+
+mkdir -p /opt/container_storage/lorad
+if docker ps --format '{{.Names}}' | grep -qx lorad-front; then
+  printf "Already started.\n"
+  exit 0
+else
+  docker rm lorad-front || :
+  printf "Starting...\n"
+  docker compose up -d lorad-front >/dev/null
+fi

@@ -1,0 +1,29 @@
+#!/bin/bash
+
+set -e
+set -x
+
+source "config"
+
+RESULT="UNKNOWN"
+EXITCODE=1
+
+set +e
+echo "Getting container status..."
+
+if docker ps --format '{{.Names}}' | grep -qx lorad; then
+  CONTAINER_ONLINE=1
+  RESULT="ONLINE"
+  EXITCODE=0
+else
+  CONTAINER_ONLINE=0
+  RESULT="OFFLINE"
+  EXITCODE=1
+fi
+
+set -e
+
+echo "Container online: ${CONTAINER_ONLINE}"
+echo "$RESULT"
+
+exit $EXITCODE

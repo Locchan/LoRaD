@@ -1,0 +1,8 @@
+#!/bin/bash
+
+set -e
+set -x
+
+./stop
+./build_upgrade-backend
+./start

@@ -1,0 +1,39 @@
+services:
+  lorad:
+    image: docker.locchan.dev/lorad:latest
+    container_name: lorad
+    privileged: true
+    ports: ["5475:5475", "5476:5476", "5478:5478"]
+    networks:
+      - dockernet
+    env_file: envfile.env
+    restart: unless-stopped
+    shm_size: 256m
+    volumes:
+      - type: bind
+        source: /opt/container_storage/lorad/
+        target: /data/
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+  lorad-front:
+    image: docker.locchan.dev/lorad-front:latest
+    container_name: lorad-front
+    privileged: true
+    ports: ["5477:5477"]
+    networks:
+      - dockernet
+    env_file: envfile.env
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 64M
+
+networks:
+  dockernet:
+    name: dockernet
+    external: true

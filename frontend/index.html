@@ -69,40 +69,6 @@
       </div>
     </div>
 
-    <div id="source-dock" class="source-dock" hidden>
-      <div class="source-field">
-        <label for="player" class="field-label">Плеер</label>
-        <select id="player" class="select">
-          <option value="">Выберите плеер</option>
-        </select>
-        <div id="player-loading" class="loading-indicator" hidden>
-          <i class="fas fa-spinner fa-spin"></i> Переключение плеера...
-        </div>
-      </div>
-      <div class="source-field">
-        <label for="station" class="field-label">Станция</label>
-        <select id="station" class="select">
-          <option value="">Выберите станцию</option>
-        </select>
-      </div>
-      <div id="yandex-search-field" class="source-field source-search" hidden>
-        <label for="yandex-search" class="field-label">Поиск</label>
-        <div class="search-wrap">
-          <input type="search" id="yandex-search" class="form-input search-input" placeholder="Трек или исполнитель" autocomplete="off">
-          <div id="yandex-search-panel" class="search-panel" hidden>
-            <ul id="yandex-search-results" class="search-results"></ul>
-            <div id="yandex-search-actions" class="search-actions" hidden>
-              <button type="button" id="search-play-btn" class="search-action-btn" title="Играть сейчас" disabled>
-                <i class="fas fa-play"></i>
-              </button>
-              <button type="button" id="search-queue-btn" class="search-action-btn" title="В очередь" hidden disabled>
-                <i class="fas fa-list"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 
   <div id="view-schedule" class="page" hidden>
@@ -164,10 +130,46 @@
   </div>
 
   <div id="queue-popup" class="queue-popup" hidden>
-    <div class="queue-popup-card card" role="dialog" aria-labelledby="queue-popup-title">
-      <h2 id="queue-popup-title" class="queue-popup-title">Очередь</h2>
-      <ul id="queue-popup-list" class="queue-popup-list"></ul>
-      <p id="queue-popup-empty" class="queue-popup-empty" hidden>Очередь пуста</p>
+    <div class="queue-popup-card card" role="dialog" aria-label="Плеер и очередь">
+      <div id="source-dock" class="source-dock">
+        <div class="source-field">
+          <label for="player" class="field-label">Плеер</label>
+          <select id="player" class="select">
+            <option value="">Выберите плеер</option>
+          </select>
+          <div id="player-loading" class="loading-indicator" hidden>
+            <i class="fas fa-spinner fa-spin"></i> Переключение плеера...
+          </div>
+        </div>
+        <div class="source-field">
+          <label for="station" class="field-label">Станция</label>
+          <select id="station" class="select">
+            <option value="">Выберите станцию</option>
+          </select>
+        </div>
+        <div id="yandex-search-field" class="source-field source-search" hidden>
+          <label for="yandex-search" class="field-label">Поиск</label>
+          <div class="search-wrap">
+            <input type="search" id="yandex-search" class="form-input search-input" placeholder="Трек или исполнитель" autocomplete="off">
+            <div id="yandex-search-panel" class="search-panel" hidden>
+              <ul id="yandex-search-results" class="search-results"></ul>
+              <div id="yandex-search-actions" class="search-actions" hidden>
+                <button type="button" id="search-play-btn" class="search-action-btn" title="Играть сейчас" disabled>
+                  <i class="fas fa-play"></i>
+                </button>
+                <button type="button" id="search-queue-btn" class="search-action-btn" title="В очередь" hidden disabled>
+                  <i class="fas fa-list"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="queue-section" class="queue-section" hidden>
+        <h2 id="queue-popup-title" class="queue-popup-title">Очередь</h2>
+        <ul id="queue-popup-list" class="queue-popup-list"></ul>
+        <p id="queue-popup-empty" class="queue-popup-empty" hidden>Очередь пуста</p>
+      </div>
       <button type="button" id="queue-popup-close" class="queue-popup-close" title="Закрыть">
         <i class="fas fa-times"></i>
       </button>
@@ -208,7 +210,7 @@
         <button type="button" id="loop-track-btn" class="control-btn loop-track-btn" title="Повтор" hidden>
           <i id="loop-track-icon" class="fas fa-repeat"></i>
         </button>
-        <button type="button" id="queue-view-btn" class="control-btn queue-view-btn" title="Показать очередь" hidden>
+        <button type="button" id="queue-view-btn" class="control-btn queue-view-btn" title="Плеер и очередь" hidden>
           <i class="fas fa-list"></i>
         </button>
       </div>

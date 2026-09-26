@@ -238,7 +238,6 @@
     const authed = api.isAuthenticated() && route() !== "/login";
     setHidden($("player-init-loading"), !state.loading);
     setHidden($("player-loading"), !state.switchingPlayer);
-    setHidden($("source-dock"), state.loading);
     setHidden($("audio-player-section"), !authed || state.loading);
     setHidden($("refresh-btn"), !authed);
     $("player").disabled = locked || state.switchingPlayer;
@@ -272,9 +271,9 @@
     $("loop-track-btn").disabled = locked || state.loopInFlight;
     $("loop-track-btn").classList.toggle("looping", state.looping === true);
     $("loop-track-icon").className = state.loopInFlight ? "fas fa-spinner fa-spin" : "fas fa-repeat";
-    setHidden($("queue-view-btn"), !state.customPlaying);
-    $("queue-view-btn").disabled = !state.customPlaying;
-    if (!state.customPlaying) closeQueuePopup();
+    setHidden($("queue-view-btn"), !authed || state.loading);
+    $("queue-view-btn").disabled = state.loading;
+    if ($("queue-popup") && !$("queue-popup").hidden) syncQueueSection();
     loadCover(false);
     // After layout (stacked portrait bar is taller than the desktop fallback).
     requestAnimationFrame(syncPlayerBarHeight);
@@ -324,7 +323,7 @@
     state.looping = typeof data.looping === "boolean" ? data.looping : null;
     state.customPlaying = Boolean(data.custom_playing);
     state.customQueue = Array.isArray(data.custom_queue) ? data.custom_queue : [];
-    if ($("queue-popup") && !$("queue-popup").hidden) renderQueuePopupList();
+    if ($("queue-popup") && !$("queue-popup").hidden) syncQueueSection();
     state.coverReady = nextReady;
     if (trackChanged) {
       if (state.coverUrl && state.coverUrl.startsWith("blob:")) {
@@ -364,6 +363,13 @@
 
   function isRadio() {
     return state.currentPlayer === "player_radio";
+  }
+
+  function syncQueueSection() {
+    const section = $("queue-section");
+    const showQueue = Boolean(state.customPlaying);
+    setHidden(section, !showQueue);
+    if (showQueue) renderQueuePopupList();
   }
 
   function renderQueuePopupList() {
@@ -409,21 +415,21 @@
     try {
       const data = await api.removeYandexQueueTrack(index);
       state.customQueue = Array.isArray(data.custom_queue) ? data.custom_queue : [];
-      renderQueuePopupList();
+      syncQueueSection();
     } catch (error) {
       console.error("Failed to remove queue track:", error);
     }
   }
 
   function openQueuePopup() {
-    if (!state.customPlaying) return;
-    renderQueuePopupList();
+    syncQueueSection();
     setHidden($("queue-popup"), false);
   }
 
   function closeQueuePopup() {
     const popup = $("queue-popup");
     if (popup) setHidden(popup, true);
+    closeSearchResults();
   }
 
   function closeSearchResults() {
@@ -656,7 +662,7 @@
     clearCover();
     setHidden($("audio-player-section"), true);
     setHidden($("refresh-btn"), true);
-    setHidden($("source-dock"), true);
+    closeQueuePopup();
     syncPlayerBarHeight();
     renderProgress();
   }
@@ -1043,7 +1049,7 @@
 
   // The photo is painted with background-size: contain against the viewport, so its own
   // bottom-right sits inside the page by however much the aspect ratios differ. Keep it
-  // above the player bar and (in portrait) the full-width source dock.
+  // above the player bar.
   function positionBackgroundDate() {
     const label = $("background-date");
     if (!label || label.hidden) return;
@@ -1051,13 +1057,8 @@
     const viewWidth = document.documentElement.clientWidth;
     const viewHeight = document.documentElement.clientHeight;
     const bar = $("audio-player-section");
-    const dock = $("source-dock");
     const barHeight = bar && !bar.hidden ? bar.offsetHeight : 0;
-    const dockVisible = dock && !dock.hidden && route() === "/";
-    // Portrait dock spans the width above the bar; desktop dock stays left and misses the stamp.
-    const dockFullWidth = dockVisible && global.matchMedia("(max-width: 768px)").matches;
-    const dockClear = dockFullWidth ? dock.offsetHeight + 14 : 0;
-    const clearBottom = barHeight + dockClear + 12;
+    const clearBottom = barHeight + 12;
     if (!natural || !natural.width || !natural.height) {
       label.style.left = "auto";
       label.style.top = "auto";

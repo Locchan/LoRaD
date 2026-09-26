@@ -38,6 +38,7 @@ if ! docker image inspect local/lorad-front-arm:${LORAD_VERSION} >/dev/null 2>&1
     --build-arg LORAD_SCHEME="${LORAD_SCHEME:-http}" \
     --build-arg LORAD_API_PATH="${LORAD_API_PATH:-/radio/api}" \
     --build-arg LORAD_RADIO_PATH="${LORAD_RADIO_PATH:-/radio}" \
+    --build-arg LORAD_WS_PATH="${LORAD_WS_PATH:-/radio/ws}" \
     -f Dockerfile \
     -t local/lorad-front-arm:${LORAD_VERSION} \
     .

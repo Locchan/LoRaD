@@ -1,0 +1,7 @@
+REGISTRY=docker.locchan.dev
+IMAGE_NAME=lorad
+LORAD_DOMAIN=radio.locchan.dev
+LORAD_SCHEME=https
+LORAD_API_PATH=/lorad/api
+LORAD_RADIO_PATH=/lorad/live
+LORAD_WS_PATH=/lorad/ws

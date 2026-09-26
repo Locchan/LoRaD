@@ -1,0 +1,10 @@
+{
+  "belarus": {
+    "name": "Радио \"Беларусь\"",
+    "url": "https://media2.datacenter.by/stream/belarussputnik/stream"
+  },
+  "kultura": {
+    "name": "Радио \"Культура\"",
+    "url": "https://media2.datacenter.by/stream/kultura/stream"
+  }
+}

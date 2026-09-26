@@ -1,6 +1,6 @@
 # /opt on radio.local
 
-Production home for **ДедоРадио** (LoRaD) on this Raspberry Pi. Operator account is `locchan` (sudo, docker, gpio). This file lives in the repo as `prod-install/README.md` and on the Pi as `/opt/README.md`.
+Production home for **ДедоРадио** (LoRaD) on this Raspberry Pi. Operator account is `locchan` (sudo, docker, gpio). This file lives in the repo as `deploy-configs/dedoradio/README.md` and on the Pi as `/opt/README.md`.
 
 Secrets stay in `/opt/radio/lorad/data/config.json` and `/opt/radio/lorad/.env`. Do not copy them here.
 
@@ -13,7 +13,7 @@ Secrets stay in `/opt/radio/lorad/data/config.json` and `/opt/radio/lorad/.env`.
     └── lorad_build/     how images get rebuilt on this Pi
 ```
 
-Host install from this tree (as root): `prod-install/install.sh`. It copies `/opt/radio`, systemd units, nginx, `/usr/bin` links, and this README to `/opt/README.md`. It does not start Docker and does not overwrite an existing `config.json` / `.env`.
+Host install from this tree (as root): `deploy-configs/dedoradio/install.sh`. It copies `/opt/radio`, systemd units, nginx, `/usr/bin` links, and this README to `/opt/README.md`. It does not start Docker and does not overwrite an existing `config.json` / `.env`.
 
 ## Why it is split this way
 

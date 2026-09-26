@@ -1,0 +1,11 @@
+#!/bin/bash
+
+set -e
+set -x
+
+if docker ps --format '{{.Names}}' | grep -qx lorad; then
+  docker compose down
+else
+  printf "Already down\n"
+  exit 0
+fi

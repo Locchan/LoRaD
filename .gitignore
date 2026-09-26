@@ -12,3 +12,11 @@ temp/
 data/
 .pytest_cache/
 .venv/
+
+# Deploy packages ship example config/stations/resources trees
+!deploy-configs/
+!deploy-configs/**/
+!deploy-configs/**/data/
+!deploy-configs/**/data/**
+!deploy-configs/**/resources/
+!deploy-configs/**/resources/**

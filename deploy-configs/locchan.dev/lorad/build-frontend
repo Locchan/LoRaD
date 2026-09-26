@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+set -e
+set -x
+
+source "config"
+if [ ! -d "./temp" ]; then
+  mkdir -p ./temp
+  git clone https://github.com/Locchan/LoRaD ./temp
+fi
+
+cd temp
+
+VERSION=$(/bin/sh getver.sh --frontend)
+
+cd frontend
+
+docker build \
+  --build-arg "VERSION=$VERSION" \
+  --build-arg LORAD_ENV=production \
+  --build-arg "LORAD_DOMAIN=${LORAD_DOMAIN}" \
+  --build-arg "LORAD_SCHEME=${LORAD_SCHEME}" \
+  --build-arg "LORAD_API_PATH=${LORAD_API_PATH}" \
+  --build-arg "LORAD_RADIO_PATH=${LORAD_RADIO_PATH}" \
+  --build-arg "LORAD_WS_PATH=${LORAD_WS_PATH}" \
+  -t "$REGISTRY/${IMAGE_NAME}-front:$VERSION" \
+  -t "$REGISTRY/${IMAGE_NAME}-front:latest" \
+  -f Dockerfile .
+
+cd ../../
+
+rm -rf ./temp
+docker push "$REGISTRY/${IMAGE_NAME}-front:$VERSION"
+docker push "$REGISTRY/${IMAGE_NAME}-front:latest"
+docker image prune --force

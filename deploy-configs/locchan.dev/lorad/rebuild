@@ -1,0 +1,9 @@
+#!/bin/bash
+set -e
+set -x
+
+./stop
+./build
+./start
+
+docker image prune --force
