@@ -363,9 +363,7 @@ body {
   top: calc(100% + 4px);
   bottom: auto;
   z-index: 1060;
-  display: flex;
-  align-items: stretch;
-  gap: 0.35rem;
+  display: block;
   max-height: 14rem;
 }
 
@@ -405,13 +403,7 @@ body {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
-#search-popup .search-action-btn {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-}
-
 .search-results {
-  flex: 1;
-  min-width: 0;
   margin: 0;
   padding: 0.25rem 0;
   list-style: none;
@@ -423,37 +415,43 @@ body {
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
 }
 
+.search-result-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding-right: 0.35rem;
+}
+
+.search-result-row:has(.search-result.selected) {
+  background: rgba(99, 102, 241, 0.4);
+}
+
 .search-actions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   flex-shrink: 0;
-  gap: 0.35rem;
-  align-self: stretch;
-  justify-content: flex-start;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .search-action-btn {
-  flex: 0 0 calc(50% - 0.175rem);
-  height: calc(50% - 0.175rem);
-  max-height: calc(50% - 0.175rem);
-  min-width: 2.75rem;
-  min-height: 0;
+  width: 2.1rem;
+  height: 2.1rem;
+  min-width: 2.1rem;
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  background: rgba(15, 23, 42, 0.95);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.75);
   color: var(--text);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.95rem;
-  backdrop-filter: blur(12px);
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
+  font-size: 0.8rem;
 }
 
 .search-action-btn:hover:not(:disabled) {
-  background: rgba(99, 102, 241, 0.35);
+  background: rgba(99, 102, 241, 0.45);
 }
 
 .search-action-btn:disabled {
@@ -465,7 +463,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
+  width: auto;
   padding: 0.55rem 0.75rem;
   border: none;
   background: transparent;
@@ -481,8 +481,14 @@ body {
   outline: none;
 }
 
+.search-result-row:has(.search-result.selected) .search-result,
+.search-result-row:has(.search-result.selected) .search-result:hover,
+.search-result-row:has(.search-result.selected) .search-result:focus {
+  background: transparent;
+}
+
 .search-result.selected {
-  background: rgba(99, 102, 241, 0.4);
+  background: transparent;
 }
 
 .search-result-title {

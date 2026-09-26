@@ -515,14 +515,25 @@
     const actions = $("yandex-search-actions");
     const playBtn = $("search-play-btn");
     const queueBtn = $("search-queue-btn");
+    const panel = $("yandex-search-panel");
     const hasSelection = Boolean(state.selectedSearchTrackId);
-    const panelOpen = !$("yandex-search-panel").hidden;
+    const panelOpen = panel && !panel.hidden;
     const locked =
       !state.canSwitch ||
       state.switchingPlayer ||
       state.playSearchInFlight ||
       state.queueSearchInFlight;
-    setHidden(actions, !panelOpen || !hasSelection);
+    if (hasSelection && panelOpen) {
+      const selected = $("yandex-search-results").querySelector(
+        `.search-result[data-track-id="${CSS.escape(state.selectedSearchTrackId)}"]`
+      );
+      const row = selected && selected.closest(".search-result-row");
+      if (row && actions.parentElement !== row) row.appendChild(actions);
+      setHidden(actions, false);
+    } else {
+      if (panel && actions.parentElement !== panel) panel.appendChild(actions);
+      setHidden(actions, true);
+    }
     setHidden(queueBtn, !state.customPlaying);
     playBtn.disabled = locked || !hasSelection;
     queueBtn.disabled = locked || !hasSelection || !state.customPlaying;
@@ -539,6 +550,8 @@
   function renderSearchResults(tracks) {
     const panel = $("yandex-search-panel");
     const list = $("yandex-search-results");
+    const actions = $("yandex-search-actions");
+    if (actions && panel && actions.parentElement !== panel) panel.appendChild(actions);
     list.innerHTML = "";
     state.selectedSearchTrackId = "";
     if (!tracks || !tracks.length) {
@@ -547,13 +560,14 @@
       empty.textContent = "Ничего не найдено";
       list.appendChild(empty);
       setHidden(panel, false);
-      setHidden($("yandex-search-actions"), true);
+      setHidden(actions, true);
       syncSearchActions();
       layoutSearchPopup();
       return;
     }
     tracks.forEach((track) => {
       const item = document.createElement("li");
+      item.className = "search-result-row";
       const button = document.createElement("button");
       button.type = "button";
       button.className = "search-result";
@@ -611,7 +625,7 @@
       await api.playYandexTrack(trackId);
       state.searchSeq += 1;
       $("yandex-search").value = "";
-      closeSearchResults();
+      closeSearchPopup();
     } catch (error) {
       console.error("Failed to play Yandex track:", error);
     } finally {
@@ -637,7 +651,7 @@
       await api.enqueueYandexTrack(trackId);
       state.searchSeq += 1;
       $("yandex-search").value = "";
-      closeSearchResults();
+      closeSearchPopup();
     } catch (error) {
       console.error("Failed to enqueue Yandex track:", error);
     } finally {
