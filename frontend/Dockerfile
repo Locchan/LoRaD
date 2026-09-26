@@ -6,7 +6,7 @@ COPY css /usr/share/nginx/html/ui/css
 COPY fonts /usr/share/nginx/html/ui/fonts
 COPY js /usr/share/nginx/html/ui/js
 COPY randomBackground /usr/share/nginx/html/ui/randomBackground
-COPY index.html favicon.ico logo.png /usr/share/nginx/html/ui/
+COPY index.html favicon.ico /usr/share/nginx/html/ui/
 COPY nginx.conf /etc/nginx/conf.d/lorad.conf
 COPY apply-config.sh /tmp/apply-config.sh
 

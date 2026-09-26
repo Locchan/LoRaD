@@ -236,10 +236,11 @@
     const playing = Boolean(state.audio && !state.audio.paused);
     const locked = !state.canSwitch;
     const authed = api.isAuthenticated() && route() !== "/login";
+    const onPlayerView = route() === "/";
     setHidden($("player-init-loading"), !state.loading);
     setHidden($("player-loading"), !state.switchingPlayer);
     setHidden($("audio-player-section"), !authed || state.loading);
-    setHidden($("refresh-btn"), !authed);
+    setHidden($("refresh-btn"), !authed || !onPlayerView);
     $("player").disabled = locked || state.switchingPlayer;
     $("station").disabled = locked || state.loading || state.switchingPlayer;
     const showSearch = !isRadio() && !state.loading;
@@ -271,8 +272,9 @@
     $("loop-track-btn").disabled = locked || state.loopInFlight;
     $("loop-track-btn").classList.toggle("looping", state.looping === true);
     $("loop-track-icon").className = state.loopInFlight ? "fas fa-spinner fa-spin" : "fas fa-repeat";
-    setHidden($("queue-view-btn"), !authed || state.loading);
+    setHidden($("queue-view-btn"), !authed || state.loading || !onPlayerView);
     $("queue-view-btn").disabled = state.loading;
+    if (!onPlayerView) closeQueuePopup();
     if ($("queue-popup") && !$("queue-popup").hidden) syncQueueSection();
     loadCover(false);
     // After layout (stacked portrait bar is taller than the desktop fallback).
@@ -911,7 +913,7 @@
       // the player keeps running in the background: the views are only hidden, not torn down
       showView("view-schedule");
       loadBackground();
-      if (state.audio) renderPlayer();
+      renderPlayer();
       if (schedule.loaded || schedule.loading) {
         renderSchedule();
       } else {
