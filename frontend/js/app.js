@@ -254,9 +254,10 @@
     setHidden($("player-init-loading"), !state.loading);
     setHidden($("player-loading"), !state.switchingPlayer);
     setHidden($("audio-player-section"), !authed || state.loading);
+    setHidden($("player-toolbar"), !authed || !onPlayerView);
     setHidden($("refresh-btn"), !authed || !onPlayerView);
     setHidden($("station-view-btn"), !authed || state.loading || !onPlayerView);
-    $("station-view-btn").disabled = state.loading;
+    $("station-view-btn").disabled = locked || state.loading || state.switchingPlayer;
     $("player").disabled = locked || state.switchingPlayer;
     $("station").disabled = locked || state.loading || state.switchingPlayer;
     const showSearch = !isRadio() && !state.loading;
@@ -299,6 +300,8 @@
       closeStationPopup();
       closeSearchPopup();
       closeQueuePopup();
+    } else if (locked) {
+      closeStationPopup();
     }
     if ($("queue-popup") && !$("queue-popup").hidden) renderQueuePopupList();
     loadCover(false);
@@ -482,6 +485,7 @@
   }
 
   function openStationPopup() {
+    if (!state.canSwitch || state.switchingPlayer || state.loading) return;
     setHidden($("station-popup"), false);
   }
 
@@ -805,6 +809,7 @@
     setHidden($("refresh-btn"), true);
     setHidden($("station-view-btn"), true);
     setHidden($("search-view-btn"), true);
+    setHidden($("player-toolbar"), true);
     closeAllPopups();
     syncPlayerBarHeight();
     renderProgress();
