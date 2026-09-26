@@ -129,8 +129,8 @@
     </div>
   </div>
 
-  <div id="queue-popup" class="queue-popup" hidden>
-    <div class="queue-popup-card card" role="dialog" aria-label="Плеер и очередь">
+  <div id="station-popup" class="app-popup" hidden>
+    <div class="app-popup-card card" role="dialog" aria-label="Плеер и станция">
       <div id="source-dock" class="source-dock">
         <div class="source-field">
           <label for="player" class="field-label">Плеер</label>
@@ -147,35 +147,44 @@
             <option value="">Выберите станцию</option>
           </select>
         </div>
-        <div id="yandex-search-field" class="source-field source-search" hidden>
-          <label for="yandex-search" class="field-label">Поиск</label>
-          <div class="search-wrap">
-            <input type="search" id="yandex-search" class="form-input search-input" placeholder="Трек или исполнитель" autocomplete="off">
-            <div id="yandex-search-panel" class="search-panel" hidden>
-              <ul id="yandex-search-results" class="search-results"></ul>
-              <div id="yandex-search-actions" class="search-actions" hidden>
-                <button type="button" id="search-play-btn" class="search-action-btn" title="Играть сейчас" disabled>
-                  <i class="fas fa-play"></i>
-                </button>
-                <button type="button" id="search-queue-btn" class="search-action-btn" title="В очередь" hidden disabled>
-                  <i class="fas fa-list"></i>
-                </button>
-              </div>
+      </div>
+      <button type="button" id="station-popup-close" class="popup-close" title="Закрыть">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  </div>
+
+  <div id="search-popup" class="app-popup" hidden>
+    <div class="app-popup-card card" role="dialog" aria-label="Поиск">
+      <div id="yandex-search-field" class="source-field source-search">
+        <label for="yandex-search" class="field-label">Поиск</label>
+        <div class="search-wrap">
+          <input type="search" id="yandex-search" class="form-input search-input" placeholder="Трек или исполнитель" autocomplete="off">
+          <div id="yandex-search-panel" class="search-panel" hidden>
+            <ul id="yandex-search-results" class="search-results"></ul>
+            <div id="yandex-search-actions" class="search-actions" hidden>
+              <button type="button" id="search-play-btn" class="search-action-btn" title="Играть сейчас" disabled>
+                <i class="fas fa-play"></i>
+              </button>
+              <button type="button" id="search-queue-btn" class="search-action-btn" title="В очередь" hidden disabled>
+                <i class="fas fa-list"></i>
+              </button>
             </div>
           </div>
         </div>
       </div>
-      <div id="queue-section" class="queue-section" hidden>
-        <button type="button" id="queue-collapse-btn" class="queue-collapse-btn" aria-expanded="true" aria-controls="queue-collapse-body">
-          <span id="queue-popup-title" class="queue-popup-title">Очередь</span>
-          <i class="fas fa-chevron-down" aria-hidden="true"></i>
-        </button>
-        <div id="queue-collapse-body" class="queue-collapse-body">
-          <ul id="queue-popup-list" class="queue-popup-list"></ul>
-          <p id="queue-popup-empty" class="queue-popup-empty" hidden>Очередь пуста</p>
-        </div>
-      </div>
-      <button type="button" id="queue-popup-close" class="queue-popup-close" title="Закрыть">
+      <button type="button" id="search-popup-close" class="popup-close" title="Закрыть">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  </div>
+
+  <div id="queue-popup" class="app-popup" hidden>
+    <div class="app-popup-card card" role="dialog" aria-labelledby="queue-popup-title">
+      <h2 id="queue-popup-title" class="queue-popup-title">Очередь</h2>
+      <ul id="queue-popup-list" class="queue-popup-list"></ul>
+      <p id="queue-popup-empty" class="queue-popup-empty" hidden>Очередь пуста</p>
+      <button type="button" id="queue-popup-close" class="popup-close" title="Закрыть">
         <i class="fas fa-times"></i>
       </button>
     </div>
@@ -183,11 +192,15 @@
 
   <span id="background-date" class="background-date" hidden></span>
 
-  <button type="button" id="queue-view-btn" class="queue-view-btn" title="Плеер и очередь" hidden>
-    <i class="fas fa-list"></i>
+  <button type="button" id="search-view-btn" class="toolbar-btn search-view-btn" title="Поиск" hidden>
+    <i class="fas fa-search"></i>
   </button>
 
-  <button type="button" id="refresh-btn" class="stream-refresh-btn" title="Обновить поток" hidden>
+  <button type="button" id="station-view-btn" class="toolbar-btn station-view-btn" title="Плеер и станция" hidden>
+    <i class="fas fa-gear"></i>
+  </button>
+
+  <button type="button" id="refresh-btn" class="toolbar-btn stream-refresh-btn" title="Обновить поток" hidden>
     <i class="fas fa-sync-alt"></i>
   </button>
 
@@ -205,6 +218,9 @@
       </div>
       <button type="button" id="like-track-btn" class="control-btn like-track-btn" title="Нравится" hidden>
         <i id="like-track-icon" class="far fa-heart"></i>
+      </button>
+      <button type="button" id="queue-view-btn" class="control-btn queue-view-btn" title="Очередь" hidden>
+        <i class="fas fa-list"></i>
       </button>
     </div>
 

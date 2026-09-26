@@ -310,7 +310,7 @@ body {
   align-items: center;
 }
 
-/* Player/station/search live inside the queue popup. */
+/* Player/station pickers live inside the station popup. */
 .source-dock {
   display: flex;
   flex-direction: column;
@@ -348,7 +348,8 @@ body {
   position: relative;
 }
 
-.source-dock .search-input {
+.source-dock .search-input,
+.source-search .search-input {
   width: 100%;
   margin: 0;
   padding: 0.55rem 0.75rem;
@@ -366,6 +367,46 @@ body {
   align-items: stretch;
   gap: 0.35rem;
   max-height: 14rem;
+}
+
+/* Search dialog: results stay in normal flow (not clipped by the card) and the
+   dialog sits at the top so a mobile keyboard does not cover the list. */
+#search-popup.app-popup {
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: max(1rem, env(safe-area-inset-top, 0px));
+  padding-bottom: 1rem;
+}
+
+#search-popup .app-popup-card {
+  width: min(28rem, 100%);
+  max-height: none;
+  overflow: visible;
+}
+
+#search-popup .source-search .search-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+#search-popup .search-panel {
+  position: static;
+  left: auto;
+  right: auto;
+  top: auto;
+  z-index: auto;
+  max-height: none;
+  width: 100%;
+}
+
+#search-popup .search-results {
+  max-height: min(40vh, 16rem);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+#search-popup .search-action-btn {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 .search-results {
@@ -466,8 +507,7 @@ body {
   font-size: 0.8rem;
 }
 
-.stream-refresh-btn,
-.queue-view-btn {
+.toolbar-btn {
   position: fixed;
   left: 1rem;
   z-index: 1100;
@@ -486,17 +526,20 @@ body {
   backdrop-filter: blur(8px);
 }
 
-/* Vertical toolbar: queue on top, refresh under it */
-.queue-view-btn {
+/* Vertical toolbar: search, station, refresh */
+.search-view-btn {
   top: 1rem;
 }
 
-.stream-refresh-btn {
+.station-view-btn {
   top: calc(1rem + 44px + 0.55rem);
 }
 
-.stream-refresh-btn:disabled,
-.queue-view-btn:disabled {
+.stream-refresh-btn {
+  top: calc(1rem + 2 * (44px + 0.55rem));
+}
+
+.toolbar-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
@@ -858,7 +901,7 @@ body {
   cursor: pointer;
 }
 
-.queue-popup {
+.app-popup {
   position: fixed;
   inset: 0;
   z-index: 1200;
@@ -869,7 +912,7 @@ body {
   background: rgba(15, 23, 42, 0.55);
 }
 
-.queue-popup-card {
+.app-popup-card {
   position: relative;
   width: min(28rem, 100%);
   max-height: min(80vh, 40rem);
@@ -887,57 +930,10 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-.queue-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  min-height: 0;
-  flex-shrink: 0;
-}
-
-.queue-collapse-btn {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  width: 100%;
-  margin: 0;
-  padding: 0.15rem 0;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: 1.1rem;
-  font-weight: 600;
-  cursor: pointer;
-  text-align: left;
-}
-
-.queue-collapse-btn i {
-  font-size: 0.75rem;
-  color: var(--text-dim);
-  transition: transform 0.15s ease;
-}
-
-.queue-section.collapsed .queue-collapse-btn i {
-  transform: rotate(-90deg);
-}
-
-.queue-collapse-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  min-height: 0;
-}
-
-.queue-section.collapsed .queue-collapse-body {
-  display: none;
-}
-
 .queue-popup-title {
   margin: 0;
-  font-size: inherit;
-  font-weight: inherit;
+  font-size: 1.1rem;
+  font-weight: 600;
 }
 
 .queue-popup-list {
@@ -950,6 +946,7 @@ body {
   color: var(--text);
   font-size: 0.95rem;
   line-height: 1.35;
+  min-height: 0;
 }
 
 .queue-popup-list li {
@@ -1007,7 +1004,7 @@ body {
   font-size: 0.9rem;
 }
 
-.queue-popup-close {
+.popup-close {
   position: absolute;
   right: 0.55rem;
   top: 0.55rem;
@@ -1026,7 +1023,7 @@ body {
   line-height: 1;
 }
 
-.queue-popup-close:hover {
+.popup-close:hover {
   color: var(--text);
   background: rgba(255, 255, 255, 0.1);
 }

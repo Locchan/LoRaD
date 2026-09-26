@@ -241,14 +241,20 @@
     setHidden($("player-loading"), !state.switchingPlayer);
     setHidden($("audio-player-section"), !authed || state.loading);
     setHidden($("refresh-btn"), !authed || !onPlayerView);
+    setHidden($("station-view-btn"), !authed || state.loading || !onPlayerView);
+    $("station-view-btn").disabled = state.loading;
     $("player").disabled = locked || state.switchingPlayer;
     $("station").disabled = locked || state.loading || state.switchingPlayer;
     const showSearch = !isRadio() && !state.loading;
-    setHidden($("yandex-search-field"), !showSearch);
+    setHidden($("search-view-btn"), !authed || !onPlayerView || !showSearch);
+    $("search-view-btn").disabled = locked || state.switchingPlayer;
     $("yandex-search").disabled =
       locked || state.switchingPlayer || state.playSearchInFlight || state.queueSearchInFlight;
     syncSearchActions();
-    if (!showSearch) closeSearchResults();
+    if (!showSearch) {
+      closeSearchResults();
+      closeSearchPopup();
+    }
     $("track-title").textContent = state.trackTitle || state.track || "Нет информации о треке";
     $("track-artist").textContent = state.trackArtist || "";
     $("play-pause-icon").className = playing ? "fas fa-pause" : "fas fa-play";
@@ -272,10 +278,15 @@
     $("loop-track-btn").disabled = locked || state.loopInFlight;
     $("loop-track-btn").classList.toggle("looping", state.looping === true);
     $("loop-track-icon").className = state.loopInFlight ? "fas fa-spinner fa-spin" : "fas fa-repeat";
-    setHidden($("queue-view-btn"), !authed || state.loading || !onPlayerView);
-    $("queue-view-btn").disabled = state.loading;
-    if (!onPlayerView) closeQueuePopup();
-    if ($("queue-popup") && !$("queue-popup").hidden) syncQueueSection();
+    setHidden($("queue-view-btn"), !state.customPlaying);
+    $("queue-view-btn").disabled = !state.customPlaying;
+    if (!state.customPlaying) closeQueuePopup();
+    if (!onPlayerView) {
+      closeStationPopup();
+      closeSearchPopup();
+      closeQueuePopup();
+    }
+    if ($("queue-popup") && !$("queue-popup").hidden) renderQueuePopupList();
     loadCover(false);
     // After layout (stacked portrait bar is taller than the desktop fallback).
     requestAnimationFrame(syncPlayerBarHeight);
@@ -325,7 +336,7 @@
     state.looping = typeof data.looping === "boolean" ? data.looping : null;
     state.customPlaying = Boolean(data.custom_playing);
     state.customQueue = Array.isArray(data.custom_queue) ? data.custom_queue : [];
-    if ($("queue-popup") && !$("queue-popup").hidden) syncQueueSection();
+    if ($("queue-popup") && !$("queue-popup").hidden) renderQueuePopupList();
     state.coverReady = nextReady;
     if (trackChanged) {
       if (state.coverUrl && state.coverUrl.startsWith("blob:")) {
@@ -365,27 +376,6 @@
 
   function isRadio() {
     return state.currentPlayer === "player_radio";
-  }
-
-  function syncQueueSection() {
-    const section = $("queue-section");
-    const showQueue = Boolean(state.customPlaying);
-    setHidden(section, !showQueue);
-    if (showQueue) renderQueuePopupList();
-  }
-
-  function setQueueCollapsed(collapsed) {
-    const section = $("queue-section");
-    const btn = $("queue-collapse-btn");
-    if (!section || !btn) return;
-    section.classList.toggle("collapsed", collapsed);
-    btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
-  }
-
-  function toggleQueueCollapsed() {
-    const section = $("queue-section");
-    if (!section || section.hidden) return;
-    setQueueCollapsed(!section.classList.contains("collapsed"));
   }
 
   function renderQueuePopupList() {
@@ -431,22 +421,84 @@
     try {
       const data = await api.removeYandexQueueTrack(index);
       state.customQueue = Array.isArray(data.custom_queue) ? data.custom_queue : [];
-      syncQueueSection();
+      renderQueuePopupList();
     } catch (error) {
       console.error("Failed to remove queue track:", error);
     }
   }
 
+  function openStationPopup() {
+    setHidden($("station-popup"), false);
+  }
+
+  function closeStationPopup() {
+    const popup = $("station-popup");
+    if (popup) setHidden(popup, true);
+  }
+
+  function layoutSearchPopup() {
+    const popup = $("search-popup");
+    const card = popup && popup.querySelector(".app-popup-card");
+    const results = $("yandex-search-results");
+    if (!popup || popup.hidden || !card) return;
+    const vv = global.visualViewport;
+    const visibleTop = vv ? vv.offsetTop : 0;
+    const visibleH = vv ? vv.height : global.innerHeight;
+    const pad = 16;
+    // Keep the dialog inside the visible viewport (above the soft keyboard).
+    popup.style.paddingTop = `${Math.max(pad, visibleTop + pad)}px`;
+    card.style.maxHeight = `${Math.max(140, visibleH - pad * 2)}px`;
+    card.style.overflowY = "auto";
+    if (results && !$("yandex-search-panel").hidden) {
+      // Leave room for the input, label, actions column, and chrome.
+      const reserved = 7.5 * 16;
+      results.style.maxHeight = `${Math.max(96, visibleH - reserved - pad * 2)}px`;
+    }
+  }
+
+  function openSearchPopup() {
+    if (isRadio()) return;
+    setHidden($("search-popup"), false);
+    layoutSearchPopup();
+    const input = $("yandex-search");
+    if (input) {
+      // Let the keyboard open, then re-measure the visible viewport.
+      input.focus({ preventScroll: true });
+      setTimeout(layoutSearchPopup, 300);
+    }
+  }
+
+  function closeSearchPopup() {
+    const popup = $("search-popup");
+    if (popup) {
+      setHidden(popup, true);
+      popup.style.paddingTop = "";
+    }
+    const card = popup && popup.querySelector(".app-popup-card");
+    if (card) {
+      card.style.maxHeight = "";
+      card.style.overflowY = "";
+    }
+    const results = $("yandex-search-results");
+    if (results) results.style.maxHeight = "";
+    closeSearchResults();
+  }
+
   function openQueuePopup() {
-    setQueueCollapsed(false);
-    syncQueueSection();
+    if (!state.customPlaying) return;
+    renderQueuePopupList();
     setHidden($("queue-popup"), false);
   }
 
   function closeQueuePopup() {
     const popup = $("queue-popup");
     if (popup) setHidden(popup, true);
-    closeSearchResults();
+  }
+
+  function closeAllPopups() {
+    closeStationPopup();
+    closeSearchPopup();
+    closeQueuePopup();
   }
 
   function closeSearchResults() {
@@ -497,6 +549,7 @@
       setHidden(panel, false);
       setHidden($("yandex-search-actions"), true);
       syncSearchActions();
+      layoutSearchPopup();
       return;
     }
     tracks.forEach((track) => {
@@ -517,6 +570,7 @@
     });
     setHidden(panel, false);
     syncSearchActions();
+    layoutSearchPopup();
   }
 
   async function runYandexSearch(query) {
@@ -679,7 +733,9 @@
     clearCover();
     setHidden($("audio-player-section"), true);
     setHidden($("refresh-btn"), true);
-    closeQueuePopup();
+    setHidden($("station-view-btn"), true);
+    setHidden($("search-view-btn"), true);
+    closeAllPopups();
     syncPlayerBarHeight();
     renderProgress();
   }
@@ -953,8 +1009,11 @@
     $("next-track-btn").addEventListener("click", skipTrack);
     $("like-track-btn").addEventListener("click", toggleLike);
     $("loop-track-btn").addEventListener("click", toggleLoop);
+    $("station-view-btn").addEventListener("click", openStationPopup);
+    $("search-view-btn").addEventListener("click", openSearchPopup);
     $("queue-view-btn").addEventListener("click", openQueuePopup);
-    $("queue-collapse-btn").addEventListener("click", toggleQueueCollapsed);
+    $("station-popup-close").addEventListener("click", closeStationPopup);
+    $("search-popup-close").addEventListener("click", closeSearchPopup);
     $("queue-popup-close").addEventListener("click", closeQueuePopup);
     $("queue-popup-list").addEventListener("click", (event) => {
       const button = event.target.closest("[data-queue-index]");
@@ -963,6 +1022,12 @@
       if (!Number.isInteger(index)) return;
       removeQueueTrack(index);
     });
+    $("station-popup").addEventListener("click", (event) => {
+      if (event.target === $("station-popup")) closeStationPopup();
+    });
+    $("search-popup").addEventListener("click", (event) => {
+      if (event.target === $("search-popup")) closeSearchPopup();
+    });
     $("queue-popup").addEventListener("click", (event) => {
       if (event.target === $("queue-popup")) closeQueuePopup();
     });
@@ -970,6 +1035,9 @@
       if (state.canSwitch) refreshStream();
     });
     $("yandex-search").addEventListener("input", scheduleYandexSearch);
+    $("yandex-search").addEventListener("focus", () => {
+      setTimeout(layoutSearchPopup, 300);
+    });
     $("yandex-search").addEventListener("keydown", (event) => {
       if (event.key === "Escape") closeSearchResults();
     });
@@ -981,9 +1049,12 @@
     $("search-play-btn").addEventListener("click", confirmPlaySearchTrack);
     $("search-queue-btn").addEventListener("click", enqueueSearchTrack);
     document.addEventListener("click", (event) => {
+      const popup = $("search-popup");
+      if (!popup || popup.hidden) return;
       const field = $("yandex-search-field");
-      if (!field || field.hidden) return;
+      if (!field) return;
       if (field.contains(event.target)) return;
+      if (event.target === popup) return;
       closeSearchResults();
     });
     // Volume is a local audio-element setting, so it stays usable even while the backend is locked.
@@ -1018,7 +1089,12 @@
 
     global.addEventListener("resize", () => {
       syncPlayerBarHeight();
+      layoutSearchPopup();
     });
+    if (global.visualViewport) {
+      global.visualViewport.addEventListener("resize", layoutSearchPopup);
+      global.visualViewport.addEventListener("scroll", layoutSearchPopup);
+    }
     global.addEventListener("hashchange", render);
     global.addEventListener("lorad:unauthorized", () => {
       stopPlayer();
