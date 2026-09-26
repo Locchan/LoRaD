@@ -4,7 +4,7 @@ import lorad.common.utils.globs as globs
 
 ENDP_PATH = "/yandex/next_track"
 LOGIN_REQUIRED = True
-DOCSTRING = {"POST": "Skip to the next Yandex track after it is buffered in RAM. Blocked until the previous skip finishes."}
+DOCSTRING = {"POST": "Skip to the next Yandex track. Starts buffering immediately and returns; does not wait for cutover."}
 REQUIRED_FIELDS = {}
 OPTIONAL_FIELDS = {}
 
@@ -20,4 +20,4 @@ def impl_POST(headers, data):
     ok = player.skip_to_next()
     if not ok:
         return (409, {"error": "Could not skip (busy or buffer failed)."})
-    return {"success": True, "playing": player.currently_playing}
+    return {"success": True}

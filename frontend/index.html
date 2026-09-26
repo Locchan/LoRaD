@@ -63,7 +63,14 @@
     </header>
 
     <div class="main-content">
-      <div class="panel card">
+      <div id="player-init-loading" class="loading-card card">
+        <i class="fas fa-spinner fa-spin"></i>
+        <p>Загрузка плеера и станций...</p>
+      </div>
+    </div>
+
+    <div id="source-dock" class="source-dock" hidden>
+      <div class="source-field">
         <label for="player" class="field-label">Плеер</label>
         <select id="player" class="select">
           <option value="">Выберите плеер</option>
@@ -72,53 +79,26 @@
           <i class="fas fa-spinner fa-spin"></i> Переключение плеера...
         </div>
       </div>
-
-      <div class="panel card">
+      <div class="source-field">
         <label for="station" class="field-label">Станция</label>
         <select id="station" class="select">
           <option value="">Выберите станцию</option>
         </select>
       </div>
-
-      <div id="player-init-loading" class="loading-card card">
-        <i class="fas fa-spinner fa-spin"></i>
-        <p>Загрузка плеера и станций...</p>
-      </div>
-
-      <div id="audio-player-section" class="player-card card" hidden>
-        <div id="track-title" class="track-title">Нет информации о треке</div>
-
-        <div class="player-controls">
-          <button type="button" id="play-pause-btn" class="control-btn play-pause-btn" disabled>
-            <i id="play-pause-icon" class="fas fa-play"></i>
-          </button>
-          <button type="button" id="next-track-btn" class="control-btn" title="Следующий трек" hidden>
-            <i id="next-track-icon" class="fas fa-forward-step"></i>
-          </button>
-          <button type="button" id="like-track-btn" class="control-btn like-track-btn" title="Нравится" hidden>
-            <i id="like-track-icon" class="far fa-heart"></i>
-          </button>
-          <button type="button" id="loop-track-btn" class="control-btn loop-track-btn" title="Повтор" hidden>
-            <i id="loop-track-icon" class="fas fa-repeat"></i>
-          </button>
-          <button type="button" id="refresh-btn" class="control-btn" title="Обновить поток">
-            <i class="fas fa-sync-alt"></i>
-          </button>
-        </div>
-
-        <div id="track-progress" class="track-progress" hidden>
-          <span id="track-position">0:00</span> / <span id="track-length">0:00</span>
-        </div>
-
-        <div class="player-footer">
-          <div class="volume-control">
-            <i class="fas fa-volume-up"></i>
-            <input type="range" id="volume-slider" min="0" max="100" value="100" class="volume-slider" title="Громкость">
-            <span id="volume-value" class="volume-value">100%</span>
-          </div>
-          <div class="status-indicator">
-            <span id="status-dot" class="status-dot"></span>
-            <span id="status-text">Остановлено</span>
+      <div id="yandex-search-field" class="source-field source-search" hidden>
+        <label for="yandex-search" class="field-label">Поиск</label>
+        <div class="search-wrap">
+          <input type="search" id="yandex-search" class="form-input search-input" placeholder="Трек или исполнитель" autocomplete="off">
+          <div id="yandex-search-panel" class="search-panel" hidden>
+            <ul id="yandex-search-results" class="search-results"></ul>
+            <div id="yandex-search-actions" class="search-actions" hidden>
+              <button type="button" id="search-play-btn" class="search-action-btn" title="Играть сейчас" disabled>
+                <i class="fas fa-play"></i>
+              </button>
+              <button type="button" id="search-queue-btn" class="search-action-btn" title="В очередь" hidden disabled>
+                <i class="fas fa-list"></i>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -183,7 +163,71 @@
     </div>
   </div>
 
+  <div id="queue-popup" class="queue-popup" hidden>
+    <div class="queue-popup-card card" role="dialog" aria-labelledby="queue-popup-title">
+      <h2 id="queue-popup-title" class="queue-popup-title">Очередь</h2>
+      <ul id="queue-popup-list" class="queue-popup-list"></ul>
+      <p id="queue-popup-empty" class="queue-popup-empty" hidden>Очередь пуста</p>
+      <button type="button" id="queue-popup-close" class="queue-popup-close" title="Закрыть">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  </div>
+
   <span id="background-date" class="background-date" hidden></span>
+
+  <button type="button" id="refresh-btn" class="stream-refresh-btn" title="Обновить поток" hidden>
+    <i class="fas fa-sync-alt"></i>
+  </button>
+
+  <footer id="audio-player-section" class="player-bar" hidden>
+    <div class="player-bar-left">
+      <div class="track-cover-wrap">
+        <img id="track-cover" class="track-cover" alt="" hidden>
+        <div id="track-cover-placeholder" class="track-cover-placeholder" aria-hidden="true">
+          <i class="fas fa-music"></i>
+        </div>
+      </div>
+      <div class="track-meta">
+        <div id="track-title" class="track-title">Нет информации о треке</div>
+        <div id="track-artist" class="track-artist"></div>
+      </div>
+      <button type="button" id="like-track-btn" class="control-btn like-track-btn" title="Нравится" hidden>
+        <i id="like-track-icon" class="far fa-heart"></i>
+      </button>
+    </div>
+
+    <div class="player-bar-center">
+      <div class="player-controls">
+        <button type="button" id="play-pause-btn" class="control-btn play-pause-btn" disabled>
+          <i id="play-pause-icon" class="fas fa-play"></i>
+        </button>
+        <button type="button" id="next-track-btn" class="control-btn" title="Следующий трек" hidden>
+          <i id="next-track-icon" class="fas fa-forward-step"></i>
+        </button>
+        <button type="button" id="loop-track-btn" class="control-btn loop-track-btn" title="Повтор" hidden>
+          <i id="loop-track-icon" class="fas fa-repeat"></i>
+        </button>
+        <button type="button" id="queue-view-btn" class="control-btn queue-view-btn" title="Показать очередь" hidden>
+          <i class="fas fa-list"></i>
+        </button>
+      </div>
+      <div id="track-progress" class="track-progress" hidden>
+        <span id="track-position">0:00</span>
+        <div class="track-progress-bar" aria-hidden="true">
+          <div id="track-progress-fill" class="track-progress-fill"></div>
+        </div>
+        <span id="track-length">0:00</span>
+      </div>
+    </div>
+
+    <div class="player-bar-right">
+      <div class="volume-control">
+        <i class="fas fa-volume-up"></i>
+        <input type="range" id="volume-slider" min="0" max="100" value="100" class="volume-slider" title="Громкость">
+      </div>
+    </div>
+  </footer>
 
   <div class="global-logo-footer">
     <img src="logo.png" alt="ФУТИК-НУТИК" class="logo-image">

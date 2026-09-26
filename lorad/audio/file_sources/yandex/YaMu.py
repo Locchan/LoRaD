@@ -7,6 +7,7 @@ import hashlib
 
 import lorad.common.utils.globs as globs
 from lorad.audio.file_sources.FileRide import FileRide
+from lorad.audio.file_sources.yandex import covers as yandex_covers
 from lorad.audio.file_sources.yandex.Radio import Radio
 from lorad.common.utils.logger import get_logger
 from lorad.common.utils.shm import read_yandex_stations, unlink_shm, write_yandex_stations
@@ -24,9 +25,16 @@ class YaMu(FileRide):
         self.current_track: Track = None
         self.current_track_path: str = None
         self.current_track_name: str = None
+        self.current_track_title: str = None
+        self.current_track_artist: str = None
         self.next_track_obj: Track = None
         self.next_track_path: str = None
         self.next_track_name: str = None
+        self.next_track_title: str = None
+        self.next_track_artist: str = None
+        self.custom_queue: list[Track] = []
+        self.playing_custom: bool = False
+        self._next_is_custom: bool = False
         self._likes_lock = RLock()
         self._liked_track_ids: set[str] | None = None
 
@@ -101,6 +109,14 @@ class YaMu(FileRide):
             self.promote_next()
             if self.current_track_path:
                 return self.current_track
+        if self.custom_queue:
+            track = self.custom_queue.pop(0)
+            self._next_is_custom = True
+            self.__set_current_track(track)
+            self.playing_custom = True
+            self._next_is_custom = False
+            return self.current_track
+        self.playing_custom = False
         track = self.__advance()
         self.__set_current_track(track)
         return track
@@ -111,15 +127,22 @@ class YaMu(FileRide):
         if self.radio is None:
             raise RuntimeError("Yandex is not initialized.")
         # Whatever was prefetched belongs to the old station.
+        self.clear_custom_playlist()
         self.drop_prefetched()
         track = self.radio.start_radio(station_id)
         if track is None:
             return None
         self.radio_started = True
+        self._next_is_custom = False
         self.__set_next_track(track)
         if not self.next_track_path:
             return None
         return self.next_track_name, self.next_track_path
+
+    def clear_custom_playlist(self):
+        self.custom_queue.clear()
+        self.playing_custom = False
+        self._next_is_custom = False
 
     def drop_prefetched(self):
         if self.next_track_path:
@@ -127,6 +150,118 @@ class YaMu(FileRide):
         self.next_track_obj = None
         self.next_track_path = None
         self.next_track_name = None
+        self.next_track_title = None
+        self.next_track_artist = None
+        self._next_is_custom = False
+
+    def search_tracks(self, query: str, limit: int = 10) -> list[dict]:
+        """Top track hits for the UI dropdown: id / title / artist."""
+        text = (query or "").strip()
+        if not text:
+            return []
+        result = self.client.search(text, type_="track")
+        if result is None or result.tracks is None or not result.tracks.results:
+            return []
+        found = []
+        for track in result.tracks.results[: max(0, int(limit))]:
+            artist, title, _ = self.__track_parts(track)
+            found.append(
+                {
+                    "id": str(track.track_id),
+                    "title": title,
+                    "artist": artist,
+                }
+            )
+        return found
+
+    def queue_track(self, track_id: str, *, start_custom: bool = False) -> tuple[str, str] | None:
+        """Download a specific track as next. start_custom clears the custom playlist."""
+        if self.radio is None:
+            raise RuntimeError("Yandex is not initialized.")
+        track_id = str(track_id or "").strip()
+        if not track_id:
+            return None
+        if start_custom:
+            self.custom_queue.clear()
+        self.drop_prefetched()
+        tracks = self.client.tracks(track_id)
+        if not tracks:
+            logger.warning(f"Yandex track not found: {track_id}")
+            return None
+        track = tracks[0]
+        artist, title, name = self.__track_parts(track)
+        path = self.__download_track(track, name)
+        if not path:
+            return None
+        self.next_track_obj = track
+        self.next_track_name = name
+        self.next_track_path = path
+        self.next_track_title = title
+        self.next_track_artist = artist
+        self._next_is_custom = True if start_custom else self.playing_custom
+        yandex_covers.ensure_cover_async(track)
+        return name, path
+
+    def enqueue_custom_track(self, track_id: str) -> bool:
+        """Append metadata to the custom playlist. Download happens later via prefetch."""
+        if not self.playing_custom:
+            return False
+        track_id = str(track_id or "").strip()
+        if not track_id:
+            return False
+        tracks = self.client.tracks(track_id)
+        if not tracks:
+            logger.warning(f"Yandex track not found: {track_id}")
+            return False
+        self.custom_queue.append(tracks[0])
+        logger.info(
+            f"Queued custom Yandex track [{self.__track_parts(tracks[0])[2]}] "
+            f"(queue={len(self.custom_queue)})"
+        )
+        # Drop a station prefetch so the custom queue is what Prefetch pulls next.
+        if self.next_track_obj is not None and not self._next_is_custom:
+            self.drop_prefetched()
+        return True
+
+    def is_playing_custom(self) -> bool:
+        return bool(self.playing_custom)
+
+    def custom_queue_list(self) -> list[dict]:
+        """Current custom track (if any) plus upcoming (buffered next + queued)."""
+        items = []
+        if self.playing_custom and self.current_track is not None:
+            artist, title, _ = self.__track_parts(self.current_track)
+            items.append({"artist": artist, "title": title, "playing": True})
+        if self._next_is_custom and self.next_track_obj is not None:
+            artist, title, _ = self.__track_parts(self.next_track_obj)
+            items.append({"artist": artist, "title": title, "playing": False})
+        for track in self.custom_queue:
+            artist, title, _ = self.__track_parts(track)
+            items.append({"artist": artist, "title": title, "playing": False})
+        return items
+
+    def remove_custom_queue_at(self, index: int) -> bool:
+        """Remove an upcoming custom entry by the same index as custom_queue_list()."""
+        if not self.playing_custom or index < 0:
+            return False
+        # Skip the currently playing row — it is not removable from the queue UI.
+        if self.playing_custom and self.current_track is not None:
+            if index == 0:
+                return False
+            index -= 1
+        if self._next_is_custom and self.next_track_obj is not None:
+            if index == 0:
+                self.drop_prefetched()
+                return True
+            index -= 1
+        if index < len(self.custom_queue):
+            removed = self.custom_queue.pop(index)
+            logger.info(
+                f"Removed custom Yandex track [{self.__track_parts(removed)[2]}] "
+                f"(queue={len(self.custom_queue)})"
+            )
+            return True
+        return False
 
     def supports_next_track(self) -> bool:
         return True
@@ -179,6 +314,14 @@ class YaMu(FileRide):
             )
             if self.next_track_path:
                 return self.next_track_name, self.next_track_path
+        if self.custom_queue:
+            track = self.custom_queue.pop(0)
+            self._next_is_custom = True
+            self.__set_next_track(track)
+            if self.next_track_path:
+                return self.next_track_name, self.next_track_path
+            return None
+        self._next_is_custom = False
         track = self.__advance()
         self.__set_next_track(track)
         if self.next_track_path:
@@ -196,9 +339,34 @@ class YaMu(FileRide):
         self.current_track = self.next_track_obj
         self.current_track_path = self.next_track_path
         self.current_track_name = self.next_track_name
+        self.current_track_title = self.next_track_title
+        self.current_track_artist = self.next_track_artist
+        self.playing_custom = bool(self._next_is_custom)
         self.next_track_obj = None
         self.next_track_path = None
         self.next_track_name = None
+        self.next_track_title = None
+        self.next_track_artist = None
+        self._next_is_custom = False
+        yandex_covers.ensure_cover_async(self.current_track)
+
+    def current_cover_ready(self) -> bool:
+        if self.current_track is None:
+            return False
+        track_id = self.current_track.track_id
+        if yandex_covers.cover_ready(track_id):
+            return True
+        yandex_covers.ensure_cover_async(self.current_track)
+        return False
+
+    def current_cover_bytes(self) -> bytes | None:
+        if self.current_track is None:
+            return None
+        data = yandex_covers.read_cover_bytes(self.current_track.track_id)
+        if data:
+            return data
+        yandex_covers.ensure_cover_async(self.current_track)
+        return None
 
     def notify_playing(self):
         if self.radio is None or self.current_track is None:
@@ -216,11 +384,15 @@ class YaMu(FileRide):
         logger.warn("Radio was not started, but next_track was called. Starting radio...")
         return self.radio.start_radio()
 
-    def __track_name(self, track) -> str:
+    def __track_parts(self, track) -> tuple[str, str, str]:
+        """(artist, title, combined display name)."""
         if track is None:
-            return "unknown"
-        artists = [x.name for x in (track.artists or [])]
-        return f"{','.join(artists)} - {track.title}"
+            return "", "unknown", "unknown"
+        artists = ", ".join(x.name for x in (track.artists or []) if x.name)
+        title = track.title or "unknown"
+        if artists:
+            return artists, title, f"{artists} - {title}"
+        return "", title, title
 
     def __apply_track(self, track, as_next: bool) -> bool:
         retries = 16 if self.radio is not None and self.radio._is_likes() else 1
@@ -228,17 +400,22 @@ class YaMu(FileRide):
         for _ in range(max(1, retries)):
             if current is None:
                 break
-            name = self.__track_name(current)
+            artist, title, name = self.__track_parts(current)
             path = self.__download_track(current, name)
             if path:
                 if as_next:
                     self.next_track_obj = current
                     self.next_track_name = name
                     self.next_track_path = path
+                    self.next_track_title = title
+                    self.next_track_artist = artist
                 else:
                     self.current_track = current
                     self.current_track_name = name
                     self.current_track_path = path
+                    self.current_track_title = title
+                    self.current_track_artist = artist
+                yandex_covers.ensure_cover_async(current)
                 return True
             if retries == 1:
                 break
@@ -247,10 +424,14 @@ class YaMu(FileRide):
             self.next_track_obj = None
             self.next_track_name = None
             self.next_track_path = None
+            self.next_track_title = None
+            self.next_track_artist = None
         else:
             self.current_track = None
             self.current_track_name = None
             self.current_track_path = None
+            self.current_track_title = None
+            self.current_track_artist = None
         return False
 
     def __set_current_track(self, track) -> None:

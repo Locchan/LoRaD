@@ -44,10 +44,23 @@ def _state():
         ),
         "can_switch": _can_switch(player),
     }
+    playing = response["playing"] or ""
+    title = getattr(player, "track_title", None) or ""
+    artist = getattr(player, "track_artist", None) or ""
+    if title:
+        response["track_title"] = title
+        response["track_artist"] = artist
+    elif playing:
+        response["track_title"] = playing
+        response["track_artist"] = ""
 
     if globs.FILESTREAMER is not None and player.name_tech == globs.FILESTREAMER.name_tech:
         response["station_tech"] = player.current_source()
         response["looping"] = bool(getattr(player, "looping", False))
+        response["cover_ready"] = bool(getattr(player, "current_cover_ready", lambda: False)())
+        response["custom_playing"] = bool(getattr(player, "is_playing_custom", lambda: False)())
+        if response["custom_playing"]:
+            response["custom_queue"] = list(getattr(player, "custom_queue_list", lambda: [])())
         # Files have a playhead; a live restream does not, so these stay absent for radio.
         length = player.track_length()
         if length:

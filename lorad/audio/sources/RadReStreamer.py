@@ -59,6 +59,8 @@ class RadReStreamer(GenericPlayer):
         self.default_format = config["DEFAULT_AUDIO_FORMAT"]
         self.current_station = "default"
         self.currently_playing = self.current_station
+        self.track_title = ""
+        self.track_artist = ""
         # Bumped on every station switch so a stream loop still on the old URL gives up.
         self._epoch = 0
         self.get_stations()
@@ -81,6 +83,8 @@ class RadReStreamer(GenericPlayer):
             epoch = self._epoch
             station_url = stations[self.current_station]["url"]
             self.currently_playing = stations[self.current_station]["name"]
+            self.track_title = self.currently_playing
+            self.track_artist = ""
             fmt = self.preflight_format(station_url) or self.default_format
             hub.acquire(self)
             logger.info(f"Starting streaming '{self.current_station}' ({fmt}) {station_url}")

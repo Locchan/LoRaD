@@ -76,6 +76,10 @@ class GenericPrg:
                 logger.info(f"Program: {self.name}; Track {anum+1}/{len(self.prepared_program)}")
                 if prev is not None:
                     prev.currently_playing = aname
+                    if hasattr(prev, "track_title"):
+                        prev.track_title = aname
+                    if hasattr(prev, "track_artist"):
+                        prev.track_artist = ""
                 buffers.load_current_track(afile, aname)
                 hub.begin_source(
                     self,

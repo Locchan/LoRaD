@@ -31,6 +31,8 @@ class FileStreamer(GenericPlayer):
         self.connector_index = 0
         self.current_ride = self.connectors[self.connector_index]
         self.currently_playing = ""
+        self.track_title = ""
+        self.track_artist = ""
         self.current_filepath = ""
         self.target_bitrate = int(config["BITRATE_KBPS"])
         self.bytes_per_sec = (self.target_bitrate * 1000) / 8
@@ -82,6 +84,37 @@ class FileStreamer(GenericPlayer):
             raise RuntimeError("Current source does not support likes.")
         return self.current_ride.set_current_track_liked(liked)
 
+    def current_cover_ready(self) -> bool:
+        ride = self.current_ride
+        if ride is not globs.YANDEX_OBJ:
+            return False
+        return bool(getattr(ride, "current_cover_ready", lambda: False)())
+
+    def current_cover_bytes(self) -> bytes | None:
+        ride = self.current_ride
+        if ride is not globs.YANDEX_OBJ:
+            return None
+        getter = getattr(ride, "current_cover_bytes", None)
+        return getter() if callable(getter) else None
+
+    def _sync_track_meta_from_ride(self, playing: str):
+        ride = self.current_ride
+        title = getattr(ride, "current_track_title", None)
+        artist = getattr(ride, "current_track_artist", None)
+        if title:
+            self.track_title = title
+            self.track_artist = artist or ""
+            return
+        # Combined "Artist - Title" / "Artist — Title" from older paths
+        for sep in (" — ", " - "):
+            if sep in playing:
+                left, right = playing.split(sep, 1)
+                self.track_artist = left.strip()
+                self.track_title = right.strip()
+                return
+        self.track_title = playing
+        self.track_artist = ""
+
     def carousel(self):
         logger.debug("Entering carousel")
         hub = get_hub()
@@ -96,6 +129,7 @@ class FileStreamer(GenericPlayer):
                 if not track or not isinstance(track, tuple):
                     raise RuntimeError(f"Got an invalid track for the carousel: '{track}'")
                 self.currently_playing, self.current_filepath = track
+                self._sync_track_meta_from_ride(self.currently_playing)
                 hub.acquire(self)
                 self._play_from_file(self.current_filepath, self.currently_playing)
             except Exception as e:
@@ -214,9 +248,17 @@ class FileStreamer(GenericPlayer):
             title = track_id3_obj.get("title")
             if artist is None and title is None:
                 raise RuntimeError("No track name in metadata.")
-            return f"{artist} — {title}"
+            artist_s = artist[0] if isinstance(artist, list) and artist else (artist or "")
+            title_s = title[0] if isinstance(title, list) and title else (title or "")
+            self.track_artist = artist_s or ""
+            self.track_title = title_s or Path(path).stem
+            if artist_s and title_s:
+                return f"{artist_s} — {title_s}"
+            return title_s or artist_s or Path(path).stem
         except Exception:
-            return Path(path).stem
+            self.track_artist = ""
+            self.track_title = Path(path).stem
+            return self.track_title
 
     def play_files(self, files: dict[str, str], unswitcheable=False):
         """Play named files as hub owner (used by scheduled programs)."""
@@ -244,13 +286,18 @@ class FileStreamer(GenericPlayer):
             self.running = was_running
 
     def skip_to_next(self) -> bool:
+        """Start a skip on a worker thread; returns once the job is accepted."""
         if not self.supports_next_track():
             return False
-        if self._skip_busy:
+        if self._skip_busy or self.switching:
             return False
         self._skip_busy = True
         self.switching = True
         self.looping = False
+        Thread(name="TrackSkip", target=self._skip_worker, daemon=True).start()
+        return True
+
+    def _skip_worker(self):
         try:
             with self.buffers.lock:
                 if self.buffers.preload.ready and self.buffers.preload.path == self.current_filepath:
@@ -269,11 +316,109 @@ class FileStreamer(GenericPlayer):
                 time.sleep(0.2)
             else:
                 logger.error("Skip failed: next track did not buffer in time")
-                return False
-            return self._skip_to_preloaded()
+                return
+            if not self._skip_to_preloaded():
+                logger.error("Skip failed: player did not take the buffered track")
+        except Exception as e:
+            logger.exception(e)
         finally:
             self._skip_busy = False
             self.switching = False
+
+    def play_track_id(self, track_id: str) -> bool:
+        """Start playing a specific Yandex track on a worker; returns once accepted."""
+        ride = self.current_ride
+        if ride is not globs.YANDEX_OBJ or not hasattr(ride, "queue_track"):
+            return False
+        if self._skip_busy or self.switching:
+            return False
+        self._skip_busy = True
+        self.switching = True
+        self.looping = False
+        Thread(name="TrackPlay", target=self._play_track_worker, args=(str(track_id),), daemon=True).start()
+        return True
+
+    def _play_track_worker(self, track_id: str):
+        try:
+            with self.buffers.lock:
+                self._prefetch_epoch += 1
+                self.buffers.reserve_preload_for_track = True
+                self.buffers.preload.clear()
+            ride = self.current_ride
+            got = ride.queue_track(track_id, start_custom=True)
+            if not got:
+                logger.error(f"Could not queue Yandex track {track_id}")
+                return
+            name, path = got
+            self.buffers.load_preload_track(path, name)
+            if not self.running:
+                ride.promote_next()
+                self._sync_track_meta_from_ride(name)
+                return
+            if not self._skip_to_preloaded():
+                logger.error(f"Play track {track_id}: player did not take the buffered track")
+        except Exception as e:
+            logger.exception(e)
+        finally:
+            self.buffers.release_track_reservation()
+            self._skip_busy = False
+            self.switching = False
+
+    def enqueue_track_id(self, track_id: str) -> bool:
+        """Append to the Yandex custom playlist (only while a custom track is playing)."""
+        ride = self.current_ride
+        if ride is not globs.YANDEX_OBJ or not hasattr(ride, "enqueue_custom_track"):
+            return False
+        had_station_next = bool(
+            getattr(ride, "next_track_obj", None) is not None
+            and not getattr(ride, "_next_is_custom", False)
+        )
+        if not ride.enqueue_custom_track(track_id):
+            return False
+        # Only replace a dropped station prefetch; otherwise wait for the normal Prefetch window.
+        if had_station_next:
+            with self.buffers.lock:
+                self._prefetch_epoch += 1
+                self.buffers.preload.clear()
+            self._prefetch_next_track()
+        return True
+
+    def is_playing_custom(self) -> bool:
+        ride = self.current_ride
+        if ride is not globs.YANDEX_OBJ:
+            return False
+        return bool(getattr(ride, "playing_custom", False))
+
+    def custom_queue_list(self) -> list[dict]:
+        ride = self.current_ride
+        if ride is not globs.YANDEX_OBJ:
+            return []
+        getter = getattr(ride, "custom_queue_list", None)
+        return getter() if callable(getter) else []
+
+    def remove_custom_queue_at(self, index: int) -> bool:
+        ride = self.current_ride
+        if ride is not globs.YANDEX_OBJ or not hasattr(ride, "remove_custom_queue_at"):
+            return False
+        dropped_next = bool(
+            getattr(ride, "_next_is_custom", False) and getattr(ride, "next_track_obj", None) is not None
+        )
+        # Index 1 in the UI list is the buffered next when current is playing.
+        removing_next = (
+            getattr(ride, "playing_custom", False)
+            and getattr(ride, "current_track", None) is not None
+            and index == 1
+            and dropped_next
+        )
+        if not ride.remove_custom_queue_at(index):
+            return False
+        if removing_next:
+            with self.buffers.lock:
+                self._prefetch_epoch += 1
+                self.buffers.preload.clear()
+            if getattr(ride, "custom_queue", None):
+                self._prefetch_next_track()
+        return True
 
     def _skip_to_preloaded(self) -> bool:
         """Ask the feeding loop to cut over to whatever sits in the preload buffer."""
@@ -362,6 +507,8 @@ class FileStreamer(GenericPlayer):
     def _play_from_file(self, path, name, allow_prefetch=True, advance_after=True, listen_report=True):
         if not name:
             name = self.set_track_name_from_metadata(path)
+        elif not self.track_title:
+            self._sync_track_meta_from_ride(name)
         self.currently_playing = name
         self.current_filepath = path
         self.buffers.load_current_track(path, name)
@@ -476,6 +623,7 @@ class FileStreamer(GenericPlayer):
             self.current_ride.promote_next()
         self.currently_playing = name
         self.current_filepath = path
+        self._sync_track_meta_from_ride(name)
         self._track_started = time.monotonic()
         self._track_duration = self.buffers.current.duration_s or file_duration_s(path)
         if not looping_same:

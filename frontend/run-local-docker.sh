@@ -11,7 +11,7 @@ API_URL="${LORAD_API_URL:-http://127.0.0.1:5476}"
 RADIO_URL="${LORAD_RADIO_URL:-http://127.0.0.1:5475}"
 WS_URL="${LORAD_WS_URL:-ws://127.0.0.1:5478}"
 
-docker build \
+docker buildx build --load \
   --build-arg LORAD_API_URL="$API_URL" \
   --build-arg LORAD_RADIO_URL="$RADIO_URL" \
   --build-arg LORAD_WS_URL="$WS_URL" \

@@ -155,5 +155,26 @@
       // X-Background-Date is absent when Immich has no date for the photo
       return { blob: await response.blob(), date: response.headers.get("X-Background-Date") };
     },
+    getYandexCover: async () => {
+      const headers = { Authorization: authHeader() };
+      const response = await fetch(`${config().apiUrl}/yandex/cover?t=${Date.now()}`, { headers });
+      if (response.status === 401) {
+        logout();
+        global.dispatchEvent(new CustomEvent("lorad:unauthorized"));
+        const error = new Error("Unauthorized");
+        error.status = 401;
+        throw error;
+      }
+      if (!response.ok) return null;
+      return response.blob();
+    },
+    searchYandexTracks: (q) =>
+      request(`/yandex/search?q=${encodeURIComponent(q)}`),
+    playYandexTrack: (trackId) =>
+      request("/yandex/play_track", { method: "POST", body: { track_id: trackId } }),
+    enqueueYandexTrack: (trackId) =>
+      request("/yandex/enqueue_track", { method: "POST", body: { track_id: trackId } }),
+    removeYandexQueueTrack: (index) =>
+      request("/yandex/remove_queue_track", { method: "POST", body: { index } }),
   };
 })(window);

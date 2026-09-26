@@ -6,7 +6,7 @@ from lorad.common.utils.globs import FEAT_FILESTREAMER_YANDEX
 
 ENDP_PATH = "/yandex/switch_station"
 LOGIN_REQUIRED = True
-DOCSTRING = {"POST": "Switches the station. Get stations from /yandex/available_stations"}
+DOCSTRING = {"POST": "Switches the station. Starts the switch immediately and returns; does not wait for the first track to buffer."}
 REQUIRED_FIELDS = {
     "POST": ["new_station"]
 }

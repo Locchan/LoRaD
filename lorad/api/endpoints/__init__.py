@@ -21,7 +21,7 @@ endpoints_to_register : list[ModuleType] = \
 [
 version, apidoc, openapi, whatsplaying, current_player, available_players, locale, switch_player, enabled_features, background, # root
 users.auth, users.whoami, users.register, users.remove, # user
-yandex.available_stations, yandex.current_station, yandex.switch_station, yandex.next_track, yandex.like_track, yandex.loop_track, # yandex
+yandex.available_stations, yandex.current_station, yandex.switch_station, yandex.next_track, yandex.like_track, yandex.loop_track, yandex.cover, yandex.search, yandex.play_track, yandex.enqueue_track, yandex.remove_queue_track, # yandex
 radio.available_stations, radio.current_station, radio.switch_station, # radio
 admin.get_config, admin.set_config # admin
 ]

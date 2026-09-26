@@ -28,10 +28,23 @@
     stationTech: "",
     stationName: "",
     track: "",
+    trackTitle: "",
+    trackArtist: "",
     canSkip: false,
     canSwitch: true,
     liked: null,
     looping: null,
+    coverReady: false,
+    coverUrl: "",
+    coverTrackKey: "",
+    coverLoading: false,
+    searchTimer: null,
+    searchSeq: 0,
+    playSearchInFlight: false,
+    queueSearchInFlight: false,
+    selectedSearchTrackId: "",
+    customPlaying: false,
+    customQueue: [],
     skipInFlight: false,
     likeInFlight: false,
     loopInFlight: false,
@@ -122,6 +135,8 @@
     if (!known) return;
     $("track-position").textContent = clock(state.position);
     $("track-length").textContent = clock(state.length);
+    const pct = state.length > 0 ? Math.min(100, (state.position / state.length) * 100) : 0;
+    $("track-progress-fill").style.width = `${pct}%`;
   }
 
   function applyProgress(data) {
@@ -150,21 +165,96 @@
     }
   }
 
+  function clearCover() {
+    if (state.coverUrl && state.coverUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(state.coverUrl);
+    }
+    state.coverUrl = "";
+    state.coverTrackKey = "";
+    state.coverReady = false;
+    const img = $("track-cover");
+    img.removeAttribute("src");
+    setHidden(img, true);
+    setHidden($("track-cover-placeholder"), false);
+  }
+
+  async function loadCover(force) {
+    const key = state.track || state.trackTitle || "";
+    if (!state.coverReady) {
+      if (state.coverUrl && state.coverUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(state.coverUrl);
+      }
+      state.coverUrl = "";
+      state.coverTrackKey = "";
+      setHidden($("track-cover"), true);
+      setHidden($("track-cover-placeholder"), false);
+      return;
+    }
+    if (!force && state.coverTrackKey === key && state.coverUrl) {
+      setHidden($("track-cover"), false);
+      setHidden($("track-cover-placeholder"), true);
+      return;
+    }
+    if (state.coverLoading) return;
+    state.coverLoading = true;
+    try {
+      const blob = await api.getYandexCover();
+      if (!blob) {
+        setHidden($("track-cover"), true);
+        setHidden($("track-cover-placeholder"), false);
+        return;
+      }
+      if (state.coverUrl && state.coverUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(state.coverUrl);
+      }
+      state.coverUrl = URL.createObjectURL(blob);
+      state.coverTrackKey = key;
+      const img = $("track-cover");
+      img.src = state.coverUrl;
+      setHidden(img, false);
+      setHidden($("track-cover-placeholder"), true);
+    } catch (error) {
+      console.error("Failed to load track cover:", error);
+      setHidden($("track-cover"), true);
+      setHidden($("track-cover-placeholder"), false);
+    } finally {
+      state.coverLoading = false;
+    }
+  }
+
+  function syncPlayerBarHeight() {
+    const bar = $("audio-player-section");
+    const height = bar && !bar.hidden ? bar.offsetHeight : 0;
+    document.documentElement.style.setProperty(
+      "--player-bar-height",
+      height > 0 ? `${height}px` : "5.5rem"
+    );
+    positionBackgroundDate();
+  }
+
   function renderPlayer() {
     const playing = Boolean(state.audio && !state.audio.paused);
     const locked = !state.canSwitch;
+    const authed = api.isAuthenticated() && route() !== "/login";
     setHidden($("player-init-loading"), !state.loading);
     setHidden($("player-loading"), !state.switchingPlayer);
-    setHidden($("audio-player-section"), state.loading);
+    setHidden($("source-dock"), state.loading);
+    setHidden($("audio-player-section"), !authed || state.loading);
+    setHidden($("refresh-btn"), !authed);
     $("player").disabled = locked || state.switchingPlayer;
     $("station").disabled = locked || state.loading || state.switchingPlayer;
-    $("track-title").textContent = state.track || "Нет информации о треке";
+    const showSearch = !isRadio() && !state.loading;
+    setHidden($("yandex-search-field"), !showSearch);
+    $("yandex-search").disabled =
+      locked || state.switchingPlayer || state.playSearchInFlight || state.queueSearchInFlight;
+    syncSearchActions();
+    if (!showSearch) closeSearchResults();
+    $("track-title").textContent = state.trackTitle || state.track || "Нет информации о треке";
+    $("track-artist").textContent = state.trackArtist || "";
     $("play-pause-icon").className = playing ? "fas fa-pause" : "fas fa-play";
     $("play-pause-btn").classList.toggle("playing", playing);
-    $("play-pause-btn").disabled = locked || !state.track;
+    $("play-pause-btn").disabled = locked || !(state.track || state.trackTitle);
     $("refresh-btn").disabled = locked;
-    $("status-dot").classList.toggle("active", playing);
-    $("status-text").textContent = playing ? "Воспроизводится" : "Остановлено";
     setHidden($("next-track-btn"), !state.canSkip);
     $("next-track-btn").disabled = locked || state.skipInFlight;
     $("next-track-icon").className = state.skipInFlight ? "fas fa-spinner fa-spin" : "fas fa-forward-step";
@@ -182,6 +272,12 @@
     $("loop-track-btn").disabled = locked || state.loopInFlight;
     $("loop-track-btn").classList.toggle("looping", state.looping === true);
     $("loop-track-icon").className = state.loopInFlight ? "fas fa-spinner fa-spin" : "fas fa-repeat";
+    setHidden($("queue-view-btn"), !state.customPlaying);
+    $("queue-view-btn").disabled = !state.customPlaying;
+    if (!state.customPlaying) closeQueuePopup();
+    loadCover(false);
+    // After layout (stacked portrait bar is taller than the desktop fallback).
+    requestAnimationFrame(syncPlayerBarHeight);
   }
 
   function streamUrl() {
@@ -214,12 +310,29 @@
 
   function applyWhatsPlaying(data) {
     if (!data) return;
-    state.track = data.playing || "";
+    const nextTrack = data.playing || "";
+    const nextReady = Boolean(data.cover_ready);
+    const trackChanged = nextTrack !== state.track;
+    const coverBecameReady = nextReady && !state.coverReady;
+    state.track = nextTrack;
+    state.trackTitle = data.track_title || nextTrack;
+    state.trackArtist = data.track_artist || "";
     state.canSkip = Boolean(data.can_skip);
     // The server locks switching during programs and right after a switch.
     state.canSwitch = data.can_switch !== false;
     state.liked = typeof data.liked === "boolean" ? data.liked : null;
     state.looping = typeof data.looping === "boolean" ? data.looping : null;
+    state.customPlaying = Boolean(data.custom_playing);
+    state.customQueue = Array.isArray(data.custom_queue) ? data.custom_queue : [];
+    if ($("queue-popup") && !$("queue-popup").hidden) renderQueuePopupList();
+    state.coverReady = nextReady;
+    if (trackChanged) {
+      if (state.coverUrl && state.coverUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(state.coverUrl);
+      }
+      state.coverUrl = "";
+      state.coverTrackKey = "";
+    }
     if (data.player_tech && data.player_tech !== state.currentPlayer) {
       state.currentPlayer = data.player_tech;
       $("player").value = data.player_tech;
@@ -231,6 +344,9 @@
     }
     applyProgress(data);
     renderPlayer();
+    if (coverBecameReady || (nextReady && trackChanged)) {
+      loadCover(true);
+    }
   }
 
   function connectSocket() {
@@ -248,6 +364,209 @@
 
   function isRadio() {
     return state.currentPlayer === "player_radio";
+  }
+
+  function renderQueuePopupList() {
+    const list = $("queue-popup-list");
+    const empty = $("queue-popup-empty");
+    list.innerHTML = "";
+    const queue = state.customQueue || [];
+    setHidden(empty, queue.length > 0);
+    setHidden(list, queue.length === 0);
+    let upcomingNumber = 2;
+    queue.forEach((item, index) => {
+      const li = document.createElement("li");
+      const marker = document.createElement("span");
+      marker.className = "queue-popup-index";
+      const text = document.createElement("span");
+      text.className = "queue-popup-text";
+      const artist = item.artist || "";
+      const title = item.title || "";
+      text.textContent = artist ? `${artist} - ${title}` : title;
+      if (item.playing) {
+        marker.classList.add("playing");
+        marker.textContent = "▶";
+      } else {
+        marker.textContent = `${upcomingNumber}.`;
+        upcomingNumber += 1;
+      }
+      li.append(marker, text);
+      if (!item.playing) {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "queue-popup-remove";
+        remove.title = "Убрать из очереди";
+        remove.dataset.queueIndex = String(index);
+        remove.textContent = "✕";
+        li.appendChild(remove);
+      }
+      list.appendChild(li);
+    });
+  }
+
+  async function removeQueueTrack(index) {
+    if (!state.customPlaying || state.canSwitch === false) return;
+    try {
+      const data = await api.removeYandexQueueTrack(index);
+      state.customQueue = Array.isArray(data.custom_queue) ? data.custom_queue : [];
+      renderQueuePopupList();
+    } catch (error) {
+      console.error("Failed to remove queue track:", error);
+    }
+  }
+
+  function openQueuePopup() {
+    if (!state.customPlaying) return;
+    renderQueuePopupList();
+    setHidden($("queue-popup"), false);
+  }
+
+  function closeQueuePopup() {
+    const popup = $("queue-popup");
+    if (popup) setHidden(popup, true);
+  }
+
+  function closeSearchResults() {
+    const panel = $("yandex-search-panel");
+    const list = $("yandex-search-results");
+    list.innerHTML = "";
+    state.selectedSearchTrackId = "";
+    setHidden(panel, true);
+    setHidden($("yandex-search-actions"), true);
+    syncSearchActions();
+  }
+
+  function syncSearchActions() {
+    const actions = $("yandex-search-actions");
+    const playBtn = $("search-play-btn");
+    const queueBtn = $("search-queue-btn");
+    const hasSelection = Boolean(state.selectedSearchTrackId);
+    const panelOpen = !$("yandex-search-panel").hidden;
+    const locked =
+      !state.canSwitch ||
+      state.switchingPlayer ||
+      state.playSearchInFlight ||
+      state.queueSearchInFlight;
+    setHidden(actions, !panelOpen || !hasSelection);
+    setHidden(queueBtn, !state.customPlaying);
+    playBtn.disabled = locked || !hasSelection;
+    queueBtn.disabled = locked || !hasSelection || !state.customPlaying;
+  }
+
+  function selectSearchTrack(trackId) {
+    state.selectedSearchTrackId = trackId || "";
+    $("yandex-search-results").querySelectorAll(".search-result").forEach((btn) => {
+      btn.classList.toggle("selected", btn.dataset.trackId === state.selectedSearchTrackId);
+    });
+    syncSearchActions();
+  }
+
+  function renderSearchResults(tracks) {
+    const panel = $("yandex-search-panel");
+    const list = $("yandex-search-results");
+    list.innerHTML = "";
+    state.selectedSearchTrackId = "";
+    if (!tracks || !tracks.length) {
+      const empty = document.createElement("li");
+      empty.className = "search-results-empty";
+      empty.textContent = "Ничего не найдено";
+      list.appendChild(empty);
+      setHidden(panel, false);
+      setHidden($("yandex-search-actions"), true);
+      syncSearchActions();
+      return;
+    }
+    tracks.forEach((track) => {
+      const item = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "search-result";
+      button.dataset.trackId = track.id;
+      const title = document.createElement("span");
+      title.className = "search-result-title";
+      title.textContent = track.title || track.id;
+      const artist = document.createElement("span");
+      artist.className = "search-result-artist";
+      artist.textContent = track.artist || "";
+      button.append(title, artist);
+      item.appendChild(button);
+      list.appendChild(item);
+    });
+    setHidden(panel, false);
+    syncSearchActions();
+  }
+
+  async function runYandexSearch(query) {
+    const q = query.trim();
+    if (!q || isRadio()) {
+      closeSearchResults();
+      return;
+    }
+    const seq = ++state.searchSeq;
+    try {
+      const data = await api.searchYandexTracks(q);
+      if (seq !== state.searchSeq) return;
+      renderSearchResults(data.tracks || []);
+    } catch (error) {
+      if (seq !== state.searchSeq) return;
+      console.error("Yandex search failed:", error);
+      closeSearchResults();
+    }
+  }
+
+  function scheduleYandexSearch() {
+    clearTimeout(state.searchTimer);
+    const q = $("yandex-search").value.trim();
+    if (!q) {
+      state.searchSeq += 1;
+      closeSearchResults();
+      return;
+    }
+    state.searchTimer = setTimeout(() => runYandexSearch(q), 300);
+  }
+
+  async function confirmPlaySearchTrack() {
+    const trackId = state.selectedSearchTrackId;
+    if (!trackId || !state.canSwitch || state.playSearchInFlight || isRadio()) return;
+    state.playSearchInFlight = true;
+    renderPlayer();
+    try {
+      await api.playYandexTrack(trackId);
+      state.searchSeq += 1;
+      $("yandex-search").value = "";
+      closeSearchResults();
+    } catch (error) {
+      console.error("Failed to play Yandex track:", error);
+    } finally {
+      state.playSearchInFlight = false;
+      renderPlayer();
+    }
+  }
+
+  async function enqueueSearchTrack() {
+    const trackId = state.selectedSearchTrackId;
+    if (
+      !trackId ||
+      !state.customPlaying ||
+      !state.canSwitch ||
+      state.queueSearchInFlight ||
+      isRadio()
+    ) {
+      return;
+    }
+    state.queueSearchInFlight = true;
+    renderPlayer();
+    try {
+      await api.enqueueYandexTrack(trackId);
+      state.searchSeq += 1;
+      $("yandex-search").value = "";
+      closeSearchResults();
+    } catch (error) {
+      console.error("Failed to enqueue Yandex track:", error);
+    } finally {
+      state.queueSearchInFlight = false;
+      renderPlayer();
+    }
   }
 
   async function loadStations() {
@@ -287,7 +606,6 @@
     state.loading = true;
     state.volume = api.loadVolume();
     $("volume-slider").value = String(state.volume);
-    $("volume-value").textContent = `${state.volume}%`;
     renderPlayer();
 
     state.audio = new Audio(streamUrl());
@@ -335,6 +653,11 @@
     state.length = null;
     state.position = null;
     state.positionKey = "";
+    clearCover();
+    setHidden($("audio-player-section"), true);
+    setHidden($("refresh-btn"), true);
+    setHidden($("source-dock"), true);
+    syncPlayerBarHeight();
     renderProgress();
   }
 
@@ -567,6 +890,7 @@
       // the player keeps running in the background: the views are only hidden, not torn down
       showView("view-schedule");
       loadBackground();
+      if (state.audio) renderPlayer();
       if (schedule.loaded || schedule.loading) {
         renderSchedule();
       } else {
@@ -606,14 +930,42 @@
     $("next-track-btn").addEventListener("click", skipTrack);
     $("like-track-btn").addEventListener("click", toggleLike);
     $("loop-track-btn").addEventListener("click", toggleLoop);
+    $("queue-view-btn").addEventListener("click", openQueuePopup);
+    $("queue-popup-close").addEventListener("click", closeQueuePopup);
+    $("queue-popup-list").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-queue-index]");
+      if (!button) return;
+      const index = Number(button.dataset.queueIndex);
+      if (!Number.isInteger(index)) return;
+      removeQueueTrack(index);
+    });
+    $("queue-popup").addEventListener("click", (event) => {
+      if (event.target === $("queue-popup")) closeQueuePopup();
+    });
     $("refresh-btn").addEventListener("click", () => {
       if (state.canSwitch) refreshStream();
+    });
+    $("yandex-search").addEventListener("input", scheduleYandexSearch);
+    $("yandex-search").addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeSearchResults();
+    });
+    $("yandex-search-results").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-track-id]");
+      if (!button) return;
+      selectSearchTrack(button.dataset.trackId);
+    });
+    $("search-play-btn").addEventListener("click", confirmPlaySearchTrack);
+    $("search-queue-btn").addEventListener("click", enqueueSearchTrack);
+    document.addEventListener("click", (event) => {
+      const field = $("yandex-search-field");
+      if (!field || field.hidden) return;
+      if (field.contains(event.target)) return;
+      closeSearchResults();
     });
     // Volume is a local audio-element setting, so it stays usable even while the backend is locked.
     $("volume-slider").addEventListener("input", (event) => {
       state.volume = parseInt(event.target.value, 10);
       if (state.audio) state.audio.volume = state.volume / 100;
-      $("volume-value").textContent = `${state.volume}%`;
       api.saveVolume(state.volume);
     });
 
@@ -640,7 +992,9 @@
       });
     });
 
-    global.addEventListener("resize", positionBackgroundDate);
+    global.addEventListener("resize", () => {
+      syncPlayerBarHeight();
+    });
     global.addEventListener("hashchange", render);
     global.addEventListener("lorad:unauthorized", () => {
       stopPlayer();
@@ -688,23 +1042,36 @@
   }
 
   // The photo is painted with background-size: contain against the viewport, so its own
-  // bottom-right corner sits inside the page by however much the aspect ratios differ.
+  // bottom-right sits inside the page by however much the aspect ratios differ. Keep it
+  // above the player bar and (in portrait) the full-width source dock.
   function positionBackgroundDate() {
     const label = $("background-date");
     if (!label || label.hidden) return;
     const natural = state.backgroundNatural;
     const viewWidth = document.documentElement.clientWidth;
     const viewHeight = document.documentElement.clientHeight;
+    const bar = $("audio-player-section");
+    const dock = $("source-dock");
+    const barHeight = bar && !bar.hidden ? bar.offsetHeight : 0;
+    const dockVisible = dock && !dock.hidden && route() === "/";
+    // Portrait dock spans the width above the bar; desktop dock stays left and misses the stamp.
+    const dockFullWidth = dockVisible && global.matchMedia("(max-width: 768px)").matches;
+    const dockClear = dockFullWidth ? dock.offsetHeight + 14 : 0;
+    const clearBottom = barHeight + dockClear + 12;
     if (!natural || !natural.width || !natural.height) {
-      label.style.removeProperty("right");
-      label.style.removeProperty("bottom");
+      label.style.left = "auto";
+      label.style.top = "auto";
+      label.style.right = "20px";
+      label.style.bottom = `${clearBottom}px`;
       return;
     }
     const scale = Math.min(viewWidth / natural.width, viewHeight / natural.height);
     const insetX = Math.round((viewWidth - natural.width * scale) / 2);
     const insetY = Math.round((viewHeight - natural.height * scale) / 2);
+    label.style.left = "auto";
+    label.style.top = "auto";
     label.style.right = `${insetX + 14}px`;
-    label.style.bottom = `${insetY + 12}px`;
+    label.style.bottom = `${Math.max(insetY + 12, clearBottom)}px`;
   }
 
   function applyBackground(url) {
