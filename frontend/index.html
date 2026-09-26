@@ -166,9 +166,14 @@
         </div>
       </div>
       <div id="queue-section" class="queue-section" hidden>
-        <h2 id="queue-popup-title" class="queue-popup-title">Очередь</h2>
-        <ul id="queue-popup-list" class="queue-popup-list"></ul>
-        <p id="queue-popup-empty" class="queue-popup-empty" hidden>Очередь пуста</p>
+        <button type="button" id="queue-collapse-btn" class="queue-collapse-btn" aria-expanded="true" aria-controls="queue-collapse-body">
+          <span id="queue-popup-title" class="queue-popup-title">Очередь</span>
+          <i class="fas fa-chevron-down" aria-hidden="true"></i>
+        </button>
+        <div id="queue-collapse-body" class="queue-collapse-body">
+          <ul id="queue-popup-list" class="queue-popup-list"></ul>
+          <p id="queue-popup-empty" class="queue-popup-empty" hidden>Очередь пуста</p>
+        </div>
       </div>
       <button type="button" id="queue-popup-close" class="queue-popup-close" title="Закрыть">
         <i class="fas fa-times"></i>
@@ -177,6 +182,10 @@
   </div>
 
   <span id="background-date" class="background-date" hidden></span>
+
+  <button type="button" id="queue-view-btn" class="queue-view-btn" title="Плеер и очередь" hidden>
+    <i class="fas fa-list"></i>
+  </button>
 
   <button type="button" id="refresh-btn" class="stream-refresh-btn" title="Обновить поток" hidden>
     <i class="fas fa-sync-alt"></i>
@@ -201,18 +210,19 @@
 
     <div class="player-bar-center">
       <div class="player-controls">
+        <div class="player-controls-leading">
+          <button type="button" id="loop-track-btn" class="control-btn loop-track-btn" title="Повтор" hidden>
+            <i id="loop-track-icon" class="fas fa-repeat"></i>
+          </button>
+        </div>
         <button type="button" id="play-pause-btn" class="control-btn play-pause-btn" disabled>
           <i id="play-pause-icon" class="fas fa-play"></i>
         </button>
-        <button type="button" id="next-track-btn" class="control-btn" title="Следующий трек" hidden>
-          <i id="next-track-icon" class="fas fa-forward-step"></i>
-        </button>
-        <button type="button" id="loop-track-btn" class="control-btn loop-track-btn" title="Повтор" hidden>
-          <i id="loop-track-icon" class="fas fa-repeat"></i>
-        </button>
-        <button type="button" id="queue-view-btn" class="control-btn queue-view-btn" title="Плеер и очередь" hidden>
-          <i class="fas fa-list"></i>
-        </button>
+        <div class="player-controls-trailing">
+          <button type="button" id="next-track-btn" class="control-btn" title="Следующий трек" hidden>
+            <i id="next-track-icon" class="fas fa-forward-step"></i>
+          </button>
+        </div>
       </div>
       <div id="track-progress" class="track-progress" hidden>
         <span id="track-position">0:00</span>

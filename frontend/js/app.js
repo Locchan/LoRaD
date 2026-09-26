@@ -372,6 +372,20 @@
     if (showQueue) renderQueuePopupList();
   }
 
+  function setQueueCollapsed(collapsed) {
+    const section = $("queue-section");
+    const btn = $("queue-collapse-btn");
+    if (!section || !btn) return;
+    section.classList.toggle("collapsed", collapsed);
+    btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  }
+
+  function toggleQueueCollapsed() {
+    const section = $("queue-section");
+    if (!section || section.hidden) return;
+    setQueueCollapsed(!section.classList.contains("collapsed"));
+  }
+
   function renderQueuePopupList() {
     const list = $("queue-popup-list");
     const empty = $("queue-popup-empty");
@@ -422,6 +436,7 @@
   }
 
   function openQueuePopup() {
+    setQueueCollapsed(false);
     syncQueueSection();
     setHidden($("queue-popup"), false);
   }
@@ -937,6 +952,7 @@
     $("like-track-btn").addEventListener("click", toggleLike);
     $("loop-track-btn").addEventListener("click", toggleLoop);
     $("queue-view-btn").addEventListener("click", openQueuePopup);
+    $("queue-collapse-btn").addEventListener("click", toggleQueueCollapsed);
     $("queue-popup-close").addEventListener("click", closeQueuePopup);
     $("queue-popup-list").addEventListener("click", (event) => {
       const button = event.target.closest("[data-queue-index]");
