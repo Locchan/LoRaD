@@ -61,9 +61,8 @@ def get_username_from_headers(headers):
 
 def hash_password(password):
     from purest.auth.hashing import hash_password as _hash
-    from lorad.api.auth_backend import PASSWORD_SALT
 
-    return _hash(password, PASSWORD_SALT)
+    return _hash(password)
 
 def thread_alive(thread_name):
     for thread in threading.enumerate():

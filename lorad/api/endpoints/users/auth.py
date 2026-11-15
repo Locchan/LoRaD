@@ -1,5 +1,5 @@
-import inspect
-from lorad.api.orm import Token, User
+from lorad.api.orm.Token import gen_token
+from lorad.api.orm.User import user_login
 from lorad.api.utils.decorators import lrd_api_endp, lrd_validate
 import lorad.common.utils.globs as globs
 from lorad.common.utils.logger import get_logger
@@ -25,15 +25,9 @@ def validate(headers, data):
 @lrd_validate(validate_func=validate)
 @lrd_api_endp
 def impl_POST(headers, data):
-    login_result = User.user_login(data['username'], data["password"])
-    if login_result == globs.LOGIN_NO_SUCH_USER:
-        logger.info(f"Attempt to log in as {data['username']} failed: No such user.")
-        return (401, {"error": "Login failed"})
-    if login_result == globs.LOGIN_INCORRECT_PASSWORD:
-        logger.info(f"Attempt to log in as {data['username']} failed: Incorrect password.")
-        return (401, {"error": "Login failed"})
-    if login_result == globs.LOGIN_SUCCESS:
-        logger.info(f"{data['username']} logged in.")
-        return {"token": Token.gen_token(data['username'])}
-    logger.error(f"Attempt to log in as {data['username']} failed: Invalid response from login method.")
-    return (401, {"error": "Login failed"})
+    login_result = user_login(data['username'], data["password"])
+    if login_result != globs.LOGIN_SUCCESS:
+        logger.info(f"Attempt to log in as {data['username']} failed.")
+        return (401, {"error": "Authentication failed"})
+    logger.info(f"{data['username']} logged in.")
+    return {"token": gen_token(data['username'])}

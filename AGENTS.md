@@ -272,7 +272,7 @@ Yandex station list always injects those two synthetic ids first (`Моя вол
 
 Always `with MySQL.get_session() as session:`. Handle `IntegrityError` for the news unique constraint. Do not add a second engine.
 
-Passwords are SHA-512 with a hardcoded salt in `lorad/api/auth_backend.py` (`PASSWORD_SALT`). Do not change the salt; existing rows would break.
+Passwords use purest scrypt (`hash_password`). Existing SHA-512 rows still verify via `legacy_salt` (`PASSWORD_SALT` in `lorad/api/auth_backend.py`) and are upgraded to scrypt on successful login. Do not change the legacy salt.
 
 ## Localization
 
