@@ -5,10 +5,11 @@ LoRaD is a self-hosted internet radio: it muxes downloaded tracks and/or live ra
 ## Stack
 
 - Python `>3.10,<3.14`, packaged with Poetry (`pyproject.toml`, package `lorad`). Images use 3.12. The locked `openai`/`pydantic-core` stack has no 3.14 wheels.
+- REST/WebSocket harness lives in the `purest` git submodule (path dep). LoRaD owns endpoints, Immich, and MySQL auth models that extend purest mixins.
 - No web framework. Three stdlib HTTP servers:
   - radio stream: `ThreadingHTTPServer` (`lorad/audio/server/AudioStream.py`)
-  - REST API: non-threaded `HTTPServer` (`lorad/api/LoRadAPISrv.py`)
-  - WebSocket API: threaded `HTTPServer` on `REST.WS_LISTEN_PORT`
+  - REST API: non-threaded `HTTPServer` via purest (`lorad/api/LoRadAPISrv.py` configures and starts it)
+  - WebSocket API: threaded `HTTPServer` on `REST.WS_LISTEN_PORT` (purest)
 - Threads, not asyncio. Fatal failures call `os._exit`
 - SQLAlchemy 2.x + PyMySQL (`mapped_column` / `Mapped[...]`)
 - ffmpeg on PATH (transcode, re-encode, concat). Required at runtime; Alpine images install it in the install scripts
@@ -20,6 +21,7 @@ Version is `pyproject.toml` plus commit count. Runtime version is `/version` (Do
 
 ```
 lorad_main.py                 # process entry; starts threads
+purest/                       # git submodule: REST/WS harness + auth ABC
 lorad/
   common/                     # config, logger, globs, locale, MySQL, shm
   audio/
@@ -31,14 +33,14 @@ lorad/
     file_sources/             # FileRide providers (YaMu)
     programs/                 # scheduled shows (NewsSmall)
     utils/ffmpeg_utils.py     # file re-encode / concat helpers
-  api/                        # REST server, endpoints, user/token ORM
+  api/                        # LoRaD adapters, endpoints, MySQL auth ORM
 tests/api/                    # live HTTP tests against a running API
-full_install.sh               # Alpine image: poetry build + /usr/bin/lorad
-upgrade_install.sh            # same, force-reinstall wheel
+full_install.sh               # Alpine image: build purest then lorad wheels
+upgrade_install.sh            # same, force-reinstall wheels
 Dockerfile_full / _upgrade    # ports 5475 (stream), 5476 (REST), 5478 (WebSocket)
 ```
 
-Ignore `frontend/` and generated/runtime dirs (`data/`, `temp/`, `dist/`).
+Ignore `frontend/` and generated/runtime dirs (`data/`, `temp/`, `dist/`). Clone with `--recurse-submodules` (or `git submodule update --init`) so `purest/` is present before Docker builds.
 
 ## Boot
 
@@ -186,7 +188,9 @@ SQLAlchemy `News.body_prepared is None` filters in `orm/News.py` are Python `is`
 
 ## REST API
 
-Started by `start_api_server()` on `REST.LISTEN_PORT` (images: 5476). **Not multi-threaded.** Keep handlers short; do not block on downloads or ffmpeg from an endpoint.
+Harness code is the `purest` submodule (`configure` / `serve` / decorators / `AuthBackend`). `start_api_server()` in `lorad/api/LoRadAPISrv.py` wires LoRaD config, logger, feature flags, and `SqlAlchemyAuthBackend`, then starts purest on `REST.LISTEN_PORT` (images: 5476). **Not multi-threaded.** Keep handlers short; do not block on downloads or ffmpeg from an endpoint.
+
+Endpoint modules still use `@lrd_*` aliases from `lorad/api/utils/decorators.py` (re-exports of purest decorators).
 
 WebSocket endpoints (`@lrd_websocket`) bind a second **threaded** `HTTPServer` on `REST.WS_LISTEN_PORT` (images: 5478). REST GETs of those paths return 426.
 
@@ -231,6 +235,8 @@ Rules:
 
 ### Auth
 
+Auth protocol is purest's `AuthBackend`. LoRaD expands it via `lorad/api/auth_backend.py` (`SqlAlchemyAuthBackend` + mixin-based `User`/`Group`/`Token` ORM). Facades `user_login` / `gen_token` / `validate_token` / `check_caps` / etc. still live under `lorad/api/orm/` and delegate to that backend.
+
 `Authorization: <username>, <token>` (comma-separated, not Bearer). Tokens are 32 hex chars in `api_token`, TTL `REST.TOKEN_EXPIRATION_MIN`.
 
 Capabilities (`globs`): `BU` basic, `ADMIN` admin, `ALL` bypasses the check. Stored as a comma-separated string on `api_group`. New users land in group `default` with `BU`.
@@ -266,7 +272,7 @@ Yandex station list always injects those two synthetic ids first (`Моя вол
 
 Always `with MySQL.get_session() as session:`. Handle `IntegrityError` for the news unique constraint. Do not add a second engine.
 
-Passwords are SHA-512 with a hardcoded salt in `hash_password`. Do not change the salt; existing rows would break.
+Passwords are SHA-512 with a hardcoded salt in `lorad/api/auth_backend.py` (`PASSWORD_SALT`). Do not change the salt; existing rows would break.
 
 ## Localization
 
@@ -282,7 +288,7 @@ Passwords are SHA-512 with a hardcoded salt in `hash_password`. Do not change th
 
 ## Docker / install
 
-Images are Alpine Python 3.12. `full_install.sh` / `upgrade_install.sh` build the Poetry wheel, install it, copy `lorad_main.py` to `/usr/bin/lorad`, write `/version`, set timezone `Europe/Minsk`. Third-party imports used at runtime belong in `pyproject.toml` (`requests` already is).
+Images are Alpine Python 3.12. `full_install.sh` / `upgrade_install.sh` build and install the `purest` wheel from the submodule, then the LoRaD wheel, copy `lorad_main.py` to `/usr/bin/lorad`, write `/version`, set timezone `Europe/Minsk`. The Docker build context must include a populated `purest/` submodule. Third-party imports used at runtime belong in `pyproject.toml` (`requests` already is).
 
 ## Conventions
 

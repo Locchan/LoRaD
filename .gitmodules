@@ -1,0 +1,3 @@
+[submodule "purest"]
+	path = purest
+	url = https://github.com/Locchan/purest.git

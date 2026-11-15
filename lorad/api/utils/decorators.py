@@ -1,139 +1,15 @@
-from lorad.api.orm.Token import check_caps, validate_token
-from lorad.common.utils.logger import get_logger
-from lorad.common.utils.misc import read_config
+"""LoRaD aliases for purest decorators (keeps @lrd_* names in endpoints)."""
 
-logger = get_logger()
+from purest.decorators import api_endp as lrd_api_endp
+from purest.decorators import auth as lrd_auth
+from purest.decorators import feat_req as lrd_feat_req
+from purest.decorators import validate as lrd_validate
+from purest.decorators import websocket as lrd_websocket
 
-
-def _inherit_endp_flags(wrapper, wrapped):
-    if getattr(wrapped, "_lrd_websocket", False):
-        wrapper._lrd_websocket = True
-
-###
-#    Preferred decorator order
-#    - @lrd_auth
-#    - @lrd_feat_req
-#    - @lrd_validate
-#    - @lrd_api_endp          # REST
-#    - @lrd_websocket         # instead of lrd_api_endp: impl_GET(headers, ws)
-###
-
-# All decorators that are above @lrd_api_endp should return responses in the raw format
-#  Example: {"rc": "200", "data": {"success": True}}
-# Decorators can return content type if it is not 'application/json' by setting "content-type:
-#  Example: {"rc": "200", "content-type": "text/html", "data": "<html>test</html>"}
-# All decorators below @lrd_api_endp are shielded by @lrd_api_endp's data handler so these can return whatever.
-
-# Makes endpoint inaccessible if a feature (or a range of features) is/are not enabled.
-#  Preferably to be used on top of any other decorators.
-# feat_needed can be a single string or a list of strings.
-# Features are defined in the glob module.
-def lrd_feat_req(feat_needed):
-    def decorator(func):
-        def lrd_wrp_endp(*args, **kwargs):
-            config = read_config()
-            if isinstance(feat_needed, str):
-                if feat_needed in config["ENABLED_FEATURES"]:
-                    return func(*args, **kwargs)
-            elif isinstance(feat_needed, list):
-                for afeature in feat_needed:
-                    if afeature in config["ENABLED_FEATURES"]:
-                        return func(*args, **kwargs)
-            return {"rc": 405, "data": {"error": f"{feat_needed} feature is not enabled. Enable it in order to use this endpoint."}}
-        _inherit_endp_flags(lrd_wrp_endp, func)
-        return lrd_wrp_endp
-    return decorator
-
-# Default wrapper for API endpoints. All endpoints should be decorated with this.
-# Handles errors and responses so that the function can just shit out whatever or crash in any way
-#  and the function will make a valid JSON response out of this.
-def lrd_api_endp(func):
-    def lrd_wrp_endp(*args, **kwargs):
-        try:
-            result = func(*args, **kwargs)
-            if isinstance(result, tuple):
-                return {"rc": result[0], "data": result[1]}
-            elif isinstance(result, dict):
-                if "rc" in result:
-                    return result
-                else:
-                    return {"rc": 200, "data": result}
-            elif isinstance(result, str):
-                return {"rc": 200, "data": result}
-            elif isinstance(result, (bytes, bytearray)):
-                return {"rc": 200, "data": bytes(result), "content-type": "application/octet-stream"}
-            else:
-                return {"rc": 500, "data": {"error": "Incorrect output from the endpoint function."}}
-        except Exception as e:
-            logger.exception(e)
-            return {"rc": 500, "data": {"error": f"Error ({e.__class__.__name__}). Details are in the server log."}}
-    return lrd_wrp_endp
-
-# Validates the input data and returns 400 if the validation does not pass
-# Consumes a validation function which will do the actual validation and return errors.
-#  Note: the good result is 'None', anything else returned by the validation function will mean an error.
-def lrd_validate(validate_func):
-    def decorator(func):
-        def lrd_wrp_endp(*args, **kwargs):
-            validate_error = validate_func(*args, **kwargs)
-            if isinstance(validate_error, dict):
-                if "rc" in validate_error:
-                    return validate_error
-            if validate_error is not None:
-                return {"rc": 400, "data": {"error": validate_error}}
-            else:
-                return func(*args, **kwargs)
-        _inherit_endp_flags(lrd_wrp_endp, func)
-        return lrd_wrp_endp
-    return decorator
-
-# Makes an endpoint require authentication as well as require the authenticated user have some specific capability.
-# Consumes a capability. Capabilities are defined in the glob module.
-def lrd_auth(cap_required):
-    def decorator(func):
-        def lrd_wrp_endp(*args, **kwargs):
-            headers = dict(args[0]._headers)
-            if "Authorization" in headers:
-                auth_split = headers["Authorization"].split(",")
-                if len(auth_split) != 2:
-                    return {"rc": 400, "data": {"error": "Incorrect 'Authorization' header."}}
-                valid = validate_token(auth_split[0].strip(), auth_split[1].strip())
-                if valid:
-                    if check_caps(auth_split[0], cap_required):
-                        return func(*args, **kwargs)
-                    else:
-                        return {"rc": 403, "data": {"error": "Insufficient permissions"}}
-                else:
-                    return {"rc": 401, "data": {"error": "Unauthorized"}}
-            else:
-                return {"rc": 401, "data": {"error": "Unauthorized"}}
-        _inherit_endp_flags(lrd_wrp_endp, func)
-        return lrd_wrp_endp
-    return decorator
-
-
-def lrd_websocket(func):
-    """Upgrade GET to a WebSocket on REST.WS_LISTEN_PORT. Use instead of @lrd_api_endp.
-
-    impl_GET(headers, ws): ws is a lorad.api.utils.websocket.WebSocket.
-    Auth/feature wrappers still run as HTTP before the 101 handshake, so a failed
-    login is a normal 401 JSON response, not a half-open socket.
-    """
-
-    def lrd_wrp_ws(headers, ws=None, *args, **kwargs):
-        if ws is None:
-            return {"rc": 101, "websocket": True}
-        try:
-            func(headers, ws, *args, **kwargs)
-        except Exception as e:
-            logger.exception(e)
-        finally:
-            try:
-                if ws.open:
-                    ws.close()
-            except Exception:
-                pass
-        return {"rc": 101, "websocket": True, "done": True}
-
-    lrd_wrp_ws._lrd_websocket = True
-    return lrd_wrp_ws
+__all__ = [
+    "lrd_api_endp",
+    "lrd_auth",
+    "lrd_feat_req",
+    "lrd_validate",
+    "lrd_websocket",
+]

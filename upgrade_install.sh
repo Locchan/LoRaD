@@ -5,6 +5,7 @@ set -x
 
 apk add ffmpeg
 pip install poetry
+(cd purest && poetry build && pip install --upgrade --no-cache-dir dist/*.whl)
 poetry build
 pip install --upgrade --no-deps --force-reinstall dist/*.whl
 pip install --upgrade dist/*.whl
@@ -14,4 +15,5 @@ ln -sf /usr/share/zoneinfo/Europe/Minsk /etc/localtime
 echo "${VERSION}" > /version
 pip freeze > /packages
 sed -i '/lorad/d' /packages
+sed -i '/purest/d' /packages
 rm -rf /tmp/lorad

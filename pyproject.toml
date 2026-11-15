@@ -17,6 +17,7 @@ google-cloud-texttospeech = "==2.25.0"
 yandex-music = "==2.2.0"
 tzdata = ">=2025.2"
 requests = ">=2.32,<3"
+purest = { path = "purest", develop = true }
 
 [build-system]
 requires = ["poetry-core"]

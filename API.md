@@ -2,6 +2,8 @@
 
 This is the complete HTTP API for the LoRaD backend. The audio stream (`GET /` as `audio/mpeg` on `LISTEN_PORT`, typically 5475) is **not** part of this API.
 
+The HTTP harness (stdlib REST/WebSocket servers, decorators, apidoc/openapi generators, auth ABC) lives in the `purest` submodule. LoRaD registers endpoints and supplies a MySQL-backed `AuthBackend`. Endpoint contract and wire behavior below are unchanged.
+
 Live copies of a thinner catalog also exist at `GET /apidoc` (HTML) and `GET /openapi` (OpenAPI 3.0). Those are generated from endpoint metadata and miss WebSocket protocol, status codes, and feature gates. This file is the source of truth.
 
 ## Servers
