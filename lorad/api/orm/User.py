@@ -1,10 +1,4 @@
-from purest.auth import UserMixin
-
-from lorad.common.database.Base import Base
-
-
-class User(UserMixin, Base):
-    __tablename__ = "api_user"
+from lorad.api.orm import User  # noqa: F401 — model from purest MysqlAuthBackend
 
 
 def user_register(username, password) -> bool:

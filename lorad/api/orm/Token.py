@@ -1,10 +1,4 @@
-from purest.auth import TokenMixin
-
-from lorad.common.database.Base import Base
-
-
-class Token(TokenMixin, Base):
-    __tablename__ = "api_token"
+from lorad.api.orm import Token  # noqa: F401 — model from purest MysqlAuthBackend
 
 
 def gen_token(username):

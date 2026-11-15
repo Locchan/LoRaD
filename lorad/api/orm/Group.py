@@ -1,7 +1,1 @@
-from purest.auth import GroupMixin
-
-from lorad.common.database.Base import Base
-
-
-class Group(GroupMixin, Base):
-    __tablename__ = "api_group"
+from lorad.api.orm import Group  # noqa: F401 — model from purest MysqlAuthBackend

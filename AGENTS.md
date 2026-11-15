@@ -188,7 +188,7 @@ SQLAlchemy `News.body_prepared is None` filters in `orm/News.py` are Python `is`
 
 ## REST API
 
-Harness code is the `purest` submodule (`configure` / `serve` / decorators / `AuthBackend`). `start_api_server()` in `lorad/api/LoRadAPISrv.py` wires LoRaD config, logger, feature flags, and `SqlAlchemyAuthBackend`, then starts purest on `REST.LISTEN_PORT` (images: 5476). **Not multi-threaded.** Keep handlers short; do not block on downloads or ffmpeg from an endpoint.
+Harness code is the `purest` submodule (`configure` / `serve` / decorators / `AuthBackend`). `start_api_server()` in `lorad/api/LoRadAPISrv.py` wires LoRaD config, logger, feature flags, and `MysqlAuthBackend`, then starts purest on `REST.LISTEN_PORT` (images: 5476). **Not multi-threaded.** Keep handlers short; do not block on downloads or ffmpeg from an endpoint.
 
 Endpoint modules still use `@lrd_*` aliases from `lorad/api/utils/decorators.py` (re-exports of purest decorators).
 
@@ -235,7 +235,7 @@ Rules:
 
 ### Auth
 
-Auth protocol is purest's `AuthBackend`. LoRaD expands it via `lorad/api/auth_backend.py` (`SqlAlchemyAuthBackend` + mixin-based `User`/`Group`/`Token` ORM). Facades `user_login` / `gen_token` / `validate_token` / `check_caps` / etc. still live under `lorad/api/orm/` and delegate to that backend.
+Auth protocol is purest's `AuthBackend`. LoRaD uses purest's `MysqlAuthBackend` (`api_user` / `api_group` / `api_token` on LoRaD's `Base`) via `lorad/api/auth_backend.py`. Facades `user_login` / `gen_token` / `validate_token` / `check_caps` / etc. still live under `lorad/api/orm/` and delegate to that backend.
 
 `Authorization: <username>, <token>` (comma-separated, not Bearer). Tokens are 32 hex chars in `api_token`, TTL `REST.TOKEN_EXPIRATION_MIN`.
 
