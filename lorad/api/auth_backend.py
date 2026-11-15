@@ -19,8 +19,8 @@ def get_auth_backend() -> MysqlAuthBackend:
     if _backend is None:
         config = read_config()
         _backend = MysqlAuthBackend(
-            MySQL.get_session,
             Base,
+            session_factory=MySQL.get_session,
             salt=PASSWORD_SALT,
             token_ttl_min=config["REST"]["TOKEN_EXPIRATION_MIN"],
             bypass_cap=globs.CAP_IMBA,

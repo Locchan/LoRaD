@@ -1,4 +1,4 @@
-from lorad.api.orm import Token  # noqa: F401 — model from purest MysqlAuthBackend
+from lorad.api.orm import Token  # noqa: F401 — model from purest create_auth_models
 
 
 def gen_token(username):

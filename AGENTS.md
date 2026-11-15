@@ -235,7 +235,7 @@ Rules:
 
 ### Auth
 
-Auth protocol is purest's `AuthBackend`. LoRaD uses purest's `MysqlAuthBackend` (`api_user` / `api_group` / `api_token` on LoRaD's `Base`) via `lorad/api/auth_backend.py`. Facades `user_login` / `gen_token` / `validate_token` / `check_caps` / etc. still live under `lorad/api/orm/` and delegate to that backend.
+Auth protocol is purest's `AuthBackend`. LoRaD uses purest's `MysqlAuthBackend` / `create_auth_models` (`api_user` / `api_group` / `api_token` on LoRaD's `Base`, host `MySQL.get_session`) via `lorad/api/auth_backend.py`. Facades `user_login` / `gen_token` / `validate_token` / `check_caps` / etc. still live under `lorad/api/orm/` and delegate to that backend.
 
 `Authorization: <username>, <token>` (comma-separated, not Bearer). Tokens are 32 hex chars in `api_token`, TTL `REST.TOKEN_EXPIRATION_MIN`.
 

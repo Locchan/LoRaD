@@ -32,7 +32,7 @@ class MySQL():
         if feature_enabled(globs.FEAT_NEURONEWS):
             from lorad.audio.programs.news.orm.News import News
         if feature_enabled(globs.FEAT_REST):
-            # Binds api_* tables via purest create_mysql_auth_models(Base).
+            # Binds api_* tables via purest create_auth_models(Base).
             from lorad.api.orm import Group, Token, User  # noqa: F401
         Base.metadata.create_all(MySQL.engine)
 
