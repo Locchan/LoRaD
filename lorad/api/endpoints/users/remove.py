@@ -16,7 +16,7 @@ def validate(headers, data):
     for areq in REQUIRED_FIELDS['POST']:
         if areq not in data or areq == "":
             return f"This method requires {REQUIRED_FIELDS['POST']} to be specified."
-    if len(data["username"]) < 3:
+    if len(data["username"]) < 4:
         return "Such user cannot possibly exist"
     return
 

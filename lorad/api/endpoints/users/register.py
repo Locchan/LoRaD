@@ -15,8 +15,8 @@ def validate(headers, data):
     for areq in REQUIRED_FIELDS['POST']:
         if areq not in data or areq == "":
             return f"This method requires {REQUIRED_FIELDS['POST']} to be specified."
-    if len(data["username"]) < 3:
-        return "The username should be at least 3 characters"
+    if len(data["username"]) < 4:
+        return "The username should be at least 4 characters"
     if len(data["password"]) < 8:
         return "The password has to be at least 8 characters"
     return
